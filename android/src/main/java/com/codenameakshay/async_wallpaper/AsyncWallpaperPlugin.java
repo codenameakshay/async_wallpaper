@@ -1,6 +1,7 @@
 package com.codenameakshay.async_wallpaper;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.DownloadManager;
 import android.app.WallpaperManager;
 import android.graphics.Bitmap;
@@ -26,9 +27,11 @@ import com.squareup.picasso.Target;
 import java.io.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 import android.content.Context;
 
@@ -43,13 +46,13 @@ import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 /**
  * AsyncWallpaperPlugin
  */
-public class AsyncWallpaperPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
+public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, MethodCallHandler, ActivityAware {
     /// The MethodChannel that will the communication between Flutter and native Android
     ///
     /// This local reference serves to register the plugin with the Flutter Engine and unregister it
     /// when the Flutter Engine is detached from the Activity
     private MethodChannel channel;
-    private Context context;
+    public static Context context;
     private Activity activity;
     public static MethodChannel.Result res;
 
@@ -144,6 +147,7 @@ public class AsyncWallpaperPlugin implements FlutterPlugin, MethodCallHandler, A
     public void onDetachedFromActivityForConfigChanges() {
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
         res = result;
@@ -196,8 +200,46 @@ public class AsyncWallpaperPlugin implements FlutterPlugin, MethodCallHandler, A
             Picasso.get().load("file://" + url).into(target3);
             // result.success(1);
 
+        } else if (call.method.equals("set_video_wallpaper")) {
+            String url = call.argument("url"); // .argument returns the correct type
+            android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
+            // Picasso.get().load("file://" + url).into(target3);
+            copyFile(new File(url), new File(activity.getFilesDir().toPath() + "/file.mp4"));
+            VideoLiveWallpaper mVideoLiveWallpaper = new VideoLiveWallpaper();
+            mVideoLiveWallpaper.setToWallPaper(context);
+            result.success(true);
+
         } else {
             result.notImplemented();
+        }
+    }
+
+    public void copyFile(File fromFile, File toFile) {
+        FileInputStream fileInputStream = null;
+        FileOutputStream fileOutputStream = null;
+        FileChannel fileChannelInput = null;
+        FileChannel fileChannelOutput = null;
+        try {
+            fileInputStream = new FileInputStream(fromFile);
+            fileOutputStream = new FileOutputStream(toFile);
+            fileChannelInput = fileInputStream.getChannel();
+            fileChannelOutput = fileOutputStream.getChannel();
+            fileChannelInput.transferTo(0, fileChannelInput.size(), fileChannelOutput);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (fileInputStream != null)
+                    fileInputStream.close();
+                if (fileChannelInput != null)
+                    fileChannelInput.close();
+                if (fileOutputStream != null)
+                    fileOutputStream.close();
+                if (fileChannelOutput != null)
+                    fileChannelOutput.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 

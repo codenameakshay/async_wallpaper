@@ -74,4 +74,17 @@ class AsyncWallpaper {
     /// Function returns the set String as result, use for debugging
     return result ? 'Wallpaper set' : 'There was an error.';
   }
+
+  /// Function takes input live file path, and shows live wallpaper activity
+  static Future<String> setLiveWallpaper(
+    String filePath,
+  ) async {
+    /// Variable to store operation result
+    bool result = false;
+    result =
+        await (_channel.invokeMethod('set_video_wallpaper', {'url': filePath}));
+
+    /// Function returns the set String as result, use for debugging
+    return result ? 'Wallpaper set' : 'There was an error.';
+  }
 }

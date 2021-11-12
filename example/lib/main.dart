@@ -24,7 +24,10 @@ class _MyAppState extends State<MyApp> {
   String _wallpaperUrlHome = 'Unknown';
   String _wallpaperUrlLock = 'Unknown';
   String _wallpaperUrlBoth = 'Unknown';
+  String _liveWallpaper = 'Unknown';
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
+  String live_url =
+      'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   @override
   void initState() {
@@ -201,6 +204,32 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  // Platform messages are asynchronous, so we initialize in an async method.
+  Future<void> setLiveWallpaper() async {
+    setState(() {
+      _liveWallpaper = 'Loading';
+    });
+    String result;
+    var file = await DefaultCacheManager().getSingleFile(live_url);
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    try {
+      result = await AsyncWallpaper.setLiveWallpaper(
+        file.path,
+      );
+    } on PlatformException {
+      result = 'Failed to get wallpaper.';
+    }
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+
+    setState(() {
+      _liveWallpaper = result;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -266,6 +295,15 @@ class _MyAppState extends State<MyApp> {
             ),
             Center(
               child: Text('Wallpaper status: $_wallpaperUrlBoth\n'),
+            ),
+            ElevatedButton(
+              onPressed: setLiveWallpaper,
+              child: _liveWallpaper == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set live wallpaper'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_liveWallpaper\n'),
             ),
           ],
         ),

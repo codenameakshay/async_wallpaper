@@ -1,5 +1,5 @@
 name: async_wallpaper
-description: A new flutter plugin project.
+description: Set wallpapers on Android asynchronously. Also supports video live wallpapers.
 version: 1.0.0
 homepage: https://github.com/codenameakshay/async_wallpaper
 

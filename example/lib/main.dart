@@ -26,7 +26,7 @@ class _MyAppState extends State<MyApp> {
   String _wallpaperUrlBoth = 'Unknown';
   String _liveWallpaper = 'Unknown';
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
-  String live_url =
+  String liveUrl =
       'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   @override
@@ -210,7 +210,7 @@ class _MyAppState extends State<MyApp> {
       _liveWallpaper = 'Loading';
     });
     String result;
-    var file = await DefaultCacheManager().getSingleFile(live_url);
+    var file = await DefaultCacheManager().getSingleFile(liveUrl);
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setLiveWallpaper(

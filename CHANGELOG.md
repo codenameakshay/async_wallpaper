@@ -1,3 +1,5 @@
-## 0.0.1
+## 1.0.0
 
-* TODO: Describe initial release.
+* Initial release
+* Supports setting wallpaper from file/url
+* Supports video live wallpapers (.mp4)

@@ -35,7 +35,11 @@ and the Flutter guide for
   </a>
 </p><br>
 
-![Example](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/demo.gif) ![Example App](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/image.jpg)
+ 
+
+| ![Example](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/demo.gif)  | ![Example App](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/image.jpg)  |
+|---|---|
+|  **Example in another app** |  **Example app screenshot** |
 ## Features
 The package allows you to set wallpaper on your Android device asynchronously, in the following ways.
 

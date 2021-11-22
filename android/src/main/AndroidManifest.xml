@@ -14,7 +14,8 @@
             android:name=".VideoLiveWallpaper"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_WALLPAPER"
-            android:process=":wallpaper">
+            android:process=":wallpaper"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>

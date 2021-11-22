@@ -29,7 +29,7 @@ and the Flutter guide for
     <img src="https://img.shields.io/github/license/aagarwal1012/animated-text-kit?color=red"
       alt="License: MIT" />
   </a>
-  <a href="https://www.paypal.me/akshaymaurya3006">
+  <a href="https://www.paypal.me/codenameakshay">
     <img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal"
       alt="Donate" />
   </a>

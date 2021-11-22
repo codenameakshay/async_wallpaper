@@ -1,3 +1,8 @@
+## 1.0.1
+
+* Add support for Android 12
+* Fixed documentation
+
 ## 1.0.0+1
 
 * Fixed documentation

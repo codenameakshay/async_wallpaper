@@ -270,7 +270,9 @@ class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean>
                     Uri contentURI = getImageContentUri(mContext, finalFile.getAbsolutePath());
                     Log.i("Arguments ", "configureFlutterEngine: " + "Opening crop intent");
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                        mContext.startActivity(wallpaperManager.getCropAndSetWallpaperIntent(contentURI));
+                        final Intent intentCrop = new wallpaperManager.getCropAndSetWallpaperIntent(contentURI);
+                        intentCrop.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        mContext.startActivity(intentCrop);
                     }
                     // wallpaperManager.setBitmap(pairs[0].first);
                 } catch (Exception ex) {

@@ -49,6 +49,26 @@ class AsyncWallpaper {
     return result ? 'Wallpaper set' : 'There was an error.';
   }
 
+  /// Function takes input url's image, and opens wallpaper apply intent
+  static Future<String> setWallpaperNative(String url) async {
+    /// Variable to store operation result
+    bool result = false;
+    result = await (_channel.invokeMethod('set_wallpaper', {'url': url}));
+
+    /// Function returns the set String as result, use for debugging
+    return result ? 'Wallpaper set' : 'There was an error.';
+  }
+
+  /// Function takes input image file path, and opens wallpaper apply intent
+  static Future<String> setWallpaperFromFileNative(String url) async {
+    /// Variable to store operation result
+    bool result = false;
+    result = await (_channel.invokeMethod('set_wallpaper_file', {'url': url}));
+
+    /// Function returns the set String as result, use for debugging
+    return result ? 'Wallpaper set' : 'There was an error.';
+  }
+
   /// Function takes input image's file path & location choice, and applies wallpaper depending on location choice
   static Future<String> setWallpaperFromFile(
       String filePath, int wallpaperLocation) async {

@@ -109,6 +109,7 @@ class AsyncWallpaper {
     // The paramters for the method call
     final options = {
       'url': url,
+      'goToHome': goToHome,
     };
 
     result = await _channel.invokeMethod(
@@ -133,6 +134,7 @@ class AsyncWallpaper {
     // The paramters for the method call
     final options = {
       'url': filePath,
+      'goToHome': goToHome,
     };
 
     result = await _channel.invokeMethod(

@@ -24,7 +24,7 @@ public class VideoLiveWallpaper extends WallpaperService {
     public static final boolean ACTION_MUSIC_UNMUTE = false;
     public static final boolean ACTION_MUSIC_MUTE = true;
 
-    public static void setToWallPaper(Context context) {
+    public static void setToWallPaper(Context context, boolean goToHome) {
         // android.util.Log.i("Arguments ",videoPath);
         // if(AsyncWallpaperPlugin.sVideoPath!=null){
         // android.util.Log.i("Arguments ",AsyncWallpaperPlugin.sVideoPath);
@@ -37,6 +37,12 @@ public class VideoLiveWallpaper extends WallpaperService {
         context.startActivity(intent);
         try {
             WallpaperManager.getInstance(context).clear();
+            if(goToHome) {
+                Intent intent2 = new Intent(Intent.ACTION_MAIN);
+                intent2.addCategory(Intent.CATEGORY_HOME);
+                intent2.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }

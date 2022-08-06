@@ -28,12 +28,14 @@ class _MyAppState extends State<MyApp> {
   String _wallpaperUrlBoth = 'Unknown';
   String _liveWallpaper = 'Unknown';
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
-  String liveUrl =
-      'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+  String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+
+  late bool goToHome;
 
   @override
   void initState() {
     super.initState();
+    goToHome = false;
     initPlatformState();
   }
 
@@ -43,8 +45,7 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion =
-          await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
+      platformVersion = await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -69,8 +70,11 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setWallpaperFromFileNative(
-        file.path,
-      );
+        filePath: file.path,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -95,7 +99,12 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.HOME_SCREEN);
+        filePath: file.path,
+        wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -120,7 +129,12 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.LOCK_SCREEN);
+        filePath: file.path,
+        wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -145,7 +159,12 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.BOTH_SCREENS);
+        filePath: file.path,
+        wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -169,8 +188,11 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setWallpaperNative(
-        url,
-      );
+        url: url,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -193,8 +215,13 @@ class _MyAppState extends State<MyApp> {
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
-      result =
-          await AsyncWallpaper.setWallpaper(url, AsyncWallpaper.HOME_SCREEN);
+      result = await AsyncWallpaper.setWallpaper(
+        url: url,
+        wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -217,8 +244,13 @@ class _MyAppState extends State<MyApp> {
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
-      result =
-          await AsyncWallpaper.setWallpaper(url, AsyncWallpaper.LOCK_SCREEN);
+      result = await AsyncWallpaper.setWallpaper(
+        url: url,
+        wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -241,8 +273,13 @@ class _MyAppState extends State<MyApp> {
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
-      result =
-          await AsyncWallpaper.setWallpaper(url, AsyncWallpaper.BOTH_SCREENS);
+      result = await AsyncWallpaper.setWallpaper(
+        url: url,
+        wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -267,8 +304,11 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     try {
       result = await AsyncWallpaper.setLiveWallpaper(
-        file.path,
-      );
+        filePath: file.path,
+        goToHome: goToHome,
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
     } on PlatformException {
       result = 'Failed to get wallpaper.';
     }
@@ -297,6 +337,14 @@ class _MyAppState extends State<MyApp> {
               Center(
                 child: Text('Running on: $_platformVersion\n'),
               ),
+              SwitchListTile(
+                  title: const Text('Go to home'),
+                  value: goToHome,
+                  onChanged: (value) {
+                    setState(() {
+                      goToHome = value;
+                    });
+                  }),
               ElevatedButton(
                 onPressed: setWallpaperFromFileNative,
                 child: _wallpaperFileNative == 'Loading'
@@ -371,9 +419,8 @@ class _MyAppState extends State<MyApp> {
               ),
               ElevatedButton(
                 onPressed: setLiveWallpaper,
-                child: _liveWallpaper == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set live wallpaper'),
+                child:
+                    _liveWallpaper == 'Loading' ? const CircularProgressIndicator() : const Text('Set live wallpaper'),
               ),
               Center(
                 child: Text('Wallpaper status: $_liveWallpaper\n'),

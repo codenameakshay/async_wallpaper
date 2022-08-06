@@ -1,26 +1,32 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.codenameakshay.async_wallpaper">
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.codenameakshay.async_wallpaper">
 
-  <uses-permission android:name="android.permission.INTERNET" />
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-  <uses-permission android:name="android.permission.SET_WALLPAPER" />
-  <uses-feature
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
+    <uses-feature
         android:name="android.software.live_wallpaper"
-        android:required="true"></uses-feature>
-  <application
-        android:allowBackup="true">
-    <service
+        android:required="true" />
+
+    <application android:allowBackup="true">
+
+        <service
             android:name=".VideoLiveWallpaper"
+            android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_WALLPAPER"
-            android:process=":wallpaper"
-            android:exported="true">
+            android:process=":wallpaper">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>
+
             <meta-data
                 android:name="android.service.wallpaper"
                 android:resource="@xml/livewallpaper" />
         </service>
-  </application>
+    </application>
+
 </manifest>

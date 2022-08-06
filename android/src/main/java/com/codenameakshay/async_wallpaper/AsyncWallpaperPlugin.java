@@ -2,46 +2,41 @@ package com.codenameakshay.async_wallpaper;
 
 import android.app.Activity;
 import android.app.Application;
-import android.app.DownloadManager;
 import android.app.WallpaperManager;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Environment;
 import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Pair;
-import android.net.Uri;
-import android.content.ContentValues;
-import android.content.*;
-import android.database.Cursor;
-import android.provider.MediaStore;
-import android.view.View;
-import android.widget.ImageButton;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import com.squareup.picasso.Picasso;
-import com.squareup.picasso.Target;
-
-import java.io.*;
-import java.io.File;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
-import android.content.Context;
+import com.squareup.picasso.Picasso;
+import com.squareup.picasso.Target;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 
 /**
  * AsyncWallpaperPlugin
@@ -55,6 +50,9 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
     public static Context context;
     private Activity activity;
     public static MethodChannel.Result res;
+
+    private boolean redirectToLiveWallpaper;
+    private boolean goToHome;
 
     private Target target = new Target() {
         @Override
@@ -126,6 +124,8 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
         channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "async_wallpaper");
         channel.setMethodCallHandler(this);
         context = flutterPluginBinding.getApplicationContext();
+        redirectToLiveWallpaper = false;
+        goToHome = false;
     }
 
     @Override
@@ -134,6 +134,9 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
 
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding flutterPluginBinding) {
+        if (redirectToLiveWallpaper && goToHome) {
+            home();
+        }
     }
 
 
@@ -147,6 +150,15 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
     public void onDetachedFromActivityForConfigChanges() {
     }
 
+    public void home() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_HOME);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+        }
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
@@ -155,56 +167,72 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             result.success("Android " + android.os.Build.VERSION.RELEASE);
         } else if (call.method.equals("set_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target);
             // result.success(1);
         } else if (call.method.equals("set_wallpaper_file")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load("file://" + url).into(target);
             // result.success(1);
 
         } else if (call.method.equals("set_lock_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target1);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_home_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target2);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_both_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target3);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_lock_wallpaper_file")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load("file://" + url).into(target1);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_home_wallpaper_file")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load("file://" + url).into(target2);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_both_wallpaper_file")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load("file://" + url).into(target3);
+            if (goToHome) home();
             // result.success(1);
 
         } else if (call.method.equals("set_video_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             // Picasso.get().load("file://" + url).into(target3);
             copyFile(new File(url), new File(activity.getFilesDir().toPath() + "/file.mp4"));
+            redirectToLiveWallpaper = false;
             VideoLiveWallpaper mVideoLiveWallpaper = new VideoLiveWallpaper();
             mVideoLiveWallpaper.setToWallPaper(context);
             result.success(true);
@@ -270,12 +298,18 @@ class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean>
                     Uri contentURI = getImageContentUri(mContext, finalFile.getAbsolutePath());
                     Log.i("Arguments ", "configureFlutterEngine: " + "Opening crop intent");
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-//                        final Intent intentCrop = wallpaperManager.getCropAndSetWallpaperIntent(contentURI);
-//                        intentCrop.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        mContext.startActivity(wallpaperManager.getCropAndSetWallpaperIntent(contentURI).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        final Intent intentCrop = wallpaperManager.getCropAndSetWallpaperIntent(contentURI);
+                        intentCrop.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        mContext.startActivity(intentCrop);
+                    } else {
+                        wallpaperManager.setBitmap(pairs[0].first);
                     }
-                    // wallpaperManager.setBitmap(pairs[0].first);
                 } catch (Exception ex) {
+                    try {
+                        wallpaperManager.setBitmap(pairs[0].first);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     ex.printStackTrace();
                     return false;
                 }

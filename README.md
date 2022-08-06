@@ -15,7 +15,6 @@ and the Flutter guide for
 
 <p align="center">A flutter package which contains a collection of some functions to set wallpaper on your Android device asynchronously. With this plugin you can also set video live wallpapers (.mp4) natively.</p><br>
 
-
 <p align="center">
   <a href="https://flutter.dev">
     <img src="https://img.shields.io/badge/Platform-Flutter-02569B?logo=flutter"
@@ -35,18 +34,19 @@ and the Flutter guide for
   </a>
 </p><br>
 
- 
-
 | ![Example](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/demo.gif)  | ![Example App](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/image.jpg)  |
 |---|---|
 |  **Example in another app** |  **Example app screenshot** |
+
 ## Features
+
 The package allows you to set wallpaper on your Android device asynchronously, in the following ways.
 
- - Set wallpaper from a file path
- - Set wallpaper from a URL
- - Set wallpaper from a video file (file path)
- - Can select locations (HOME, LOCK, BOTH)
+- Set wallpaper from a file path
+- Set wallpaper from a URL
+- Set wallpaper from a video file (file path)
+- Can select locations (HOME, LOCK, BOTH)
+- Minimise your app and go to Android home screen
 
 ## Installing
 
@@ -56,7 +56,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  async_wallpaper: ^1.0.0
+  async_wallpaper: ^2.0.0
 ```
 
 ### 2. Install it
@@ -65,14 +65,14 @@ You can install packages from the command line:
 
 with `pub`:
 
-```
-$ pub get
+```bash
+pub get
 ```
 
 with `Flutter`:
 
-```
-$ flutter pub get
+```bash
+flutter pub get
 ```
 
 ### 3. Import it
@@ -90,14 +90,20 @@ When you want to set wallpaper simply use it like:
 
 ```dart
 await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.HOME_SCREEN);
+    filePath: file.path,
+    wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+    goToHome: goToHome,
+);
 ```
 
-It needs two positional arguments - 
+It needs three arguments -
+
 - `filePath` – the path of the file to set as wallpaper
 - `wallpaperLocation` – the location where you want to set the wallpaper
+- `goToHome` – a bool, which redirects your app to home screen when wallpaper is set
 
-AsyncWallpaper has three locations predefined - 
+AsyncWallpaper has three locations predefined -
+
 - `HOME_SCREEN` – set wallpaper on home screen
 - `LOCK_SCREEN` – set wallpaper on lock screen
 - `BOTH_SCREENS` – set wallpaper on both home and lock screen
@@ -117,13 +123,19 @@ It returns the platform version of the device. Useful for all the Android 11, 12
 ## setWallpaperFromFile
 
 Setting wallpaper from a file path, on home screen.
+
 ```dart
 String result;
 var file = await DefaultCacheManager().getSingleFile(url);
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.HOME_SCREEN);
+    filePath: file.path,
+    wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -131,13 +143,19 @@ try {
 ```
 
 Setting wallpaper from a file path, on lock screen.
+
 ```dart
 String result;
 var file = await DefaultCacheManager().getSingleFile(url);
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.LOCK_SCREEN);
+    filePath: file.path,
+    wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -145,13 +163,19 @@ try {
 ```
 
 Setting wallpaper from a file path, on both screens.
+
 ```dart
 String result;
 var file = await DefaultCacheManager().getSingleFile(url);
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaperFromFile(
-          file.path, AsyncWallpaper.BOTH_SCREENS);
+    filePath: file.path,
+    wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -163,12 +187,18 @@ try {
 ## setWallpaper
 
 Setting wallpaper from a url, on home screen.
+
 ```dart
 String result;
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaper(
-          url, AsyncWallpaper.HOME_SCREEN);
+    url: url,
+    wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -176,12 +206,18 @@ try {
 ```
 
 Setting wallpaper from a url, on lock screen.
+
 ```dart
 String result;
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaper(
-          url, AsyncWallpaper.LOCK_SCREEN);
+    url: url,
+    wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -189,17 +225,24 @@ try {
 ```
 
 Setting wallpaper from a url, on both screens.
+
 ```dart
 String result;
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setWallpaper(
-          url, AsyncWallpaper.BOTH_SCREENS);
+    url: url,
+    wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
 
 ```
+
 ## setLiveWallpaper
 
 Setting live wallpaper requires `.mp4` file. Also currently local files are only supported, so download it before calling this function. The method call redirect to native Android live wallpaper setting intent, so no locations are currently supported.
@@ -210,7 +253,11 @@ var file = await DefaultCacheManager().getSingleFile(liveUrl);
 // Platform messages may fail, so we use a try/catch PlatformException.
 try {
     result = await AsyncWallpaper.setLiveWallpaper(
-          file.path);
+    filePath: file.path,
+    goToHome: goToHome,
+    )
+        ? 'Wallpaper set'
+        : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
 }
@@ -224,4 +271,3 @@ try {
 If you encounter any problems feel free to open an [issue](https://github.com/codenameakshay/async_wallpaper/issues/new?template=bug_report.md). If you feel the library is missing a feature, please raise a [ticket](https://github.com/codenameakshay/async_wallpaper/issues/new?template=feature_request.md) on GitHub and I'll look into it. Pull request are also welcome.
 
 See [Contributing.md](https://github.com/codenameakshay/async_wallpaper/blob/master/CONTRIBUTING.md).
-

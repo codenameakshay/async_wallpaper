@@ -2,7 +2,7 @@
 <resources>
     <string name="about">About</string>
     <string name="add_path">Add Video File Path</string>
-    <string name="app_name">Crimson</string>
+    <string name="app_name">Async Wallpaper Plugin</string>
     <string name="apply">Apply</string>
     <string name="choose_video_file">Choose Video File</string>
     <string name="add_video_file_path">Add Video File Path</string>

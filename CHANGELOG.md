@@ -1,3 +1,8 @@
+## 2.0.1
+
+* Add support for Flutter 3.3.3
+* Update dependencies
+
 ## 2.0.0
 
 * Add support for Android 13

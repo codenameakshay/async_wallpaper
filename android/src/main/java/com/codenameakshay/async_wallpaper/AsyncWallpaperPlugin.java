@@ -183,6 +183,11 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target1);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
             if (goToHome) home();
             // result.success(1);
 
@@ -191,6 +196,11 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target2);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
             if (goToHome) home();
             // result.success(1);
 
@@ -199,6 +209,11 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             Picasso.get().load(url).into(target3);
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
             if (goToHome) home();
             // result.success(1);
 

@@ -93,6 +93,8 @@ await AsyncWallpaper.setWallpaperFromFile(
     filePath: file.path,
     wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
 );
 ```
 
@@ -100,7 +102,9 @@ It needs three arguments -
 
 - `filePath` – the path of the file to set as wallpaper
 - `wallpaperLocation` – the location where you want to set the wallpaper
-- `goToHome` – a bool, which redirects your app to home screen when wallpaper is set
+- `goToHome` – a bool, which redirects your app to home screen when wallpaper is set (optional)
+- `toastDetails:` - a `ToastDetails` object, which contains the details of the toast to be shown when wallpaper is set (optional)
+- `errorToastDetails:` - a `ToastDetails` object, which contains the details of the toast to be shown when wallpaper is not set or error (optional)
 
 AsyncWallpaper has three locations predefined -
 
@@ -133,6 +137,8 @@ try {
     filePath: file.path,
     wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -153,6 +159,8 @@ try {
     filePath: file.path,
     wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -173,6 +181,8 @@ try {
     filePath: file.path,
     wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -196,6 +206,8 @@ try {
     url: url,
     wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -215,6 +227,8 @@ try {
     url: url,
     wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -234,6 +248,8 @@ try {
     url: url,
     wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';
@@ -255,6 +271,8 @@ try {
     result = await AsyncWallpaper.setLiveWallpaper(
     filePath: file.path,
     goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
     )
         ? 'Wallpaper set'
         : 'Failed to get wallpaper.';

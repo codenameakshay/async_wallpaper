@@ -72,6 +72,8 @@ class _MyAppState extends State<MyApp> {
       result = await AsyncWallpaper.setWallpaperFromFileNative(
         filePath: file.path,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -102,6 +104,8 @@ class _MyAppState extends State<MyApp> {
         filePath: file.path,
         wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -132,6 +136,8 @@ class _MyAppState extends State<MyApp> {
         filePath: file.path,
         wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -162,6 +168,8 @@ class _MyAppState extends State<MyApp> {
         filePath: file.path,
         wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -190,6 +198,8 @@ class _MyAppState extends State<MyApp> {
       result = await AsyncWallpaper.setWallpaperNative(
         url: url,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -219,6 +229,8 @@ class _MyAppState extends State<MyApp> {
         url: url,
         wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -248,6 +260,8 @@ class _MyAppState extends State<MyApp> {
         url: url,
         wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -277,6 +291,8 @@ class _MyAppState extends State<MyApp> {
         url: url,
         wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';
@@ -306,6 +322,8 @@ class _MyAppState extends State<MyApp> {
       result = await AsyncWallpaper.setLiveWallpaper(
         filePath: file.path,
         goToHome: goToHome,
+        toastDetails: ToastDetails.success(),
+        errorToastDetails: ToastDetails.error(),
       )
           ? 'Wallpaper set'
           : 'Failed to get wallpaper.';

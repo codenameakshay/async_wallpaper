@@ -1,3 +1,8 @@
+## 2.0.2
+
+* Add fluttertoast package to show success/failure toasts
+* Add timeout of 2 seconds in goToHome method to prevent it looking like a crash
+
 ## 2.0.1
 
 * Add support for Flutter 3.3.3

@@ -2,7 +2,41 @@
 
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+
+class ToastDetails {
+  final String message;
+  final Color? backgroundColor;
+  final double? fontSize;
+  final ToastGravity? gravity;
+  final Color? textColor;
+  final Toast? toastLength;
+
+  ToastDetails({
+    required this.message,
+    this.backgroundColor,
+    this.fontSize,
+    this.gravity,
+    this.textColor,
+    this.toastLength,
+  });
+
+  factory ToastDetails.success() {
+    return ToastDetails(
+      message: '😊 Wallpaper applied successfully.',
+      backgroundColor: Colors.green,
+    );
+  }
+
+  factory ToastDetails.error() {
+    return ToastDetails(
+      message: '😢 Wallpaper could not be applied.',
+      backgroundColor: Colors.red,
+    );
+  }
+}
 
 class AsyncWallpaper {
   /// Define channel
@@ -60,6 +94,8 @@ class AsyncWallpaper {
     required String url,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
   }) async {
     /// Variable to store operation result
     bool result = false;
@@ -92,6 +128,28 @@ class AsyncWallpaper {
       options,
     );
 
+    if (toastDetails != null && result) {
+      Fluttertoast.showToast(
+        msg: toastDetails.message,
+        backgroundColor: toastDetails.backgroundColor,
+        fontSize: toastDetails.fontSize,
+        gravity: toastDetails.gravity,
+        textColor: toastDetails.textColor,
+        toastLength: toastDetails.toastLength,
+      );
+    }
+
+    if (errorToastDetails != null && !result) {
+      Fluttertoast.showToast(
+        msg: errorToastDetails.message,
+        backgroundColor: errorToastDetails.backgroundColor,
+        fontSize: errorToastDetails.fontSize,
+        gravity: errorToastDetails.gravity,
+        textColor: errorToastDetails.textColor,
+        toastLength: errorToastDetails.toastLength,
+      );
+    }
+
     /// Function returns the bool result, use for debugging or showing toast message
     return result;
   }
@@ -102,6 +160,8 @@ class AsyncWallpaper {
   static Future<bool> setWallpaperNative({
     required String url,
     bool goToHome = false,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
   }) async {
     /// Variable to store operation result
     bool result = false;
@@ -117,6 +177,28 @@ class AsyncWallpaper {
       options,
     );
 
+    if (toastDetails != null && result) {
+      Fluttertoast.showToast(
+        msg: toastDetails.message,
+        backgroundColor: toastDetails.backgroundColor,
+        fontSize: toastDetails.fontSize,
+        gravity: toastDetails.gravity,
+        textColor: toastDetails.textColor,
+        toastLength: toastDetails.toastLength,
+      );
+    }
+
+    if (errorToastDetails != null && !result) {
+      Fluttertoast.showToast(
+        msg: errorToastDetails.message,
+        backgroundColor: errorToastDetails.backgroundColor,
+        fontSize: errorToastDetails.fontSize,
+        gravity: errorToastDetails.gravity,
+        textColor: errorToastDetails.textColor,
+        toastLength: errorToastDetails.toastLength,
+      );
+    }
+
     /// Function returns the bool result, use for debugging or showing toast message
     return result;
   }
@@ -127,6 +209,8 @@ class AsyncWallpaper {
   static Future<bool> setWallpaperFromFileNative({
     required String filePath,
     bool goToHome = false,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
   }) async {
     /// Variable to store operation result
     bool result = false;
@@ -142,6 +226,28 @@ class AsyncWallpaper {
       options,
     );
 
+    if (toastDetails != null && result) {
+      Fluttertoast.showToast(
+        msg: toastDetails.message,
+        backgroundColor: toastDetails.backgroundColor,
+        fontSize: toastDetails.fontSize,
+        gravity: toastDetails.gravity,
+        textColor: toastDetails.textColor,
+        toastLength: toastDetails.toastLength,
+      );
+    }
+
+    if (errorToastDetails != null && !result) {
+      Fluttertoast.showToast(
+        msg: errorToastDetails.message,
+        backgroundColor: errorToastDetails.backgroundColor,
+        fontSize: errorToastDetails.fontSize,
+        gravity: errorToastDetails.gravity,
+        textColor: errorToastDetails.textColor,
+        toastLength: errorToastDetails.toastLength,
+      );
+    }
+
     /// Function returns the bool result, use for debugging or showing toast message
     return result;
   }
@@ -153,6 +259,8 @@ class AsyncWallpaper {
     required String filePath,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
   }) async {
     /// Variable to store operation result
     bool result = false;
@@ -185,6 +293,28 @@ class AsyncWallpaper {
       options,
     );
 
+    if (toastDetails != null && result) {
+      Fluttertoast.showToast(
+        msg: toastDetails.message,
+        backgroundColor: toastDetails.backgroundColor,
+        fontSize: toastDetails.fontSize,
+        gravity: toastDetails.gravity,
+        textColor: toastDetails.textColor,
+        toastLength: toastDetails.toastLength,
+      );
+    }
+
+    if (errorToastDetails != null && !result) {
+      Fluttertoast.showToast(
+        msg: errorToastDetails.message,
+        backgroundColor: errorToastDetails.backgroundColor,
+        fontSize: errorToastDetails.fontSize,
+        gravity: errorToastDetails.gravity,
+        textColor: errorToastDetails.textColor,
+        toastLength: errorToastDetails.toastLength,
+      );
+    }
+
     /// Function returns the bool result, use for debugging or showing toast message
     return result;
   }
@@ -195,6 +325,8 @@ class AsyncWallpaper {
   static Future<bool> setLiveWallpaper({
     required String filePath,
     bool goToHome = false,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
   }) async {
     /// Variable to store operation result
     bool result = false;
@@ -209,6 +341,28 @@ class AsyncWallpaper {
       _SET_VIDEO_WALLPAPER,
       options,
     );
+
+    if (toastDetails != null && result) {
+      Fluttertoast.showToast(
+        msg: toastDetails.message,
+        backgroundColor: toastDetails.backgroundColor,
+        fontSize: toastDetails.fontSize,
+        gravity: toastDetails.gravity,
+        textColor: toastDetails.textColor,
+        toastLength: toastDetails.toastLength,
+      );
+    }
+
+    if (errorToastDetails != null && !result) {
+      Fluttertoast.showToast(
+        msg: errorToastDetails.message,
+        backgroundColor: errorToastDetails.backgroundColor,
+        fontSize: errorToastDetails.fontSize,
+        gravity: errorToastDetails.gravity,
+        textColor: errorToastDetails.textColor,
+        toastLength: errorToastDetails.toastLength,
+      );
+    }
 
     /// Function returns the bool result, use for debugging or showing toast message
     return result;

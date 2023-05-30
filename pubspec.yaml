@@ -1,6 +1,6 @@
 name: async_wallpaper
 description: Set wallpapers on Android asynchronously. Also supports video live wallpapers. Use this, when you want to set a wallpaper on Android without a delay or blocking your whole app.
-version: 2.0.2
+version: 2.0.3
 homepage: https://hashstudios.dev
 repository: https://github.com/codenameakshay/async_wallpaper
 

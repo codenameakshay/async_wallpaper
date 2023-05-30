@@ -1,3 +1,8 @@
+## 2.0.3
+
+* Fix native external apply methods not working
+* Update dependencies
+
 ## 2.0.2
 
 * Add fluttertoast package to show success/failure toasts

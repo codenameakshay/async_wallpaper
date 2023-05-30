@@ -18,6 +18,7 @@ dependencies:
   async_wallpaper:
     path: ../
   cupertino_icons: ^1.0.2
+  file: ^6.1.4
   flutter:
     sdk: flutter
   flutter_cache_manager: ^3.1.2

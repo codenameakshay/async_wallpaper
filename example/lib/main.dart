@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:async_wallpaper/async_wallpaper.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 void main() {
@@ -27,8 +27,10 @@ class _MyAppState extends State<MyApp> {
   String _wallpaperUrlLock = 'Unknown';
   String _wallpaperUrlBoth = 'Unknown';
   String _liveWallpaper = 'Unknown';
+  String _wallpaperChooser = 'Unknown';
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
-  String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+  String liveUrl =
+      'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   late bool goToHome;
 
@@ -45,7 +47,8 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion = await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
+      platformVersion =
+          await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -341,6 +344,35 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  // Platform messages are asynchronous, so we initialize in an async method.
+  Future<void> openWallpaperChooser() async {
+    setState(() {
+      _wallpaperChooser = 'Loading';
+    });
+    String result;
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    try {
+      result = await AsyncWallpaper.openWallpaperChooser(
+        goToHome: goToHome,
+        toastDetails: ToastDetails.wallpaperChooser(),
+        errorToastDetails: ToastDetails.error(),
+      )
+          ? 'Wallpaper set'
+          : 'Failed to get wallpaper.';
+    } on PlatformException {
+      result = 'Failed to get wallpaper.';
+    }
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+
+    setState(() {
+      _liveWallpaper = result;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -348,103 +380,110 @@ class _MyAppState extends State<MyApp> {
         title: const Text('Plugin example app'),
       ),
       body: SingleChildScrollView(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height,
-          child: Column(
-            children: [
-              Center(
-                child: Text('Running on: $_platformVersion\n'),
-              ),
-              SwitchListTile(
-                  title: const Text('Go to home'),
-                  value: goToHome,
-                  onChanged: (value) {
-                    setState(() {
-                      goToHome = value;
-                    });
-                  }),
-              ElevatedButton(
-                onPressed: setWallpaperFromFileNative,
-                child: _wallpaperFileNative == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from file native'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperFileNative\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperFromFileHome,
-                child: _wallpaperFileHome == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from file home'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperFileHome\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperFromFileLock,
-                child: _wallpaperFileLock == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from file lock'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperFileLock\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperFromFileBoth,
-                child: _wallpaperFileBoth == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from file both'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperFileBoth\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperNative,
-                child: _wallpaperUrlNative == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from Url native'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperUrlNative\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperHome,
-                child: _wallpaperUrlHome == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from Url home'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperUrlHome\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperLock,
-                child: _wallpaperUrlLock == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from Url lock'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperUrlLock\n'),
-              ),
-              ElevatedButton(
-                onPressed: setWallpaperBoth,
-                child: _wallpaperUrlBoth == 'Loading'
-                    ? const CircularProgressIndicator()
-                    : const Text('Set wallpaper from Url both'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_wallpaperUrlBoth\n'),
-              ),
-              ElevatedButton(
-                onPressed: setLiveWallpaper,
-                child:
-                    _liveWallpaper == 'Loading' ? const CircularProgressIndicator() : const Text('Set live wallpaper'),
-              ),
-              Center(
-                child: Text('Wallpaper status: $_liveWallpaper\n'),
-              ),
-            ],
-          ),
+        child: Column(
+          children: [
+            Center(
+              child: Text('Running on: $_platformVersion\n'),
+            ),
+            SwitchListTile(
+                title: const Text('Go to home'),
+                value: goToHome,
+                onChanged: (value) {
+                  setState(() {
+                    goToHome = value;
+                  });
+                }),
+            ElevatedButton(
+              onPressed: setWallpaperFromFileNative,
+              child: _wallpaperFileNative == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from file native'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperFileNative\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperFromFileHome,
+              child: _wallpaperFileHome == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from file home'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperFileHome\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperFromFileLock,
+              child: _wallpaperFileLock == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from file lock'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperFileLock\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperFromFileBoth,
+              child: _wallpaperFileBoth == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from file both'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperFileBoth\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperNative,
+              child: _wallpaperUrlNative == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from Url native'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperUrlNative\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperHome,
+              child: _wallpaperUrlHome == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from Url home'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperUrlHome\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperLock,
+              child: _wallpaperUrlLock == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from Url lock'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperUrlLock\n'),
+            ),
+            ElevatedButton(
+              onPressed: setWallpaperBoth,
+              child: _wallpaperUrlBoth == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set wallpaper from Url both'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperUrlBoth\n'),
+            ),
+            ElevatedButton(
+              onPressed: setLiveWallpaper,
+              child: _liveWallpaper == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Set live wallpaper'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_liveWallpaper\n'),
+            ),
+            ElevatedButton(
+              onPressed: openWallpaperChooser,
+              child: _wallpaperChooser == 'Loading'
+                  ? const CircularProgressIndicator()
+                  : const Text('Open wallpaper chooser'),
+            ),
+            Center(
+              child: Text('Wallpaper status: $_wallpaperChooser\n'),
+            ),
+          ],
         ),
       ),
     );

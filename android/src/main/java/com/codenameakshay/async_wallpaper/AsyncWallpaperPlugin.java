@@ -260,7 +260,15 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             mVideoLiveWallpaper.setToWallPaper(context);
             result.success(true);
 
-        } else {
+        }
+        else if (call.method.equals("open_wallpaper_chooser")) {
+            goToHome = call.argument("goToHome"); // .argument returns the correct type
+            // TODO: Add logic
+            VideoLiveWallpaper mVideoLiveWallpaper = new VideoLiveWallpaper();
+            mVideoLiveWallpaper.openWallpaperChooser(context);
+            result.success(true);
+        }
+        else {
             result.notImplemented();
         }
     }
@@ -377,14 +385,8 @@ class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean>
                 }
                 break;
             }
-
         }
         return true;
-    }
-
-    @Override
-    protected void onCancelled() {
-        super.onCancelled();
     }
 
     @Override

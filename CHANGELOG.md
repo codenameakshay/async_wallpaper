@@ -1,3 +1,10 @@
+## 2.1.0
+
+* Fix Android 14 crash in apply methods
+* Add method to open native wallpaper chooser
+* Update to Flutter v3.22.1
+* Update dependencies
+
 ## 2.0.3
 
 * Fix native external apply methods not working

@@ -46,6 +46,7 @@ The package allows you to set wallpaper on your Android device asynchronously, i
 - Set wallpaper from a URL
 - Set wallpaper from a video file (file path)
 - Can select locations (HOME, LOCK, BOTH)
+- Open native wallpaper chooser
 - Minimise your app and go to Android home screen
 
 ## Installing
@@ -56,7 +57,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  async_wallpaper: ^2.0.0
+  async_wallpaper: ^2.1.0
 ```
 
 ### 2. Install it
@@ -278,6 +279,28 @@ try {
         : 'Failed to get wallpaper.';
 } on PlatformException {
     result = 'Failed to get wallpaper.';
+}
+
+```
+
+## openWallpaperChooser
+
+Opens Android native wallpaper chooser.
+
+```dart
+String result;
+// Platform messages may fail, so we use a try/catch PlatformException.
+try {
+    result = await AsyncWallpaper.openWallpaperChooser(
+    filePath: file.path,
+    goToHome: goToHome,
+    toastDetails: ToastDetails.success(),
+    errorToastDetails: ToastDetails.error(),
+    )
+        ? 'Opened wallpaper chooser'
+        : 'Failed to open wallpaper chooser.';
+} on PlatformException {
+    result = 'Failed to open wallpaper chooser.';
 }
 
 ```

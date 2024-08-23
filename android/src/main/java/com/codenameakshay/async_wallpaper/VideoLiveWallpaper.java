@@ -40,6 +40,17 @@ public class VideoLiveWallpaper extends WallpaperService {
         }
     }
 
+    public static void openWallpaperChooser(Context context) {
+        Intent intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+        try {
+            WallpaperManager.getInstance(context).clear();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public Engine onCreateEngine() {
         return new VideoEngine();

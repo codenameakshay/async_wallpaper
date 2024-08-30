@@ -1,25 +1,71 @@
 import 'dart:async';
 
 import 'package:async_wallpaper/async_wallpaper.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
+// Fictitious brand color.
+const _brandBlue = Color(0xFF1E88E5);
+
 void main() {
-  runApp(const MaterialApp(
-    restorationScopeId: 'async_wallpaper_app',
-    home: MyApp(),
-  ));
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+class MyApp extends StatelessWidget {
+  const MyApp({
+    Key? key,
+  }) : super(key: key);
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return DynamicColorBuilder(
+      builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
+        ColorScheme lightColorScheme;
+        ColorScheme darkColorScheme;
+
+        if (lightDynamic != null && darkDynamic != null) {
+          // On Android S+ devices, use the provided dynamic color scheme.
+          // (Recommended) Harmonize the dynamic color scheme' built-in semantic colors.
+          lightColorScheme = lightDynamic.harmonized();
+
+          // Repeat for the dark color scheme.
+          darkColorScheme = darkDynamic.harmonized();
+        } else {
+          // Otherwise, use fallback schemes.
+          lightColorScheme = ColorScheme.fromSeed(
+            seedColor: _brandBlue,
+          );
+          darkColorScheme = ColorScheme.fromSeed(
+            seedColor: _brandBlue,
+            brightness: Brightness.dark,
+          );
+        }
+
+        return MaterialApp(
+          restorationScopeId: 'async_wallpaper_app',
+          theme: ThemeData(
+            colorScheme: lightColorScheme,
+          ),
+          darkTheme: ThemeData(
+            colorScheme: darkColorScheme,
+          ),
+          home: const HomePage(),
+        );
+      },
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> with RestorationMixin {
+class HomePage extends StatefulWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> with RestorationMixin {
   final RestorableString _platformVersion = RestorableString('Unknown');
   final RestorableString _wallpaperFileNative = RestorableString('Unknown');
   final RestorableString _wallpaperFileHome = RestorableString('Unknown');
@@ -491,7 +537,7 @@ class _MyAppState extends State<MyApp> with RestorationMixin {
   }
 
   @override
-  String? get restorationId => '_MyAppState';
+  String? get restorationId => '_HomePageState';
 
   @override
   void restoreState(RestorationBucket? oldBucket, bool initialRestore) {

@@ -10,6 +10,7 @@ dependencies:
   async_wallpaper:
     path: ../
   cupertino_icons: ^1.0.2
+  dynamic_color: ^1.7.0
   file: ^6.1.4
   flutter:
     sdk: flutter

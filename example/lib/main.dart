@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-// Fictitious brand color.
 const _brandBlue = Color(0xFF1E88E5);
 
 void main() {
@@ -14,43 +13,33 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({
-    Key? key,
-  }) : super(key: key);
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Use DynamicColorBuilder to support Material You theming
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         ColorScheme lightColorScheme;
         ColorScheme darkColorScheme;
 
+        // Use dynamic color scheme if available, otherwise fall back to a generated scheme
         if (lightDynamic != null && darkDynamic != null) {
-          // On Android S+ devices, use the provided dynamic color scheme.
-          // (Recommended) Harmonize the dynamic color scheme' built-in semantic colors.
           lightColorScheme = lightDynamic.harmonized();
-
-          // Repeat for the dark color scheme.
           darkColorScheme = darkDynamic.harmonized();
         } else {
-          // Otherwise, use fallback schemes.
-          lightColorScheme = ColorScheme.fromSeed(
-            seedColor: _brandBlue,
-          );
+          lightColorScheme = ColorScheme.fromSeed(seedColor: _brandBlue);
           darkColorScheme = ColorScheme.fromSeed(
             seedColor: _brandBlue,
             brightness: Brightness.dark,
           );
         }
 
+        // Configure the MaterialApp with themes and home page
         return MaterialApp(
           restorationScopeId: 'async_wallpaper_app',
-          theme: ThemeData(
-            colorScheme: lightColorScheme,
-          ),
-          darkTheme: ThemeData(
-            colorScheme: darkColorScheme,
-          ),
+          theme: ThemeData(colorScheme: lightColorScheme),
+          darkTheme: ThemeData(colorScheme: darkColorScheme),
           home: const HomePage(),
         );
       },
@@ -58,6 +47,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// Main page of the application
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -66,6 +56,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with RestorationMixin {
+  // Restorable state variables for various wallpaper operations
   final RestorableString _platformVersion = RestorableString('Unknown');
   final RestorableString _wallpaperFileNative = RestorableString('Unknown');
   final RestorableString _wallpaperFileHome = RestorableString('Unknown');
@@ -77,10 +68,13 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
   final RestorableString _wallpaperUrlBoth = RestorableString('Unknown');
   final RestorableString _liveWallpaper = RestorableString('Unknown');
   final RestorableString _wallpaperChooser = RestorableString('Unknown');
+
+  // URLs for static and live wallpapers
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
   String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   late bool goToHome;
+  String? _loadingOption;
 
   @override
   void initState() {
@@ -89,6 +83,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     initPlatformState();
   }
 
+  // Initialize platform state
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     String platformVersion;
@@ -110,425 +105,234 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     });
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperFromFileNative() async {
+  // Generic method to set wallpaper and update UI
+  Future<void> setWallpaper(Function wallpaperSetter, RestorableString status, String optionLabel) async {
     setState(() {
-      _wallpaperFileNative.value = 'Loading';
+      _loadingOption = optionLabel;
+      status.value = 'Loading';
     });
+
     String result;
-    var file = await DefaultCacheManager().getSingleFile(url);
-    // Platform messages may fail, so we use a try/catch PlatformException.
     try {
-      result = await AsyncWallpaper.setWallpaperFromFileNative(
-        filePath: file.path,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
+      result = await wallpaperSetter() ? 'Wallpaper set' : 'Failed to set wallpaper.';
     } on PlatformException {
-      result = 'Failed to get wallpaper.';
+      result = 'Failed to set wallpaper.';
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
     if (!mounted) return;
 
     setState(() {
-      _wallpaperFileNative.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperFromFileHome() async {
-    setState(() {
-      _wallpaperFileHome.value = 'Loading';
-    });
-    String result;
-    var file = await DefaultCacheManager().getSingleFile(url);
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaperFromFile(
-        filePath: file.path,
-        wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperFileHome.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperFromFileLock() async {
-    setState(() {
-      _wallpaperFileLock.value = 'Loading';
-    });
-    String result;
-    var file = await DefaultCacheManager().getSingleFile(url);
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaperFromFile(
-        filePath: file.path,
-        wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperFileLock.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperFromFileBoth() async {
-    setState(() {
-      _wallpaperFileBoth.value = 'Loading';
-    });
-    String result;
-    var file = await DefaultCacheManager().getSingleFile(url);
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaperFromFile(
-        filePath: file.path,
-        wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperFileBoth.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperNative() async {
-    setState(() {
-      _wallpaperUrlNative.value = 'Loading';
-    });
-    String result;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaperNative(
-        url: url,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperUrlNative.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperHome() async {
-    setState(() {
-      _wallpaperUrlHome.value = 'Loading';
-    });
-    String result;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaper(
-        url: url,
-        wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperUrlHome.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperLock() async {
-    setState(() {
-      _wallpaperUrlLock.value = 'Loading';
-    });
-    String result;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaper(
-        url: url,
-        wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperUrlLock.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setWallpaperBoth() async {
-    setState(() {
-      _wallpaperUrlBoth.value = 'Loading';
-    });
-    String result;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setWallpaper(
-        url: url,
-        wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _wallpaperUrlBoth.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> setLiveWallpaper() async {
-    setState(() {
-      _liveWallpaper.value = 'Loading';
-    });
-    String result;
-    var file = await DefaultCacheManager().getSingleFile(liveUrl);
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.setLiveWallpaper(
-        filePath: file.path,
-        goToHome: goToHome,
-        toastDetails: ToastDetails.success(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _liveWallpaper.value = result;
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> openWallpaperChooser() async {
-    setState(() {
-      _wallpaperChooser.value = 'Loading';
-    });
-    String result;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      result = await AsyncWallpaper.openWallpaperChooser(
-        goToHome: goToHome,
-        toastDetails: ToastDetails.wallpaperChooser(),
-        errorToastDetails: ToastDetails.error(),
-      )
-          ? 'Wallpaper set'
-          : 'Failed to get wallpaper.';
-    } on PlatformException {
-      result = 'Failed to get wallpaper.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _liveWallpaper.value = result;
+      _loadingOption = null;
+      status.value = result;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Define wallpaper options with their respective functions
+    final List<Map<String, dynamic>> wallpaperOptions = [
+      {
+        'label': 'File Native',
+        'subtitle': 'Set wallpaper using a file on native screen',
+        'onTap': () => setWallpaper(() async {
+              var file = await DefaultCacheManager().getSingleFile(url);
+              return AsyncWallpaper.setWallpaperFromFileNative(
+                filePath: file.path,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperFileNative, 'File Native'),
+        'status': _wallpaperFileNative
+      },
+      {
+        'label': 'File Home',
+        'subtitle': 'Set wallpaper using a file on home screen',
+        'onTap': () => setWallpaper(() async {
+              var file = await DefaultCacheManager().getSingleFile(url);
+              return AsyncWallpaper.setWallpaperFromFile(
+                filePath: file.path,
+                wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperFileHome, 'File Home'),
+        'status': _wallpaperFileHome
+      },
+      {
+        'label': 'File Lock',
+        'subtitle': 'Set wallpaper using a file on lock screen',
+        'onTap': () => setWallpaper(() async {
+              var file = await DefaultCacheManager().getSingleFile(url);
+              return AsyncWallpaper.setWallpaperFromFile(
+                filePath: file.path,
+                wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperFileLock, 'File Lock'),
+        'status': _wallpaperFileLock
+      },
+      {
+        'label': 'File Both',
+        'subtitle': 'Set wallpaper using a file on both screens',
+        'onTap': () => setWallpaper(() async {
+              var file = await DefaultCacheManager().getSingleFile(url);
+              return AsyncWallpaper.setWallpaperFromFile(
+                filePath: file.path,
+                wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperFileBoth, 'File Both'),
+        'status': _wallpaperFileBoth
+      },
+      {
+        'label': 'URL Native',
+        'subtitle': 'Set wallpaper using URL on native screen',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.setWallpaperNative(
+                url: url,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperUrlNative, 'URL Native'),
+        'status': _wallpaperUrlNative
+      },
+      {
+        'label': 'URL Home',
+        'subtitle': 'Set wallpaper using URL on home screen',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.setWallpaper(
+                url: url,
+                wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperUrlHome, 'URL Home'),
+        'status': _wallpaperUrlHome
+      },
+      {
+        'label': 'URL Lock',
+        'subtitle': 'Set wallpaper using URL on lock screen',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.setWallpaper(
+                url: url,
+                wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperUrlLock, 'URL Lock'),
+        'status': _wallpaperUrlLock
+      },
+      {
+        'label': 'URL Both',
+        'subtitle': 'Set wallpaper using URL on both screens',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.setWallpaper(
+                url: url,
+                wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperUrlBoth, 'URL Both'),
+        'status': _wallpaperUrlBoth
+      },
+      {
+        'label': 'Live Wallpaper',
+        'subtitle': 'Set live wallpaper',
+        'onTap': () => setWallpaper(() async {
+              var file = await DefaultCacheManager().getSingleFile(liveUrl);
+              return AsyncWallpaper.setLiveWallpaper(
+                filePath: file.path,
+                goToHome: goToHome,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _liveWallpaper, 'Live Wallpaper'),
+        'status': _liveWallpaper
+      },
+      {
+        'label': 'Wallpaper Chooser',
+        'subtitle': 'Open wallpaper chooser',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.openWallpaperChooser(
+                goToHome: goToHome,
+                toastDetails: ToastDetails.wallpaperChooser(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _wallpaperChooser, 'Wallpaper Chooser'),
+        'status': _wallpaperChooser
+      },
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Plugin example app'),
+        title: const Text('Dynamic Wallpaper App'),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            Center(
-              child: Text('Running on: ${_platformVersion.value}\n'),
-            ),
+            // Switch to toggle 'Go to home' option
             SwitchListTile(
-                title: const Text('Go to home'),
-                value: goToHome,
-                onChanged: (value) {
-                  setState(() {
-                    goToHome = value;
-                  });
-                }),
-            ElevatedButton(
-              onPressed: setWallpaperFromFileNative,
-              child: _wallpaperFileNative.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from file native'),
+              title: const Text('Go to home'),
+              value: goToHome,
+              onChanged: (value) {
+                setState(() {
+                  goToHome = value;
+                });
+              },
             ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperFileNative.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperFromFileHome,
-              child: _wallpaperFileHome.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from file home'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperFileHome.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperFromFileLock,
-              child: _wallpaperFileLock.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from file lock'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperFileLock.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperFromFileBoth,
-              child: _wallpaperFileBoth.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from file both'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperFileBoth.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperNative,
-              child: _wallpaperUrlNative.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from Url native'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperUrlNative.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperHome,
-              child: _wallpaperUrlHome.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from Url home'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperUrlHome.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperLock,
-              child: _wallpaperUrlLock.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from Url lock'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperUrlLock.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setWallpaperBoth,
-              child: _wallpaperUrlBoth.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set wallpaper from Url both'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperUrlBoth.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: setLiveWallpaper,
-              child: _liveWallpaper.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Set live wallpaper'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_liveWallpaper.value}\n'),
-            ),
-            ElevatedButton(
-              onPressed: openWallpaperChooser,
-              child: _wallpaperChooser.value == 'Loading'
-                  ? const CircularProgressIndicator()
-                  : const Text('Open wallpaper chooser'),
-            ),
-            Center(
-              child: Text('Wallpaper status: ${_wallpaperChooser.value}\n'),
+            // Grid of wallpaper options
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 8.0,
+                crossAxisSpacing: 8.0,
+                childAspectRatio: 1.0, // Make buttons square
+                children: wallpaperOptions.map((option) {
+                  return ElevatedButton(
+                    onPressed: _loadingOption == null ? option['onTap'] : null,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                    child: _loadingOption == option['label']
+                        ? const Center(child: CircularProgressIndicator())
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(option['label'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4.0),
+                              Text(
+                                option['subtitle'],
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(height: 8.0),
+                              Text(
+                                option['status'].value,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ),
@@ -536,6 +340,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     );
   }
 
+  // Restoration
   @override
   String? get restorationId => '_HomePageState';
 

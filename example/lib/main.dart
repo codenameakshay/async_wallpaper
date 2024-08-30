@@ -6,7 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 void main() {
-  runApp(const MaterialApp(home: MyApp()));
+  runApp(const MaterialApp(
+    restorationScopeId: 'async_wallpaper_app',
+    home: MyApp(),
+  ));
 }
 
 class MyApp extends StatefulWidget {
@@ -16,21 +19,20 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  String _wallpaperFileNative = 'Unknown';
-  String _wallpaperFileHome = 'Unknown';
-  String _wallpaperFileLock = 'Unknown';
-  String _wallpaperFileBoth = 'Unknown';
-  String _wallpaperUrlNative = 'Unknown';
-  String _wallpaperUrlHome = 'Unknown';
-  String _wallpaperUrlLock = 'Unknown';
-  String _wallpaperUrlBoth = 'Unknown';
-  String _liveWallpaper = 'Unknown';
-  String _wallpaperChooser = 'Unknown';
+class _MyAppState extends State<MyApp> with RestorationMixin {
+  final RestorableString _platformVersion = RestorableString('Unknown');
+  final RestorableString _wallpaperFileNative = RestorableString('Unknown');
+  final RestorableString _wallpaperFileHome = RestorableString('Unknown');
+  final RestorableString _wallpaperFileLock = RestorableString('Unknown');
+  final RestorableString _wallpaperFileBoth = RestorableString('Unknown');
+  final RestorableString _wallpaperUrlNative = RestorableString('Unknown');
+  final RestorableString _wallpaperUrlHome = RestorableString('Unknown');
+  final RestorableString _wallpaperUrlLock = RestorableString('Unknown');
+  final RestorableString _wallpaperUrlBoth = RestorableString('Unknown');
+  final RestorableString _liveWallpaper = RestorableString('Unknown');
+  final RestorableString _wallpaperChooser = RestorableString('Unknown');
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
-  String liveUrl =
-      'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+  String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   late bool goToHome;
 
@@ -47,8 +49,7 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion =
-          await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
+      platformVersion = await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -59,14 +60,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _platformVersion = platformVersion;
+      _platformVersion.value = platformVersion;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperFromFileNative() async {
     setState(() {
-      _wallpaperFileNative = 'Loading';
+      _wallpaperFileNative.value = 'Loading';
     });
     String result;
     var file = await DefaultCacheManager().getSingleFile(url);
@@ -90,14 +91,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperFileNative = result;
+      _wallpaperFileNative.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperFromFileHome() async {
     setState(() {
-      _wallpaperFileHome = 'Loading';
+      _wallpaperFileHome.value = 'Loading';
     });
     String result;
     var file = await DefaultCacheManager().getSingleFile(url);
@@ -122,14 +123,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperFileHome = result;
+      _wallpaperFileHome.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperFromFileLock() async {
     setState(() {
-      _wallpaperFileLock = 'Loading';
+      _wallpaperFileLock.value = 'Loading';
     });
     String result;
     var file = await DefaultCacheManager().getSingleFile(url);
@@ -154,14 +155,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperFileLock = result;
+      _wallpaperFileLock.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperFromFileBoth() async {
     setState(() {
-      _wallpaperFileBoth = 'Loading';
+      _wallpaperFileBoth.value = 'Loading';
     });
     String result;
     var file = await DefaultCacheManager().getSingleFile(url);
@@ -186,14 +187,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperFileBoth = result;
+      _wallpaperFileBoth.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperNative() async {
     setState(() {
-      _wallpaperUrlNative = 'Loading';
+      _wallpaperUrlNative.value = 'Loading';
     });
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -216,14 +217,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperUrlNative = result;
+      _wallpaperUrlNative.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperHome() async {
     setState(() {
-      _wallpaperUrlHome = 'Loading';
+      _wallpaperUrlHome.value = 'Loading';
     });
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -247,14 +248,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperUrlHome = result;
+      _wallpaperUrlHome.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperLock() async {
     setState(() {
-      _wallpaperUrlLock = 'Loading';
+      _wallpaperUrlLock.value = 'Loading';
     });
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -278,14 +279,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperUrlLock = result;
+      _wallpaperUrlLock.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setWallpaperBoth() async {
     setState(() {
-      _wallpaperUrlBoth = 'Loading';
+      _wallpaperUrlBoth.value = 'Loading';
     });
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -309,14 +310,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _wallpaperUrlBoth = result;
+      _wallpaperUrlBoth.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> setLiveWallpaper() async {
     setState(() {
-      _liveWallpaper = 'Loading';
+      _liveWallpaper.value = 'Loading';
     });
     String result;
     var file = await DefaultCacheManager().getSingleFile(liveUrl);
@@ -340,14 +341,14 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _liveWallpaper = result;
+      _liveWallpaper.value = result;
     });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> openWallpaperChooser() async {
     setState(() {
-      _wallpaperChooser = 'Loading';
+      _wallpaperChooser.value = 'Loading';
     });
     String result;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -369,7 +370,7 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _liveWallpaper = result;
+      _liveWallpaper.value = result;
     });
   }
 
@@ -383,7 +384,7 @@ class _MyAppState extends State<MyApp> {
         child: Column(
           children: [
             Center(
-              child: Text('Running on: $_platformVersion\n'),
+              child: Text('Running on: ${_platformVersion.value}\n'),
             ),
             SwitchListTile(
                 title: const Text('Go to home'),
@@ -395,97 +396,115 @@ class _MyAppState extends State<MyApp> {
                 }),
             ElevatedButton(
               onPressed: setWallpaperFromFileNative,
-              child: _wallpaperFileNative == 'Loading'
+              child: _wallpaperFileNative.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from file native'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperFileNative\n'),
+              child: Text('Wallpaper status: ${_wallpaperFileNative.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperFromFileHome,
-              child: _wallpaperFileHome == 'Loading'
+              child: _wallpaperFileHome.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from file home'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperFileHome\n'),
+              child: Text('Wallpaper status: ${_wallpaperFileHome.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperFromFileLock,
-              child: _wallpaperFileLock == 'Loading'
+              child: _wallpaperFileLock.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from file lock'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperFileLock\n'),
+              child: Text('Wallpaper status: ${_wallpaperFileLock.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperFromFileBoth,
-              child: _wallpaperFileBoth == 'Loading'
+              child: _wallpaperFileBoth.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from file both'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperFileBoth\n'),
+              child: Text('Wallpaper status: ${_wallpaperFileBoth.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperNative,
-              child: _wallpaperUrlNative == 'Loading'
+              child: _wallpaperUrlNative.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from Url native'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperUrlNative\n'),
+              child: Text('Wallpaper status: ${_wallpaperUrlNative.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperHome,
-              child: _wallpaperUrlHome == 'Loading'
+              child: _wallpaperUrlHome.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from Url home'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperUrlHome\n'),
+              child: Text('Wallpaper status: ${_wallpaperUrlHome.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperLock,
-              child: _wallpaperUrlLock == 'Loading'
+              child: _wallpaperUrlLock.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from Url lock'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperUrlLock\n'),
+              child: Text('Wallpaper status: ${_wallpaperUrlLock.value}\n'),
             ),
             ElevatedButton(
               onPressed: setWallpaperBoth,
-              child: _wallpaperUrlBoth == 'Loading'
+              child: _wallpaperUrlBoth.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set wallpaper from Url both'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperUrlBoth\n'),
+              child: Text('Wallpaper status: ${_wallpaperUrlBoth.value}\n'),
             ),
             ElevatedButton(
               onPressed: setLiveWallpaper,
-              child: _liveWallpaper == 'Loading'
+              child: _liveWallpaper.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Set live wallpaper'),
             ),
             Center(
-              child: Text('Wallpaper status: $_liveWallpaper\n'),
+              child: Text('Wallpaper status: ${_liveWallpaper.value}\n'),
             ),
             ElevatedButton(
               onPressed: openWallpaperChooser,
-              child: _wallpaperChooser == 'Loading'
+              child: _wallpaperChooser.value == 'Loading'
                   ? const CircularProgressIndicator()
                   : const Text('Open wallpaper chooser'),
             ),
             Center(
-              child: Text('Wallpaper status: $_wallpaperChooser\n'),
+              child: Text('Wallpaper status: ${_wallpaperChooser.value}\n'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  String? get restorationId => '_MyAppState';
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_platformVersion, 'platform_version');
+    registerForRestoration(_wallpaperFileNative, 'wallpaper_file_native');
+    registerForRestoration(_wallpaperFileHome, 'wallpaper_file_home');
+    registerForRestoration(_wallpaperFileLock, 'wallpaper_file_lock');
+    registerForRestoration(_wallpaperFileBoth, 'wallpaper_file_both');
+    registerForRestoration(_wallpaperUrlNative, 'wallpaper_url_native');
+    registerForRestoration(_wallpaperUrlHome, 'wallpaper_url_home');
+    registerForRestoration(_wallpaperUrlLock, 'wallpaper_url_lock');
+    registerForRestoration(_wallpaperUrlBoth, 'wallpaper_url_both');
+    registerForRestoration(_liveWallpaper, 'live_wallpaper');
+    registerForRestoration(_wallpaperChooser, 'wallpaper_chooser');
   }
 }

@@ -71,7 +71,8 @@ class HomePageState extends State<HomePage> with RestorationMixin {
 
   // URLs for static and live wallpapers
   String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
-  String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+  String liveUrl =
+      'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   late bool goToHome;
   String? loadingOption;
@@ -90,7 +91,8 @@ class HomePageState extends State<HomePage> with RestorationMixin {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      _platformVersion = await AsyncWallpaper.instance.platformVersion ?? 'Unknown platform version';
+      _platformVersion = await AsyncWallpaper.instance.platformVersion ??
+          'Unknown platform version';
     } on PlatformException {
       _platformVersion = 'Failed to get platform version.';
     }
@@ -106,7 +108,8 @@ class HomePageState extends State<HomePage> with RestorationMixin {
   }
 
   // Generic method to set wallpaper and update UI
-  Future<void> setWallpaper(Function wallpaperSetter, RestorableString status, String optionLabel) async {
+  Future<void> setWallpaper(Function wallpaperSetter, RestorableString status,
+      String optionLabel) async {
     setState(() {
       loadingOption = optionLabel;
       status.value = 'Loading';
@@ -114,7 +117,9 @@ class HomePageState extends State<HomePage> with RestorationMixin {
 
     String result;
     try {
-      result = await wallpaperSetter() ? 'Wallpaper set' : 'Failed to set wallpaper.';
+      result = await wallpaperSetter()
+          ? 'Wallpaper set'
+          : 'Failed to set wallpaper.';
     } on PlatformException {
       result = 'Failed to set wallpaper.';
     }
@@ -312,7 +317,9 @@ class HomePageState extends State<HomePage> with RestorationMixin {
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(option['label'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(option['label'],
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4.0),
                               Text(
                                 option['subtitle'],
@@ -325,7 +332,8 @@ class HomePageState extends State<HomePage> with RestorationMixin {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Theme.of(context).colorScheme.secondary,
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
                                 ),
                               ),
                             ],

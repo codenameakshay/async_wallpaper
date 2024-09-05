@@ -15,8 +15,10 @@ void main() {
   });
 
   group('HomePage Tests', () {
-    testWidgets('initPlatformState sets platformVersion correctly', (WidgetTester tester) async {
-      when(() => mockAsyncWallpaper.platformVersion).thenAnswer((_) async => '1.0.0');
+    testWidgets('initPlatformState sets platformVersion correctly',
+        (WidgetTester tester) async {
+      when(() => mockAsyncWallpaper.platformVersion)
+          .thenAnswer((_) async => '1.0.0');
 
       await tester.pumpWidget(const MaterialApp(home: HomePage()));
       final HomePageState state = tester.state(find.byType(HomePage));
@@ -26,8 +28,10 @@ void main() {
       expect(state.platformVersion.value, '1.0.0');
     });
 
-    testWidgets('initPlatformState handles PlatformException', (WidgetTester tester) async {
-      when(() => mockAsyncWallpaper.platformVersion).thenThrow(PlatformException(code: 'ERROR'));
+    testWidgets('initPlatformState handles PlatformException',
+        (WidgetTester tester) async {
+      when(() => mockAsyncWallpaper.platformVersion)
+          .thenThrow(PlatformException(code: 'ERROR'));
 
       await tester.pumpWidget(const MaterialApp(home: HomePage()));
       final HomePageState state = tester.state(find.byType(HomePage));
@@ -37,7 +41,8 @@ void main() {
       expect(state.platformVersion.value, 'Failed to get platform version.');
     });
 
-    testWidgets('setWallpaper updates UI correctly', (WidgetTester tester) async {
+    testWidgets('setWallpaper updates UI correctly',
+        (WidgetTester tester) async {
       when(() => mockAsyncWallpaper.setWallpaperFromFileNative(
             filePath: any(named: 'filePath'),
             goToHome: any(named: 'goToHome'),
@@ -63,7 +68,8 @@ void main() {
       expect(state.loadingOption, isNull);
     });
 
-    testWidgets('setWallpaper handles PlatformException', (WidgetTester tester) async {
+    testWidgets('setWallpaper handles PlatformException',
+        (WidgetTester tester) async {
       when(() => mockAsyncWallpaper.setWallpaperFromFileNative(
             filePath: any(named: 'filePath'),
             goToHome: any(named: 'goToHome'),

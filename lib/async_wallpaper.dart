@@ -46,8 +46,14 @@ class ToastDetails {
 }
 
 class AsyncWallpaper {
+  AsyncWallpaper._();
+
+  static final AsyncWallpaper _instance = AsyncWallpaper._();
+
+  static AsyncWallpaper get instance => _instance;
+
   /// Define channel
-  static const MethodChannel _channel = MethodChannel('async_wallpaper');
+  MethodChannel channel = const MethodChannel('async_wallpaper');
 
   /// Static code for Home Screen Wallpaper Choice
   static const int HOME_SCREEN = 1;
@@ -89,9 +95,9 @@ class AsyncWallpaper {
   static const String _OPEN_WALLPAPER_CHOOSER = 'open_wallpaper_chooser';
 
   /// Function to check working/validity of method channels
-  static Future<String?> get platformVersion async {
+  Future<String?> get platformVersion async {
     /// String to store the version number before returning. This is just to test working/validity.
-    final String version = await _channel.invokeMethod('getPlatformVersion');
+    final String version = await channel.invokeMethod('getPlatformVersion');
 
     /// Function returns version number
     return version;
@@ -100,7 +106,7 @@ class AsyncWallpaper {
   /// Function takes input url's image & location choice, and applies wallpaper depending on location choice
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaper({
+  Future<bool> setWallpaper({
     required String url,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
@@ -133,7 +139,7 @@ class AsyncWallpaper {
         break;
     }
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       location,
       options,
     );
@@ -167,7 +173,7 @@ class AsyncWallpaper {
   /// Function takes input url's image, and opens wallpaper apply intent
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperNative({
+  Future<bool> setWallpaperNative({
     required String url,
     bool goToHome = false,
     ToastDetails? toastDetails,
@@ -182,7 +188,7 @@ class AsyncWallpaper {
       'goToHome': goToHome,
     };
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       _SET_WALLPAPER,
       options,
     );
@@ -216,7 +222,7 @@ class AsyncWallpaper {
   /// Function takes input image file path, and opens wallpaper apply intent
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperFromFileNative({
+  Future<bool> setWallpaperFromFileNative({
     required String filePath,
     bool goToHome = false,
     ToastDetails? toastDetails,
@@ -231,7 +237,7 @@ class AsyncWallpaper {
       'goToHome': goToHome,
     };
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       _SET_WALLPAPER_FILE,
       options,
     );
@@ -265,7 +271,7 @@ class AsyncWallpaper {
   /// Function takes input image's file path & location choice, and applies wallpaper depending on location choice
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperFromFile({
+  Future<bool> setWallpaperFromFile({
     required String filePath,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
@@ -298,7 +304,7 @@ class AsyncWallpaper {
         break;
     }
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       location,
       options,
     );
@@ -332,7 +338,7 @@ class AsyncWallpaper {
   /// Function takes input live file path, and shows live wallpaper activity
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setLiveWallpaper({
+  Future<bool> setLiveWallpaper({
     required String filePath,
     bool goToHome = false,
     ToastDetails? toastDetails,
@@ -347,7 +353,7 @@ class AsyncWallpaper {
       'goToHome': goToHome,
     };
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       _SET_VIDEO_WALLPAPER,
       options,
     );
@@ -379,7 +385,7 @@ class AsyncWallpaper {
   }
 
   /// Opens Android native wallpaper chooser
-  static Future<bool> openWallpaperChooser({
+  Future<bool> openWallpaperChooser({
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
@@ -392,7 +398,7 @@ class AsyncWallpaper {
       'goToHome': goToHome,
     };
 
-    result = await _channel.invokeMethod(
+    result = await channel.invokeMethod(
       _OPEN_WALLPAPER_CHOOSER,
       options,
     );

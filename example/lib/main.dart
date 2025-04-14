@@ -120,7 +120,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion = await AsyncWallpaper.platformVersion ?? 'Unknown platform version';
+      platformVersion = await AsyncWallpaper.platformVersion;
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }

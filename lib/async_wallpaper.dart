@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:async_wallpaper/pigeon_impl_api.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -50,8 +51,7 @@ class ToastDetails {
 }
 
 class AsyncWallpaper {
-  /// Define channel
-  static const MethodChannel _channel = MethodChannel('async_wallpaper');
+  static final WallpaperApi _api = WallpaperApi();
 
   /// Static code for Home Screen Wallpaper Choice
   static const int HOME_SCREEN = 1;
@@ -62,40 +62,10 @@ class AsyncWallpaper {
   /// Static code for both Home Screen and Lock Screen Wallpaper Choice
   static const int BOTH_SCREENS = 3;
 
-  /// Name for setWallpaper native function for home
-  static const String _SET_HOME_WALLPAPER = 'set_home_wallpaper';
-
-  /// Name for setWallpaper native function for lock screen
-  static const String _SET_LOCK_WALLPAPER = 'set_lock_wallpaper';
-
-  /// Name for setWallpaper native function for both home and lock screen
-  static const String _SET_BOTH_WALLPAPER = 'set_both_wallpaper';
-
-  /// Name for 'set_wallpaper' native function
-  static const String _SET_WALLPAPER = 'set_wallpaper';
-
-  /// Name for setWallpaperFile native function for home
-  static const String _SET_HOME_WALLPAPER_FILE = 'set_home_wallpaper_file';
-
-  /// Name for setWallpaperFile native function for lock screen
-  static const String _SET_LOCK_WALLPAPER_FILE = 'set_lock_wallpaper_file';
-
-  /// Name for setWallpaperFile native function for both home and lock screen
-  static const String _SET_BOTH_WALLPAPER_FILE = 'set_both_wallpaper_file';
-
-  /// Name for 'set_wallpaper_file' native function
-  static const String _SET_WALLPAPER_FILE = 'set_wallpaper_file';
-
-  /// Name for 'set_live_wallpaper' native function\
-  static const String _SET_LIVE_WALLPAPER = 'set_live_wallpaper';
-
-  /// Name for 'wallpaper_chooser' native function\
-  static const String _OPEN_WALLPAPER_CHOOSER = 'open_wallpaper_chooser';
-
   /// Function to check working/validity of method channels
-  static Future<String?> get platformVersion async {
+  static Future<String> get platformVersion async {
     /// String to store the version number before returning. This is just to test working/validity.
-    final String? version = await _channel.invokeMethod('getPlatformVersion');
+    final String version = await _api.getPlatformVersion();
 
     /// Function returns version number
     return version;
@@ -112,34 +82,27 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      // The parameters for the method call
-      final options = {
-        'url': url,
-        'goToHome': goToHome,
-      };
+      bool result = false;
 
-      String location = _SET_BOTH_WALLPAPER;
+      Future<bool> future;
 
       switch (wallpaperLocation) {
         case HOME_SCREEN:
-          location = _SET_HOME_WALLPAPER;
+          future = _api.setHomeWallpaperFromUrl(url, goToHome);
           break;
         case LOCK_SCREEN:
-          location = _SET_LOCK_WALLPAPER;
+          future = _api.setLockWallpaperFromUrl(url, goToHome);
           break;
         case BOTH_SCREENS:
-          location = _SET_BOTH_WALLPAPER;
+          future = _api.setBothWallpaperFromUrl(url, goToHome);
           break;
         default:
-          location = _SET_BOTH_WALLPAPER;
+          future = _api.setBothWallpaperFromUrl(url, goToHome);
           break;
       }
-      final bool? result = await _channel.invokeMethod(
-        location,
-        options,
-      );
+      result = await future;
 
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -151,7 +114,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -191,15 +154,9 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      final bool? result = await _channel.invokeMethod(
-        _SET_WALLPAPER,
-        {
-          'url': url,
-          'goToHome': goToHome,
-        },
-      );
+      final bool result = await _api.setWallpaper(url, goToHome);
 
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -211,7 +168,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -251,15 +208,9 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      final bool? result = await _channel.invokeMethod(
-        _SET_WALLPAPER_FILE,
-        {
-          'url': filePath,
-          'goToHome': goToHome,
-        },
-      );
+      final bool result = await _api.setWallpaperFromFile(filePath, goToHome);
 
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -271,7 +222,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -312,34 +263,27 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      // The parameters for the method call
-      final options = {
-        'url': filePath,
-        'goToHome': goToHome,
-      };
-      String location = _SET_BOTH_WALLPAPER_FILE;
+      bool result = false;
+
+      Future<bool> future;
 
       switch (wallpaperLocation) {
         case HOME_SCREEN:
-          location = _SET_HOME_WALLPAPER_FILE;
+          future = _api.setHomeWallpaperFromFile(filePath, goToHome);
           break;
         case LOCK_SCREEN:
-          location = _SET_LOCK_WALLPAPER_FILE;
+          future = _api.setLockWallpaperFromFile(filePath, goToHome);
           break;
         case BOTH_SCREENS:
-          location = _SET_BOTH_WALLPAPER_FILE;
+          future = _api.setBothWallpaperFromFile(filePath, goToHome);
           break;
         default:
-          location = _SET_BOTH_WALLPAPER_FILE;
+          future = _api.setBothWallpaperFromFile(filePath, goToHome);
           break;
       }
+      result = await future;
 
-      final bool? result = await _channel.invokeMethod(
-        location,
-        options,
-      );
-
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -351,7 +295,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -391,15 +335,9 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      final bool? result = await _channel.invokeMethod(
-        _SET_LIVE_WALLPAPER,
-        {
-          'url': filePath,
-          'goToHome': goToHome,
-        },
-      );
+      final bool result = await _api.setLiveWallpaper(filePath, goToHome);
 
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -411,7 +349,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -448,14 +386,9 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      final bool? result = await _channel.invokeMethod(
-        _OPEN_WALLPAPER_CHOOSER,
-        {
-          'goToHome': goToHome,
-        },
-      );
+      final bool result = await _api.openWallpaperChooser();
 
-      if (result != null && result && toastDetails != null) {
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,
@@ -467,7 +400,7 @@ class AsyncWallpaper {
         );
       }
 
-      if (errorToastDetails != null && (result == null || !result)) {
+      if (errorToastDetails != null && (!result)) {
         Fluttertoast.showToast(
           msg: errorToastDetails.msg,
           toastLength: errorToastDetails.length,
@@ -511,12 +444,8 @@ class AsyncWallpaper {
     ToastDetails? errorToastDetails,
   }) async {
     try {
-      final bool? result = await _channel.invokeMethod('set_material_you_wallpaper', {
-        'url': url,
-        'goToHome': goToHome,
-        'enableEffects': enableEffects,
-      });
-      if (result != null && result && toastDetails != null) {
+      final bool result = await _api.setMaterialYouWallpaper(url, goToHome, enableEffects);
+      if (result && toastDetails != null) {
         Fluttertoast.showToast(
           msg: toastDetails.msg,
           toastLength: toastDetails.length,

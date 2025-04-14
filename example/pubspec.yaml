@@ -11,13 +11,13 @@ dependencies:
     path: ../
   cupertino_icons: ^1.0.2
   dynamic_color: ^1.7.0
-  file: ^6.1.4
+  file: ^7.0.1
   flutter:
     sdk: flutter
   flutter_cache_manager: ^3.1.2
 
 dev_dependencies:
-  flutter_lints: ^2.0.1
+  flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
 

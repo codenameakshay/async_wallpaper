@@ -38,7 +38,7 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +74,7 @@ class MyApp extends StatelessWidget {
 
 // Main page of the application
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -94,13 +94,14 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
   final RestorableString _liveWallpaper = RestorableString('Unknown');
   final RestorableString _wallpaperChooser = RestorableString('Unknown');
   final RestorableString _materialYouWallpaper = RestorableString('Unknown');
+  final RestorableInt _currentImageIndex = RestorableInt(0);
 
   // URLs for static and live wallpapers
-  String url = imageUrls[0]; // Default to first image
+  // String url = imageUrls[0]; // Default to first image
   String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
 
   // Carousel controller
-  final CarouselController _carouselController = CarouselController(initialItem: 1);
+  final CarouselController _carouselController = CarouselController(initialItem: 0);
 
   late bool goToHome;
   String? _loadingOption;
@@ -164,7 +165,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'label': 'File Native',
         'subtitle': 'Set wallpaper using a file on native screen',
         'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(url);
+              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
               return AsyncWallpaper.setWallpaperFromFileNative(
                 filePath: file.path,
                 goToHome: goToHome,
@@ -178,7 +179,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'label': 'File Home',
         'subtitle': 'Set wallpaper using a file on home screen',
         'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(url);
+              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
               return AsyncWallpaper.setWallpaperFromFile(
                 filePath: file.path,
                 wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
@@ -193,7 +194,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'label': 'File Lock',
         'subtitle': 'Set wallpaper using a file on lock screen',
         'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(url);
+              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
               return AsyncWallpaper.setWallpaperFromFile(
                 filePath: file.path,
                 wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
@@ -208,7 +209,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'label': 'File Both',
         'subtitle': 'Set wallpaper using a file on both screens',
         'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(url);
+              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
               return AsyncWallpaper.setWallpaperFromFile(
                 filePath: file.path,
                 wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
@@ -224,7 +225,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'subtitle': 'Set wallpaper using URL on native screen',
         'onTap': () => setWallpaper(() {
               return AsyncWallpaper.setWallpaperNative(
-                url: url,
+                url: imageUrls[_currentImageIndex.value],
                 goToHome: goToHome,
                 toastDetails: ToastDetails.success(),
                 errorToastDetails: ToastDetails.error(),
@@ -237,7 +238,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'subtitle': 'Set wallpaper using URL on home screen',
         'onTap': () => setWallpaper(() {
               return AsyncWallpaper.setWallpaper(
-                url: url,
+                url: imageUrls[_currentImageIndex.value],
                 wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
                 goToHome: goToHome,
                 toastDetails: ToastDetails.success(),
@@ -251,7 +252,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'subtitle': 'Set wallpaper using URL on lock screen',
         'onTap': () => setWallpaper(() {
               return AsyncWallpaper.setWallpaper(
-                url: url,
+                url: imageUrls[_currentImageIndex.value],
                 wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
                 goToHome: goToHome,
                 toastDetails: ToastDetails.success(),
@@ -265,7 +266,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'subtitle': 'Set wallpaper using URL on both screens',
         'onTap': () => setWallpaper(() {
               return AsyncWallpaper.setWallpaper(
-                url: url,
+                url: imageUrls[_currentImageIndex.value],
                 wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
                 goToHome: goToHome,
                 toastDetails: ToastDetails.success(),
@@ -305,7 +306,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
         'subtitle': 'Set Material You wallpaper (Android 12+)',
         'onTap': () => setWallpaper(() {
               return AsyncWallpaper.setMaterialYouWallpaperFromUrl(
-                url: url,
+                url: imageUrls[_currentImageIndex.value],
                 goToHome: goToHome,
                 enableEffects: true,
                 toastDetails: ToastDetails.success(),
@@ -336,21 +337,25 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
             ),
             // Image carousel
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: 150),
+              constraints: BoxConstraints(maxHeight: 180),
               child: CarouselView(
                 controller: _carouselController,
                 itemExtent: MediaQuery.of(context).size.width * 0.8,
                 itemSnapping: true,
                 onTap: (index) {
                   setState(() {
-                    url = imageUrls[index];
+                    _currentImageIndex.value = index;
                   });
                 },
                 children: imageInfos.map((ImageInfo image) {
-                  return HeroLayoutCard(imageInfo: image);
+                  return HeroLayoutCard(
+                    imageInfo: image,
+                    isSelected: _currentImageIndex.value == imageInfos.indexOf(image),
+                  );
                 }).toList(),
               ),
             ),
+            const SizedBox(height: 16),
             // Grid of wallpaper options
             Expanded(
               child: GridView.count(
@@ -418,6 +423,7 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     registerForRestoration(_liveWallpaper, 'live_wallpaper');
     registerForRestoration(_wallpaperChooser, 'wallpaper_chooser');
     registerForRestoration(_materialYouWallpaper, 'material_you_wallpaper');
+    registerForRestoration(_currentImageIndex, 'current_image_index');
   }
 }
 
@@ -425,9 +431,11 @@ class HeroLayoutCard extends StatelessWidget {
   const HeroLayoutCard({
     super.key,
     required this.imageInfo,
+    required this.isSelected,
   });
 
   final ImageInfo imageInfo;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +472,12 @@ class HeroLayoutCard extends StatelessWidget {
             ],
           ),
         ),
+        if (isSelected)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
+          ),
       ],
     );
   }

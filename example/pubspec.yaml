@@ -4,17 +4,18 @@ description: Demonstrates how to use the async_wallpaper plugin.
 publish_to: "none"
 
 environment:
-  sdk: ">=2.12.0 <3.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   async_wallpaper:
     path: ../
+  cached_network_image: ^3.3.0
   cupertino_icons: ^1.0.2
   dynamic_color: ^1.7.0
   file: ^7.0.1
   flutter:
     sdk: flutter
-  flutter_cache_manager: ^3.1.2
+  flutter_cache_manager: ^3.3.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0

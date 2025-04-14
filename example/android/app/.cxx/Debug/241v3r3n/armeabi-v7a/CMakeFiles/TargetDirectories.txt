@@ -1,0 +1,2 @@
+/Users/akshaymaurya/Development/codenameakshay/async_wallpaper/example/android/app/.cxx/Debug/241v3r3n/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/akshaymaurya/Development/codenameakshay/async_wallpaper/example/android/app/.cxx/Debug/241v3r3n/armeabi-v7a/CMakeFiles/rebuild_cache.dir

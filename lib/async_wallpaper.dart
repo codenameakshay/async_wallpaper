@@ -86,8 +86,8 @@ class AsyncWallpaper {
   /// Name for 'set_wallpaper_file' native function
   static const String _SET_WALLPAPER_FILE = 'set_wallpaper_file';
 
-  /// Name for 'set_video_wallpaper' native function\
-  static const String _SET_VIDEO_WALLPAPER = 'set_video_wallpaper';
+  /// Name for 'set_live_wallpaper' native function\
+  static const String _SET_LIVE_WALLPAPER = 'set_live_wallpaper';
 
   /// Name for 'wallpaper_chooser' native function\
   static const String _OPEN_WALLPAPER_CHOOSER = 'open_wallpaper_chooser';
@@ -392,7 +392,7 @@ class AsyncWallpaper {
   }) async {
     try {
       final bool? result = await _channel.invokeMethod(
-        _SET_VIDEO_WALLPAPER,
+        _SET_LIVE_WALLPAPER,
         {
           'url': filePath,
           'goToHome': goToHome,

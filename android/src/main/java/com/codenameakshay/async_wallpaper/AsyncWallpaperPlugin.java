@@ -258,11 +258,16 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
             goToHome = call.argument("goToHome"); // .argument returns the correct type
             android.util.Log.i("Arguments ", "configureFlutterEngine: " + url);
             // Picasso.get().load("file://" + url).into(target3);
-            copyFile(new File(url), new File(activity.getFilesDir().toPath() + "/file.mp4"));
-            redirectToLiveWallpaper = false;
-            VideoLiveWallpaper mVideoLiveWallpaper = new VideoLiveWallpaper();
-            mVideoLiveWallpaper.setToWallPaper(context);
-            result.success(true);
+            File videoFile = new File(activity.getFilesDir(), "file.mp4");
+            copyFile(new File(url), videoFile);
+            if (videoFile.exists()) {
+                redirectToLiveWallpaper = false;
+                VideoLiveWallpaper mVideoLiveWallpaper = new VideoLiveWallpaper();
+                mVideoLiveWallpaper.setToWallPaper(context);
+                result.success(true);
+            } else {
+                result.error("FILE_COPY_ERROR", "Failed to copy video file", null);
+            }
 
         } else if (call.method.equals("open_wallpaper_chooser")) {
             goToHome = call.argument("goToHome"); // .argument returns the correct type

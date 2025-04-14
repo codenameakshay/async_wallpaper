@@ -18,7 +18,11 @@ import android.view.SurfaceHolder;
 import androidx.annotation.RequiresApi;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.nio.channels.FileChannel;
 
 
 public class VideoLiveWallpaper extends WallpaperService {
@@ -36,7 +40,7 @@ public class VideoLiveWallpaper extends WallpaperService {
         try {
             WallpaperManager.getInstance(context).clear();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e("VideoLiveWallpaper", "Error clearing wallpaper", e);
         }
     }
 
@@ -47,7 +51,7 @@ public class VideoLiveWallpaper extends WallpaperService {
         try {
             WallpaperManager.getInstance(context).clear();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e("VideoLiveWallpaper", "Error clearing wallpaper", e);
         }
     }
 
@@ -59,23 +63,55 @@ public class VideoLiveWallpaper extends WallpaperService {
     class VideoEngine extends Engine {
         private MediaPlayer mediaPlayer;
         private BroadcastReceiver broadcastReceiver;
+        private boolean isReceiverRegistered = false;
+        private WeakReference<Context> contextRef;
 
         @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
-            IntentFilter intentFilter = new IntentFilter(VideoLiveWallpaper.VIDEO_PARAMS_CONTROL_ACTION);
-            registerReceiver(broadcastReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    boolean action = intent.getBooleanExtra(KEY_ACTION, false);
-                    if (action) {
-                        mediaPlayer.setVolume(0, 0);
-                    } else {
-                        mediaPlayer.setVolume(1.0f, 1.0f);
+            contextRef = new WeakReference<>(getApplicationContext());
+            registerVolumeReceiver();
+        }
+
+        private void registerVolumeReceiver() {
+            if (!isReceiverRegistered) {
+                IntentFilter intentFilter = new IntentFilter(VIDEO_PARAMS_CONTROL_ACTION);
+                broadcastReceiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        if (mediaPlayer != null) {
+                            boolean action = intent.getBooleanExtra(KEY_ACTION, false);
+                            mediaPlayer.setVolume(action ? 0 : 1.0f, action ? 0 : 1.0f);
+                        }
                     }
+                };
+                
+                // Use the appropriate registration method based on Android version
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(broadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    registerReceiver(broadcastReceiver, intentFilter);
                 }
-            }, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+                
+                isReceiverRegistered = true;
+            }
+        }
+
+        private void releaseMediaPlayer() {
+            if (mediaPlayer != null) {
+                try {
+                    if (mediaPlayer.isPlaying()) {
+                        mediaPlayer.stop();
+                    }
+                    mediaPlayer.reset();
+                    mediaPlayer.release();
+                } catch (Exception e) {
+                    Log.e("VideoEngine", "Error releasing MediaPlayer", e);
+                } finally {
+                    mediaPlayer = null;
+                }
+            }
         }
 
         @SuppressLint("SdCardPath")
@@ -90,7 +126,16 @@ public class VideoLiveWallpaper extends WallpaperService {
                 if (mediaPlayer == null) {
                     mediaPlayer = new MediaPlayer();
                     mediaPlayer.setSurface(holder.getSurface());
-                    mediaPlayer.setDataSource(getFilesDir() + "/file.mp4");
+                    
+                    // Use the appropriate file path based on Android version
+                    File videoFile = new File(getFilesDir(), "file.mp4");
+                    if (videoFile.exists()) {
+                        mediaPlayer.setDataSource(videoFile.getAbsolutePath());
+                    } else {
+                        Log.e("VideoEngine", "Video file not found: " + videoFile.getAbsolutePath());
+                        return;
+                    }
+                    
                     mediaPlayer.setLooping(true);
                     mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
                     mediaPlayer.prepare();
@@ -100,7 +145,6 @@ public class VideoLiveWallpaper extends WallpaperService {
                 }
             } catch (IOException e) {
                 Log.e("VideoEngine", "Error initializing MediaPlayer", e);
-                e.printStackTrace();
             }
         }
 
@@ -118,21 +162,59 @@ public class VideoLiveWallpaper extends WallpaperService {
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             super.onSurfaceDestroyed(holder);
-            if (mediaPlayer != null) {
-                if (mediaPlayer.isPlaying()) mediaPlayer.stop();
-                mediaPlayer.release();
-                mediaPlayer = null;
-            }
+            releaseMediaPlayer();
         }
 
         @Override
         public void onDestroy() {
             super.onDestroy();
-            if (mediaPlayer != null) {
-                mediaPlayer.release();
-                mediaPlayer = null;
+            releaseMediaPlayer();
+            if (isReceiverRegistered && broadcastReceiver != null) {
+                try {
+                    unregisterReceiver(broadcastReceiver);
+                    isReceiverRegistered = false;
+                } catch (Exception e) {
+                    Log.e("VideoEngine", "Error unregistering receiver", e);
+                }
             }
-            unregisterReceiver(broadcastReceiver);
+        }
+    }
+
+    public void copyFile(File fromFile, File toFile) {
+        FileInputStream fileInputStream = null;
+        FileOutputStream fileOutputStream = null;
+        FileChannel fileChannelInput = null;
+        FileChannel fileChannelOutput = null;
+        
+        try {
+            fileInputStream = new FileInputStream(fromFile);
+            fileOutputStream = new FileOutputStream(toFile);
+            fileChannelInput = fileInputStream.getChannel();
+            fileChannelOutput = fileOutputStream.getChannel();
+            
+            long size = fileChannelInput.size();
+            long transferred = 0;
+            while (transferred < size) {
+                transferred += fileChannelInput.transferTo(transferred, size - transferred, fileChannelOutput);
+            }
+        } catch (IOException e) {
+            Log.e("AsyncWallpaperPlugin", "Error copying file", e);
+            throw new RuntimeException("Failed to copy file", e);
+        } finally {
+            closeQuietly(fileChannelInput);
+            closeQuietly(fileChannelOutput);
+            closeQuietly(fileInputStream);
+            closeQuietly(fileOutputStream);
+        }
+    }
+
+    private void closeQuietly(AutoCloseable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                Log.e("AsyncWallpaperPlugin", "Error closing resource", e);
+            }
         }
     }
 }

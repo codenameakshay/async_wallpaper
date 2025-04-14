@@ -5,8 +5,33 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const _brandBlue = Color(0xFF1E88E5);
+
+// Sample image URLs for the carousel
+final List<String> imageUrls = [
+  'https://images.unsplash.com/photo-1635593701810-3156162e184f',
+  'https://images.unsplash.com/photo-1744132116976-0a68511b70f6',
+  'https://images.unsplash.com/photo-1741018605802-e394cf20a435',
+  'https://images.unsplash.com/photo-1743953273017-6a5e0c14ce40',
+  'https://images.unsplash.com/photo-1695067439143-81a61a8c904a',
+];
+
+class ImageInfo {
+  final String title;
+  final String url;
+
+  const ImageInfo(this.title, this.url);
+}
+
+final List<ImageInfo> imageInfos = [
+  ImageInfo('Wallpaper 1', imageUrls[0]),
+  ImageInfo('Wallpaper 2', imageUrls[1]),
+  ImageInfo('Wallpaper 3', imageUrls[2]),
+  ImageInfo('Wallpaper 4', imageUrls[3]),
+  ImageInfo('Wallpaper 5', imageUrls[4]),
+];
 
 void main() {
   runApp(const MyApp());
@@ -68,10 +93,14 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
   final RestorableString _wallpaperUrlBoth = RestorableString('Unknown');
   final RestorableString _liveWallpaper = RestorableString('Unknown');
   final RestorableString _wallpaperChooser = RestorableString('Unknown');
+  final RestorableString _materialYouWallpaper = RestorableString('Unknown');
 
   // URLs for static and live wallpapers
-  String url = 'https://images.unsplash.com/photo-1635593701810-3156162e184f';
+  String url = imageUrls[0]; // Default to first image
   String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+
+  // Carousel controller
+  final CarouselController _carouselController = CarouselController(initialItem: 1);
 
   late bool goToHome;
   String? _loadingOption;
@@ -271,6 +300,20 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
             }, _wallpaperChooser, 'Wallpaper Chooser'),
         'status': _wallpaperChooser
       },
+      {
+        'label': 'Material You',
+        'subtitle': 'Set Material You wallpaper (Android 12+)',
+        'onTap': () => setWallpaper(() {
+              return AsyncWallpaper.setMaterialYouWallpaperFromUrl(
+                url: url,
+                goToHome: goToHome,
+                enableEffects: true,
+                toastDetails: ToastDetails.success(),
+                errorToastDetails: ToastDetails.error(),
+              );
+            }, _materialYouWallpaper, 'Material You'),
+        'status': _materialYouWallpaper
+      },
     ];
 
     return Scaffold(
@@ -290,6 +333,23 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
                   goToHome = value;
                 });
               },
+            ),
+            // Image carousel
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 150),
+              child: CarouselView(
+                controller: _carouselController,
+                itemExtent: MediaQuery.of(context).size.width * 0.8,
+                itemSnapping: true,
+                onTap: (index) {
+                  setState(() {
+                    url = imageUrls[index];
+                  });
+                },
+                children: imageInfos.map((ImageInfo image) {
+                  return HeroLayoutCard(imageInfo: image);
+                }).toList(),
+              ),
             ),
             // Grid of wallpaper options
             Expanded(
@@ -357,5 +417,54 @@ class _HomePageState extends State<HomePage> with RestorationMixin {
     registerForRestoration(_wallpaperUrlBoth, 'wallpaper_url_both');
     registerForRestoration(_liveWallpaper, 'live_wallpaper');
     registerForRestoration(_wallpaperChooser, 'wallpaper_chooser');
+    registerForRestoration(_materialYouWallpaper, 'material_you_wallpaper');
+  }
+}
+
+class HeroLayoutCard extends StatelessWidget {
+  const HeroLayoutCard({
+    super.key,
+    required this.imageInfo,
+  });
+
+  final ImageInfo imageInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    return Stack(
+      alignment: AlignmentDirectional.bottomStart,
+      children: <Widget>[
+        ClipRect(
+          child: OverflowBox(
+            maxWidth: width * 7 / 8,
+            minWidth: width * 7 / 8,
+            child: CachedNetworkImage(
+              imageUrl: imageInfo.url,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                imageInfo.title,
+                overflow: TextOverflow.clip,
+                softWrap: false,
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

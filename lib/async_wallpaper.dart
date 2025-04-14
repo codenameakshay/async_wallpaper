@@ -2,45 +2,49 @@
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 class ToastDetails {
-  final String message;
-  final Color? backgroundColor;
-  final double? fontSize;
-  final ToastGravity? gravity;
-  final Color? textColor;
-  final Toast? toastLength;
+  final String msg;
+  final Toast length;
+  final ToastGravity gravity;
+  final Color backgroundColor;
+  final Color textColor;
+  final double fontSize;
+  final int timeInSecForIosWeb;
 
-  ToastDetails({
-    required this.message,
-    this.backgroundColor,
-    this.fontSize,
-    this.gravity,
-    this.textColor,
-    this.toastLength,
+  const ToastDetails({
+    required this.msg,
+    this.length = Toast.LENGTH_SHORT,
+    this.gravity = ToastGravity.BOTTOM,
+    this.backgroundColor = const Color(0xFF303030),
+    this.textColor = const Color(0xFFFFFFFF),
+    this.fontSize = 16.0,
+    this.timeInSecForIosWeb = 2,
   });
 
-  factory ToastDetails.success() {
+  /// Success toast details.
+  static ToastDetails success({String? msg}) {
     return ToastDetails(
-      message: '😊 Wallpaper applied successfully.',
-      backgroundColor: Colors.green,
+      msg: msg ?? '😊 Wallpaper set successfully',
+      backgroundColor: const Color(0xFF4CAF50),
     );
   }
 
-  factory ToastDetails.wallpaperChooser() {
+  /// Wallpaper chooser toast details.
+  static ToastDetails wallpaperChooser({String? msg}) {
     return ToastDetails(
-      message: '😊 Wallpaper chooser opened successfully.',
-      backgroundColor: Colors.green,
+      msg: msg ?? '😊 Wallpaper chooser opened',
+      backgroundColor: const Color(0xFF4CAF50),
     );
   }
 
-  factory ToastDetails.error() {
+  /// Error toast details.
+  static ToastDetails error({String? msg}) {
     return ToastDetails(
-      message: '😢 Wallpaper could not be applied.',
-      backgroundColor: Colors.red,
+      msg: msg ?? '😢 Failed to set wallpaper',
+      backgroundColor: const Color(0xFFF44336),
     );
   }
 }
@@ -91,7 +95,7 @@ class AsyncWallpaper {
   /// Function to check working/validity of method channels
   static Future<String?> get platformVersion async {
     /// String to store the version number before returning. This is just to test working/validity.
-    final String version = await _channel.invokeMethod('getPlatformVersion');
+    final String? version = await _channel.invokeMethod('getPlatformVersion');
 
     /// Function returns version number
     return version;
@@ -100,326 +104,443 @@ class AsyncWallpaper {
   /// Function takes input url's image & location choice, and applies wallpaper depending on location choice
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaper({
+  static Future<bool?> setWallpaper({
     required String url,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
+    try {
+      // The parameters for the method call
+      final options = {
+        'url': url,
+        'goToHome': goToHome,
+      };
 
-    // The parameters for the method call
-    final options = {
-      'url': url,
-      'goToHome': goToHome,
-    };
+      String location = _SET_BOTH_WALLPAPER;
 
-    String location = _SET_BOTH_WALLPAPER;
-
-    switch (wallpaperLocation) {
-      case HOME_SCREEN:
-        location = _SET_HOME_WALLPAPER;
-        break;
-      case LOCK_SCREEN:
-        location = _SET_LOCK_WALLPAPER;
-        break;
-      case BOTH_SCREENS:
-        location = _SET_BOTH_WALLPAPER;
-        break;
-      default:
-        location = _SET_BOTH_WALLPAPER;
-        break;
-    }
-
-    result = await _channel.invokeMethod(
-      location,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+      switch (wallpaperLocation) {
+        case HOME_SCREEN:
+          location = _SET_HOME_WALLPAPER;
+          break;
+        case LOCK_SCREEN:
+          location = _SET_LOCK_WALLPAPER;
+          break;
+        case BOTH_SCREENS:
+          location = _SET_BOTH_WALLPAPER;
+          break;
+        default:
+          location = _SET_BOTH_WALLPAPER;
+          break;
+      }
+      final bool? result = await _channel.invokeMethod(
+        location,
+        options,
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 
   /// Function takes input url's image, and opens wallpaper apply intent
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperNative({
+  static Future<bool?> setWallpaperNative({
     required String url,
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
-
-    // The parameters for the method call
-    final options = {
-      'url': url,
-      'goToHome': goToHome,
-    };
-
-    result = await _channel.invokeMethod(
-      _SET_WALLPAPER,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+    try {
+      final bool? result = await _channel.invokeMethod(
+        _SET_WALLPAPER,
+        {
+          'url': url,
+          'goToHome': goToHome,
+        },
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 
   /// Function takes input image file path, and opens wallpaper apply intent
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperFromFileNative({
+  static Future<bool?> setWallpaperFromFileNative({
     required String filePath,
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
-
-    // The parameters for the method call
-    final options = {
-      'url': filePath,
-      'goToHome': goToHome,
-    };
-
-    result = await _channel.invokeMethod(
-      _SET_WALLPAPER_FILE,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+    try {
+      final bool? result = await _channel.invokeMethod(
+        _SET_WALLPAPER_FILE,
+        {
+          'url': filePath,
+          'goToHome': goToHome,
+        },
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 
   /// Function takes input image's file path & location choice, and applies wallpaper depending on location choice
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setWallpaperFromFile({
+  static Future<bool?> setWallpaperFromFile({
     required String filePath,
     int wallpaperLocation = BOTH_SCREENS,
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
+    try {
+      // The parameters for the method call
+      final options = {
+        'url': filePath,
+        'goToHome': goToHome,
+      };
+      String location = _SET_BOTH_WALLPAPER_FILE;
 
-    // The parameters for the method call
-    final options = {
-      'url': filePath,
-      'goToHome': goToHome,
-    };
+      switch (wallpaperLocation) {
+        case HOME_SCREEN:
+          location = _SET_HOME_WALLPAPER_FILE;
+          break;
+        case LOCK_SCREEN:
+          location = _SET_LOCK_WALLPAPER_FILE;
+          break;
+        case BOTH_SCREENS:
+          location = _SET_BOTH_WALLPAPER_FILE;
+          break;
+        default:
+          location = _SET_BOTH_WALLPAPER_FILE;
+          break;
+      }
 
-    String location = _SET_BOTH_WALLPAPER_FILE;
-
-    switch (wallpaperLocation) {
-      case HOME_SCREEN:
-        location = _SET_HOME_WALLPAPER_FILE;
-        break;
-      case LOCK_SCREEN:
-        location = _SET_LOCK_WALLPAPER_FILE;
-        break;
-      case BOTH_SCREENS:
-        location = _SET_BOTH_WALLPAPER_FILE;
-        break;
-      default:
-        location = _SET_BOTH_WALLPAPER_FILE;
-        break;
-    }
-
-    result = await _channel.invokeMethod(
-      location,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+      final bool? result = await _channel.invokeMethod(
+        location,
+        options,
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 
   /// Function takes input live file path, and shows live wallpaper activity
   /// You can also set the bool [goToHome] to instruct the app to take the user to the home screen
   /// to show the set wallpaper. If wallpaper set fails, user won't be taken to home screen.
-  static Future<bool> setLiveWallpaper({
+  static Future<bool?> setLiveWallpaper({
     required String filePath,
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
-
-    // The parameters for the method call
-    final options = {
-      'url': filePath,
-      'goToHome': goToHome,
-    };
-
-    result = await _channel.invokeMethod(
-      _SET_VIDEO_WALLPAPER,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+    try {
+      final bool? result = await _channel.invokeMethod(
+        _SET_VIDEO_WALLPAPER,
+        {
+          'url': filePath,
+          'goToHome': goToHome,
+        },
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 
   /// Opens Android native wallpaper chooser
-  static Future<bool> openWallpaperChooser({
+  static Future<bool?> openWallpaperChooser({
     bool goToHome = false,
     ToastDetails? toastDetails,
     ToastDetails? errorToastDetails,
   }) async {
-    /// Variable to store operation result
-    bool result = false;
-
-    // The parameters for the method call
-    final options = {
-      'goToHome': goToHome,
-    };
-
-    result = await _channel.invokeMethod(
-      _OPEN_WALLPAPER_CHOOSER,
-      options,
-    );
-
-    if (toastDetails != null && result) {
-      Fluttertoast.showToast(
-        msg: toastDetails.message,
-        backgroundColor: toastDetails.backgroundColor,
-        fontSize: toastDetails.fontSize,
-        gravity: toastDetails.gravity,
-        textColor: toastDetails.textColor,
-        toastLength: toastDetails.toastLength,
+    try {
+      final bool? result = await _channel.invokeMethod(
+        _OPEN_WALLPAPER_CHOOSER,
+        {
+          'goToHome': goToHome,
+        },
       );
-    }
 
-    if (errorToastDetails != null && !result) {
-      Fluttertoast.showToast(
-        msg: errorToastDetails.message,
-        backgroundColor: errorToastDetails.backgroundColor,
-        fontSize: errorToastDetails.fontSize,
-        gravity: errorToastDetails.gravity,
-        textColor: errorToastDetails.textColor,
-        toastLength: errorToastDetails.toastLength,
-      );
-    }
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
 
-    /// Function returns the bool result, use for debugging or showing toast message
-    return result;
+      if (errorToastDetails != null && (result == null || !result)) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+
+      /// Function returns the bool result, use for debugging or showing toast message
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
+  }
+
+  /// Set Material You wallpaper from URL (Android 12+ only).
+  /// [url] is the URL of the image.
+  /// [goToHome] is whether to go to home screen after setting wallpaper.
+  /// [enableEffects] is whether to enable Material You effects.
+  /// [toastDetails] is the toast details for success.
+  /// [errorToastDetails] is the toast details for error.
+  static Future<bool?> setMaterialYouWallpaperFromUrl({
+    required String url,
+    required bool goToHome,
+    bool enableEffects = true,
+    ToastDetails? toastDetails,
+    ToastDetails? errorToastDetails,
+  }) async {
+    try {
+      final bool? result = await _channel.invokeMethod('set_material_you_wallpaper', {
+        'url': url,
+        'goToHome': goToHome,
+        'enableEffects': enableEffects,
+      });
+      if (result != null && result && toastDetails != null) {
+        Fluttertoast.showToast(
+          msg: toastDetails.msg,
+          toastLength: toastDetails.length,
+          gravity: toastDetails.gravity,
+          timeInSecForIosWeb: toastDetails.timeInSecForIosWeb,
+          backgroundColor: toastDetails.backgroundColor,
+          textColor: toastDetails.textColor,
+          fontSize: toastDetails.fontSize,
+        );
+      }
+      return result;
+    } catch (e) {
+      if (errorToastDetails != null) {
+        Fluttertoast.showToast(
+          msg: errorToastDetails.msg,
+          toastLength: errorToastDetails.length,
+          gravity: errorToastDetails.gravity,
+          timeInSecForIosWeb: errorToastDetails.timeInSecForIosWeb,
+          backgroundColor: errorToastDetails.backgroundColor,
+          textColor: errorToastDetails.textColor,
+          fontSize: errorToastDetails.fontSize,
+        );
+      }
+      return false;
+    }
   }
 }

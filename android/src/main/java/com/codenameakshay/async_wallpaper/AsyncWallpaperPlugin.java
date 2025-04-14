@@ -19,6 +19,8 @@ import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -43,6 +45,9 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * AsyncWallpaperPlugin
@@ -171,6 +176,44 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
         res = result;
         if (call.method.equals("getPlatformVersion")) {
             result.success("Android " + android.os.Build.VERSION.RELEASE);
+        } else if (call.method.equals("check_material_you_support")) {
+            // New method to check if the device supports Material You
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    WallpaperManager wallpaperManager = WallpaperManager.getInstance(context);
+                    boolean supportsMaterialYou = false;
+                    
+                    // Check if the device supports Material You by trying to access the setColorScheme method
+                    try {
+                        Method setColorSchemeMethod = WallpaperManager.class.getMethod("setColorScheme", int.class);
+                        supportsMaterialYou = setColorSchemeMethod != null;
+                    } catch (NoSuchMethodException e) {
+                        Log.d("MaterialYou", "Device does not support Material You color scheme API");
+                    }
+                    
+                    // Create a result map with device information
+                    Map<String, Object> deviceInfo = new HashMap<>();
+                    deviceInfo.put("androidVersion", Build.VERSION.RELEASE);
+                    deviceInfo.put("sdkInt", Build.VERSION.SDK_INT);
+                    deviceInfo.put("manufacturer", Build.MANUFACTURER);
+                    deviceInfo.put("model", Build.MODEL);
+                    deviceInfo.put("supportsMaterialYou", supportsMaterialYou);
+                    
+                    result.success(deviceInfo);
+                } catch (Exception e) {
+                    Log.e("MaterialYou", "Error checking Material You support", e);
+                    result.error("CHECK_ERROR", "Error checking Material You support: " + e.getMessage(), null);
+                }
+            } else {
+                Map<String, Object> deviceInfo = new HashMap<>();
+                deviceInfo.put("androidVersion", Build.VERSION.RELEASE);
+                deviceInfo.put("sdkInt", Build.VERSION.SDK_INT);
+                deviceInfo.put("manufacturer", Build.MANUFACTURER);
+                deviceInfo.put("model", Build.MODEL);
+                deviceInfo.put("supportsMaterialYou", false);
+                
+                result.success(deviceInfo);
+            }
         } else if (call.method.equals("set_wallpaper")) {
             String url = call.argument("url"); // .argument returns the correct type
             goToHome = call.argument("goToHome"); // .argument returns the correct type
@@ -282,26 +325,51 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
                 goToHome = call.argument("goToHome");
                 boolean enableEffects = call.argument("enableEffects");
                 
-                android.util.Log.i("MaterialYou", "Setting Material You wallpaper: " + url);
-                Picasso.get().load(url).into(new Target() {
-                    @Override
-                    public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
-                        SetMaterialYouWallpaperTask task = new SetMaterialYouWallpaperTask(context, enableEffects);
-                        task.execute(resource);
-                    }
+                if (url == null || url.isEmpty()) {
+                    Log.e("MaterialYou", "URL is null or empty");
+                    result.error("INVALID_URL", "URL is null or empty", null);
+                    return;
+                }
+                
+                Log.i("MaterialYou", "Setting Material You wallpaper: " + url + ", enableEffects: " + enableEffects);
+                
+                try {
+                    Picasso.get().load(url).into(new Target() {
+                        @Override
+                        public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
+                            Log.d("MaterialYou", "Bitmap loaded successfully, size: " + resource.getWidth() + "x" + resource.getHeight());
+                            SetMaterialYouWallpaperTask task = new SetMaterialYouWallpaperTask(context, enableEffects);
+                            task.execute(resource);
+                            
+                            // If goToHome is true, navigate to home screen after a short delay
+                            if (goToHome) {
+                                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        home();
+                                    }
+                                }, 1000);
+                            }
+                        }
 
-                    @Override
-                    public void onBitmapFailed(Exception e, Drawable errorDrawable) {
-                        Log.e("MaterialYou", "Failed to load bitmap", e);
-                        result.error("BITMAP_LOAD_ERROR", "Failed to load image", e.getMessage());
-                    }
+                        @Override
+                        public void onBitmapFailed(Exception e, Drawable errorDrawable) {
+                            Log.e("MaterialYou", "Failed to load bitmap", e);
+                            result.error("BITMAP_LOAD_ERROR", "Failed to load image: " + e.getMessage(), null);
+                        }
 
-                    @Override
-                    public void onPrepareLoad(Drawable placeHolderDrawable) {
-                    }
-                });
+                        @Override
+                        public void onPrepareLoad(Drawable placeHolderDrawable) {
+                            Log.d("MaterialYou", "Preparing to load image");
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e("MaterialYou", "Error setting up Picasso", e);
+                    result.error("PICASSO_ERROR", "Error setting up image loading: " + e.getMessage(), null);
+                }
             } else {
-                result.error("UNSUPPORTED_ANDROID_VERSION", "Material You is only supported on Android 12+", null);
+                Log.w("MaterialYou", "Material You is only supported on Android 12+ (API 31+)");
+                result.error("UNSUPPORTED_ANDROID_VERSION", "Material You is only supported on Android 12+ (API 31+)", null);
             }
         } else {
             result.notImplemented();
@@ -688,38 +756,125 @@ class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean>
 class SetMaterialYouWallpaperTask extends AsyncTask<Bitmap, Void, Boolean> {
     private final Context mContext;
     private final boolean enableEffects;
+    private static final int MAX_IMAGE_DIMENSION = 2048; // Maximum dimension for compressed images
+    private static final int COMPRESSION_QUALITY = 85; // JPEG compression quality (0-100)
 
     public SetMaterialYouWallpaperTask(final Context context, boolean enableEffects) {
         this.mContext = context;
         this.enableEffects = enableEffects;
     }
 
+    private Bitmap compressBitmap(Bitmap original) {
+        if (original == null) return null;
+        
+        int width = original.getWidth();
+        int height = original.getHeight();
+        
+        // Calculate new dimensions while maintaining aspect ratio
+        float scale = 1.0f;
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+            scale = (float) MAX_IMAGE_DIMENSION / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+        }
+        
+        // Create a new compressed bitmap
+        Bitmap compressed = Bitmap.createScaledBitmap(original, width, height, true);
+        
+        // Recycle the original bitmap if it's different from the compressed one
+        if (compressed != original) {
+            original.recycle();
+        }
+        
+        return compressed;
+    }
+
+    private void recycleBitmap(Bitmap bitmap) {
+        if (bitmap != null && !bitmap.isRecycled()) {
+            bitmap.recycle();
+        }
+    }
+
     @Override
     protected Boolean doInBackground(Bitmap... bitmaps) {
+        Bitmap compressedBitmap = null;
         try {
+            // Compress the bitmap before processing
+            compressedBitmap = compressBitmap(bitmaps[0]);
+            
+            if (compressedBitmap == null) {
+                Log.e("MaterialYou", "Failed to compress bitmap");
+                return false;
+            }
+            
             WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
             
             // Set the wallpaper with Material You effects
-            wallpaperManager.setBitmap(bitmaps[0], null, true, 
-                    WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK);
-            
-            // Enable Material You effects if requested
-            if (enableEffects) {
-                // This is a simplified example - in a real implementation,
-                // you would need to use the appropriate API to enable effects
-                // The actual implementation depends on the specific device and Android version
-                Log.d("MaterialYou", "Material You effects enabled");
+            try {
+                // For Android 12+ (API 31+), we can use the setBitmap method with flags
+                wallpaperManager.setBitmap(compressedBitmap, null, true, 
+                        WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK);
+                
+                // Enable Material You effects if requested
+                if (enableEffects) {
+                    boolean effectsEnabled = false;
+                    
+                    // Try multiple approaches to enable Material You effects
+                    try {
+                        // Approach 1: Use reflection to access the setColorScheme method
+                        Method setColorSchemeMethod = WallpaperManager.class.getMethod("setColorScheme", int.class);
+                        if (setColorSchemeMethod != null) {
+                            // 1 is typically the value for Material You color scheme
+                            setColorSchemeMethod.invoke(wallpaperManager, 1);
+                            Log.d("MaterialYou", "Material You effects enabled via reflection (setColorScheme)");
+                            effectsEnabled = true;
+                        }
+                    } catch (Exception e) {
+                        Log.d("MaterialYou", "Failed to enable Material You effects via setColorScheme", e);
+                    }
+                    
+                    // If the first approach failed, try another approach
+                    if (!effectsEnabled) {
+                        try {
+                            // Approach 2: Try to use the setColorSchemeEnabled method
+                            Method setColorSchemeEnabledMethod = WallpaperManager.class.getMethod("setColorSchemeEnabled", boolean.class);
+                            if (setColorSchemeEnabledMethod != null) {
+                                setColorSchemeEnabledMethod.invoke(wallpaperManager, true);
+                                Log.d("MaterialYou", "Material You effects enabled via reflection (setColorSchemeEnabled)");
+                                effectsEnabled = true;
+                            }
+                        } catch (Exception e) {
+                            Log.d("MaterialYou", "Failed to enable Material You effects via setColorSchemeEnabled", e);
+                        }
+                    }
+                    
+                    // If all approaches failed, log a warning
+                    if (!effectsEnabled) {
+                        Log.w("MaterialYou", "Could not enable Material You effects - device may not support this feature");
+                    }
+                }
+                
+                return true;
+            } catch (Exception e) {
+                Log.e("MaterialYou", "Error setting Material You wallpaper", e);
+                return false;
             }
-            
-            return true;
         } catch (Exception e) {
-            Log.e("MaterialYou", "Error setting Material You wallpaper", e);
+            Log.e("MaterialYou", "Error in doInBackground", e);
             return false;
+        } finally {
+            // Ensure bitmap is recycled after use
+            recycleBitmap(compressedBitmap);
         }
     }
 
     @Override
     protected void onPostExecute(Boolean result) {
+        if (result) {
+            Log.d("MaterialYou", "Material You wallpaper set successfully");
+        } else {
+            Log.e("MaterialYou", "Failed to set Material You wallpaper");
+        }
         AsyncWallpaperPlugin.res.success(result);
     }
 }

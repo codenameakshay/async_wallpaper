@@ -10,6 +10,7 @@ import android.content.IntentFilter;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.BatteryManager;
 import android.service.wallpaper.WallpaperService;
 import android.text.TextUtils;
 import android.util.Log;
@@ -65,6 +66,11 @@ public class VideoLiveWallpaper extends WallpaperService {
         private BroadcastReceiver broadcastReceiver;
         private boolean isReceiverRegistered = false;
         private WeakReference<Context> contextRef;
+        private static final int LOW_BATTERY_THRESHOLD = 15; // Battery percentage threshold
+        private static final float LOW_BATTERY_FPS = 15.0f; // FPS for low battery mode
+        private static final float NORMAL_FPS = 30.0f; // Normal FPS
+        private boolean isLowBatteryMode = false;
+        private BatteryManager batteryManager;
 
         @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
         @Override
@@ -72,22 +78,71 @@ public class VideoLiveWallpaper extends WallpaperService {
             super.onCreate(surfaceHolder);
             contextRef = new WeakReference<>(getApplicationContext());
             registerVolumeReceiver();
+            initializeBatteryManager();
+        }
+
+        private void initializeBatteryManager() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                batteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
+                updateBatteryMode();
+            }
+        }
+
+        private void updateBatteryMode() {
+            if (batteryManager != null) {
+                int batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                boolean newLowBatteryMode = batteryLevel <= LOW_BATTERY_THRESHOLD;
+                
+                if (newLowBatteryMode != isLowBatteryMode) {
+                    isLowBatteryMode = newLowBatteryMode;
+                    updatePlaybackSettings();
+                }
+            }
+        }
+
+        private void updatePlaybackSettings() {
+            if (mediaPlayer != null) {
+                try {
+                    if (isLowBatteryMode) {
+                        // Reduce frame rate for low battery mode
+                        mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+                        // Set lower playback speed
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            mediaPlayer.setPlaybackParams(mediaPlayer.getPlaybackParams().setSpeed(0.5f));
+                        }
+                    } else {
+                        // Normal playback settings
+                        mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            mediaPlayer.setPlaybackParams(mediaPlayer.getPlaybackParams().setSpeed(1.0f));
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e("VideoEngine", "Error updating playback settings", e);
+                }
+            }
         }
 
         private void registerVolumeReceiver() {
             if (!isReceiverRegistered) {
-                IntentFilter intentFilter = new IntentFilter(VIDEO_PARAMS_CONTROL_ACTION);
+                IntentFilter intentFilter = new IntentFilter();
+                intentFilter.addAction(VIDEO_PARAMS_CONTROL_ACTION);
+                intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED);
+                
                 broadcastReceiver = new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        if (mediaPlayer != null) {
-                            boolean action = intent.getBooleanExtra(KEY_ACTION, false);
-                            mediaPlayer.setVolume(action ? 0 : 1.0f, action ? 0 : 1.0f);
+                        if (intent.getAction().equals(VIDEO_PARAMS_CONTROL_ACTION)) {
+                            if (mediaPlayer != null) {
+                                boolean action = intent.getBooleanExtra(KEY_ACTION, false);
+                                mediaPlayer.setVolume(action ? 0 : 1.0f, action ? 0 : 1.0f);
+                            }
+                        } else if (intent.getAction().equals(Intent.ACTION_BATTERY_CHANGED)) {
+                            updateBatteryMode();
                         }
                     }
                 };
                 
-                // Use the appropriate registration method based on Android version
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     registerReceiver(broadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
                 } else {
@@ -127,7 +182,6 @@ public class VideoLiveWallpaper extends WallpaperService {
                     mediaPlayer = new MediaPlayer();
                     mediaPlayer.setSurface(holder.getSurface());
                     
-                    // Use the appropriate file path based on Android version
                     File videoFile = new File(getFilesDir(), "file.mp4");
                     if (videoFile.exists()) {
                         mediaPlayer.setDataSource(videoFile.getAbsolutePath());
@@ -139,6 +193,10 @@ public class VideoLiveWallpaper extends WallpaperService {
                     mediaPlayer.setLooping(true);
                     mediaPlayer.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
                     mediaPlayer.prepare();
+                    
+                    // Set initial playback settings based on battery level
+                    updateBatteryMode();
+                    
                     mediaPlayer.start();
                     mediaPlayer.setVolume(0, 0);
                     Log.d("VideoEngine", "MediaPlayer started successfully");

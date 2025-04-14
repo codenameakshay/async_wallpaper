@@ -339,8 +339,9 @@ public class AsyncWallpaperPlugin extends Application implements FlutterPlugin, 
 }
 
 class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean> {
-
     private final Context mContext;
+    private static final int MAX_IMAGE_DIMENSION = 2048; // Maximum dimension for compressed images
+    private static final int COMPRESSION_QUALITY = 85; // JPEG compression quality (0-100)
 
     public SetWallPaperTask(final Context context) {
         mContext = context;
@@ -404,91 +405,132 @@ class SetWallPaperTask extends AsyncTask<Pair<Bitmap, String>, Boolean, Boolean>
         }
     }
 
+    private Bitmap compressBitmap(Bitmap original) {
+        if (original == null) return null;
+        
+        int width = original.getWidth();
+        int height = original.getHeight();
+        
+        // Calculate new dimensions while maintaining aspect ratio
+        float scale = 1.0f;
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+            scale = (float) MAX_IMAGE_DIMENSION / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+        }
+        
+        // Create a new compressed bitmap
+        Bitmap compressed = Bitmap.createScaledBitmap(original, width, height, true);
+        
+        // Recycle the original bitmap if it's different from the compressed one
+        if (compressed != original) {
+            original.recycle();
+        }
+        
+        return compressed;
+    }
+
+    private void recycleBitmap(Bitmap bitmap) {
+        if (bitmap != null && !bitmap.isRecycled()) {
+            bitmap.recycle();
+        }
+    }
+
     @Override
     protected final Boolean doInBackground(Pair<Bitmap, String>... pairs) {
-        switch (pairs[0].second) {
-            case "1": {
-                WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
-                try {
+        Bitmap compressedBitmap = null;
+        try {
+            // Compress the bitmap before processing
+            compressedBitmap = compressBitmap(pairs[0].first);
+            
+            switch (pairs[0].second) {
+                case "1": {
+                    WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
+                    try {
+                        if (isMIUI()) {
+                            setWallpaperForMIUI(compressedBitmap, WallpaperManager.FLAG_SYSTEM);
+                        } else {
+                            int WITH_OTHER_APP_CODE = 733;
+                            Uri tempUri = getImageUri(mContext, compressedBitmap);
+                            Log.i("Arguments ", "configureFlutterEngine: " + "Saved image to storage");
+                            File finalFile = new File(getRealPathFromURI(tempUri));
+                            Uri contentURI = getImageContentUri(mContext, finalFile.getAbsolutePath());
+                            Log.i("Arguments ", "configureFlutterEngine: " + "Opening crop intent");
+                            Intent setWall = new Intent(Intent.ACTION_ATTACH_DATA);
+                            setWall.setDataAndType(contentURI, "image/*");
+                            setWall.putExtra("mimeType", "image/*");
+                            setWall.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            setWall.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            Intent chooser = Intent.createChooser(setWall, "Apply with external app");
+                            chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            mContext.startActivity(chooser, new Bundle(WITH_OTHER_APP_CODE));
+                        }
+                    } catch (Exception ex) {
+                        try {
+                            wallpaperManager.setBitmap(compressedBitmap);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        ex.printStackTrace();
+                        return false;
+                    }
+                }
+                break;
+                case "2": {
                     if (isMIUI()) {
-                        setWallpaperForMIUI(pairs[0].first, WallpaperManager.FLAG_SYSTEM);
+                        setWallpaperForMIUI(compressedBitmap, WallpaperManager.FLAG_LOCK);
                     } else {
-                        int WITH_OTHER_APP_CODE = 733;
-                        Uri tempUri = getImageUri(mContext, pairs[0].first);
-                        Log.i("Arguments ", "configureFlutterEngine: " + "Saved image to storage");
-                        File finalFile = new File(getRealPathFromURI(tempUri));
-                        Uri contentURI = getImageContentUri(mContext, finalFile.getAbsolutePath());
-                        Log.i("Arguments ", "configureFlutterEngine: " + "Opening crop intent");
-                        Intent setWall = new Intent(Intent.ACTION_ATTACH_DATA);
-                        setWall.setDataAndType(contentURI, "image/*");
-                        setWall.putExtra("mimeType", "image/*");
-                        setWall.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        setWall.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        Intent chooser = Intent.createChooser(setWall, "Apply with external app");
-                        chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        mContext.startActivity(chooser, new Bundle(WITH_OTHER_APP_CODE));
-                    }
-                } catch (Exception ex) {
-                    try {
-                        wallpaperManager.setBitmap(pairs[0].first);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    ex.printStackTrace();
-                    return false;
-                }
-            }
-            case "2": {
-                if (isMIUI()) {
-                    setWallpaperForMIUI(pairs[0].first, WallpaperManager.FLAG_LOCK);
-                } else {
-                    WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            wallpaperManager.setBitmap(pairs[0].first, null, true, WallpaperManager.FLAG_LOCK);
+                        WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                wallpaperManager.setBitmap(compressedBitmap, null, true, WallpaperManager.FLAG_LOCK);
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                            return false;
                         }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                        return false;
                     }
+                    break;
                 }
-                break;
-            }
-            case "3": {
-                if (isMIUI()) {
-                    setWallpaperForMIUI(pairs[0].first, WallpaperManager.FLAG_SYSTEM);
-                } else {
-                    WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            wallpaperManager.setBitmap(pairs[0].first, null, true, WallpaperManager.FLAG_SYSTEM);
+                case "3": {
+                    if (isMIUI()) {
+                        setWallpaperForMIUI(compressedBitmap, WallpaperManager.FLAG_SYSTEM);
+                    } else {
+                        WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                wallpaperManager.setBitmap(compressedBitmap, null, true, WallpaperManager.FLAG_SYSTEM);
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                            return false;
                         }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                        return false;
                     }
+                    break;
                 }
-                break;
-            }
-            case "4": {
-                if (isMIUI()) {
-                    setWallpaperForMIUI(pairs[0].first, WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK);
-                } else {
-                    WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            wallpaperManager.setBitmap(pairs[0].first, null, true,
-                                    WallpaperManager.FLAG_LOCK | WallpaperManager.FLAG_SYSTEM);
+                case "4": {
+                    if (isMIUI()) {
+                        setWallpaperForMIUI(compressedBitmap, WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK);
+                    } else {
+                        WallpaperManager wallpaperManager = WallpaperManager.getInstance(mContext);
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                wallpaperManager.setBitmap(compressedBitmap, null, true,
+                                        WallpaperManager.FLAG_LOCK | WallpaperManager.FLAG_SYSTEM);
+                            }
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                            return false;
                         }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                        return false;
                     }
+                    break;
                 }
-                break;
             }
+            return true;
+        } finally {
+            // Ensure bitmap is recycled after use
+            recycleBitmap(compressedBitmap);
         }
-        return true;
     }
 
     @Override

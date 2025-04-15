@@ -78,47 +78,59 @@ public class PigeonApi {
     }
   }
 
+
+  /** Asynchronous error handling return type for non-nullable API method returns. */
+  public interface Result<T> {
+    /** Success case callback method for handling returns. */
+    void success(@NonNull T result);
+
+    /** Failure case callback method for handling errors. */
+    void error(@NonNull Throwable error);
+  }
+  /** Asynchronous error handling return type for nullable API method returns. */
+  public interface NullableResult<T> {
+    /** Success case callback method for handling returns. */
+    void success(@Nullable T result);
+
+    /** Failure case callback method for handling errors. */
+    void error(@NonNull Throwable error);
+  }
+  /** Asynchronous error handling return type for void API method returns. */
+  public interface VoidResult {
+    /** Success case callback method for handling returns. */
+    void success();
+
+    /** Failure case callback method for handling errors. */
+    void error(@NonNull Throwable error);
+  }
   /** Generated interface from Pigeon that represents a handler of messages from Flutter. */
   public interface WallpaperApi {
 
-    @NonNull 
-    String getPlatformVersion();
+    void getPlatformVersion(@NonNull Result<String> result);
 
-    @NonNull 
-    Map<String, Object> checkMaterialYouSupport();
+    void checkMaterialYouSupport(@NonNull Result<Map<String, Object>> result);
 
-    @NonNull 
-    Boolean setHomeWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome);
+    void setHomeWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setLockWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome);
+    void setLockWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setBothWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome);
+    void setBothWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setWallpaper(@NonNull String url, @NonNull Boolean goToHome);
+    void setWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setHomeWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    void setHomeWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setLockWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    void setLockWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setBothWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    void setBothWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    void setWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setMaterialYouWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull Boolean enableEffects);
+    void setMaterialYouWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull Boolean enableEffects, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean setLiveWallpaper(@NonNull String url, @NonNull Boolean goToHome);
+    void setLiveWallpaper(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull Result<Boolean> result);
 
-    @NonNull 
-    Boolean openWallpaperChooser();
+    void openWallpaperChooser(@NonNull Result<Boolean> result);
 
     /** The codec used by WallpaperApi. */
     static @NonNull MessageCodec<Object> getCodec() {
@@ -138,14 +150,20 @@ public class PigeonApi {
           channel.setMessageHandler(
               (message, reply) -> {
                 ArrayList<Object> wrapped = new ArrayList<>();
-                try {
-                  String output = api.getPlatformVersion();
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<String> resultCallback =
+                    new Result<String>() {
+                      public void success(String result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.getPlatformVersion(resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -159,14 +177,20 @@ public class PigeonApi {
           channel.setMessageHandler(
               (message, reply) -> {
                 ArrayList<Object> wrapped = new ArrayList<>();
-                try {
-                  Map<String, Object> output = api.checkMaterialYouSupport();
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Map<String, Object>> resultCallback =
+                    new Result<Map<String, Object>>() {
+                      public void success(Map<String, Object> result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.checkMaterialYouSupport(resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -183,14 +207,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String urlArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setHomeWallpaperFromUrl(urlArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setHomeWallpaperFromUrl(urlArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -207,14 +237,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String urlArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setLockWallpaperFromUrl(urlArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setLockWallpaperFromUrl(urlArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -231,14 +267,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String urlArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setBothWallpaperFromUrl(urlArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setBothWallpaperFromUrl(urlArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -255,14 +297,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String urlArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setWallpaper(urlArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setWallpaper(urlArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -279,14 +327,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setHomeWallpaperFromFile(filePathArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setHomeWallpaperFromFile(filePathArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -303,14 +357,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setLockWallpaperFromFile(filePathArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setLockWallpaperFromFile(filePathArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -327,14 +387,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setBothWallpaperFromFile(filePathArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setBothWallpaperFromFile(filePathArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -351,14 +417,20 @@ public class PigeonApi {
                 ArrayList<Object> args = (ArrayList<Object>) message;
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setWallpaperFromFile(filePathArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setWallpaperFromFile(filePathArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -376,14 +448,20 @@ public class PigeonApi {
                 String urlArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
                 Boolean enableEffectsArg = (Boolean) args.get(2);
-                try {
-                  Boolean output = api.setMaterialYouWallpaper(urlArg, goToHomeArg, enableEffectsArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setMaterialYouWallpaper(urlArg, goToHomeArg, enableEffectsArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -398,16 +476,22 @@ public class PigeonApi {
               (message, reply) -> {
                 ArrayList<Object> wrapped = new ArrayList<>();
                 ArrayList<Object> args = (ArrayList<Object>) message;
-                String urlArg = (String) args.get(0);
+                String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
-                try {
-                  Boolean output = api.setLiveWallpaper(urlArg, goToHomeArg);
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.setLiveWallpaper(filePathArg, goToHomeArg, resultCallback);
               });
         } else {
           channel.setMessageHandler(null);
@@ -421,14 +505,20 @@ public class PigeonApi {
           channel.setMessageHandler(
               (message, reply) -> {
                 ArrayList<Object> wrapped = new ArrayList<>();
-                try {
-                  Boolean output = api.openWallpaperChooser();
-                  wrapped.add(0, output);
-                }
- catch (Throwable exception) {
-                  wrapped = wrapError(exception);
-                }
-                reply.reply(wrapped);
+                Result<Boolean> resultCallback =
+                    new Result<Boolean>() {
+                      public void success(Boolean result) {
+                        wrapped.add(0, result);
+                        reply.reply(wrapped);
+                      }
+
+                      public void error(Throwable error) {
+                        ArrayList<Object> wrappedError = wrapError(error);
+                        reply.reply(wrappedError);
+                      }
+                    };
+
+                api.openWallpaperChooser(resultCallback);
               });
         } else {
           channel.setMessageHandler(null);

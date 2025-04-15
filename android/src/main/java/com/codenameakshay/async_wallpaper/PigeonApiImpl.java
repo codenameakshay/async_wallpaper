@@ -61,6 +61,95 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         }
     }
 
+    // Helper method to get content URI for an image file
+    public static Uri getImageContentUri(Context context, String absPath) {
+        // For Android 10+ (API 29+), use MediaStore API
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, "wallpaper_" + System.currentTimeMillis() + ".jpg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+            
+            Uri imageUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (imageUri != null) {
+                try (OutputStream out = context.getContentResolver().openOutputStream(imageUri)) {
+                    // Copy the file to the new location
+                    File sourceFile = new File(absPath);
+                    if (sourceFile.exists()) {
+                        FileInputStream in = new FileInputStream(sourceFile);
+                        byte[] buffer = new byte[1024];
+                        int length;
+                        while ((length = in.read(buffer)) > 0) {
+                            out.write(buffer, 0, length);
+                        }
+                        in.close();
+                    }
+                } catch (IOException e) {
+                    Log.e("AsyncWallpaper", "Error copying file", e);
+                }
+            }
+            return imageUri;
+        } else {
+            // Legacy approach for older Android versions
+            Cursor cursor = context.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    new String[] { MediaStore.Images.Media._ID }, MediaStore.Images.Media.DATA + "=? ",
+                    new String[] { absPath }, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                int id = cursor.getInt(cursor.getColumnIndex(MediaStore.MediaColumns._ID));
+                cursor.close();
+                return Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Integer.toString(id));
+            } else if (!absPath.isEmpty()) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Images.Media.DATA, absPath);
+                return context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            } else {
+                return null;
+            }
+        }
+    }
+
+    // Helper method to get real path from URI
+    public static String getRealPathFromURI(Context context, Uri uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // For Android 10+, we can't get the real path directly
+            // Instead, we'll create a temporary file and copy the content
+            try {
+                String[] projection = {MediaStore.Images.Media.DISPLAY_NAME};
+                Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null);
+                if (cursor != null && cursor.moveToFirst()) {
+                    String displayName = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME));
+                    cursor.close();
+                    
+                    File tempFile = new File(context.getCacheDir(), displayName);
+                    try (FileOutputStream out = new FileOutputStream(tempFile)) {
+                        try (FileInputStream in = (FileInputStream) context.getContentResolver().openInputStream(uri)) {
+                            byte[] buffer = new byte[1024];
+                            int length;
+                            while ((length = in.read(buffer)) > 0) {
+                                out.write(buffer, 0, length);
+                            }
+                        }
+                    }
+                    return tempFile.getAbsolutePath();
+                }
+            } catch (Exception e) {
+                Log.e("AsyncWallpaper", "Error getting real path", e);
+            }
+            return null;
+        } else {
+            // Legacy approach for older Android versions
+            Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+                String path = cursor.getString(idx);
+                cursor.close();
+                return path;
+            }
+            return null;
+        }
+    }
+
     // Helper method to set wallpaper for MIUI devices
     private void setWallpaperForMIUI(Bitmap bitmap, int flag) {
         try {
@@ -71,10 +160,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
             out.flush();
             out.close();
 
+            // Get content URI for the file
+            Uri contentUri = getImageContentUri(context, file.getAbsolutePath());
+            if (contentUri == null) {
+                Log.e("AsyncWallpaper", "Failed to get content URI for wallpaper file");
+                return;
+            }
+
             // Create an intent to set the wallpaper
             Intent intent = new Intent(Intent.ACTION_ATTACH_DATA);
             intent.addCategory(Intent.CATEGORY_DEFAULT);
-            intent.setDataAndType(Uri.fromFile(file), "image/jpeg");
+            intent.setDataAndType(contentUri, "image/jpeg");
             intent.putExtra("mimeType", "image/jpeg");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -82,7 +178,7 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
             // Start the activity
             context.startActivity(intent);
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("AsyncWallpaper", "Error setting wallpaper for MIUI", e);
         }
     }
 
@@ -91,9 +187,22 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         private final Context mContext;
         private static final int MAX_IMAGE_DIMENSION = 2048; // Maximum dimension for compressed images
         private static final int COMPRESSION_QUALITY = 85; // JPEG compression quality (0-100)
+        private PigeonApi.Result<Boolean> resultCallback;
+        private boolean goToHome;
 
         public SetWallPaperTask(final Context context) {
             this.mContext = context;
+        }
+
+        public SetWallPaperTask(final Context context, PigeonApi.Result<Boolean> resultCallback) {
+            this.mContext = context;
+            this.resultCallback = resultCallback;
+        }
+
+        public SetWallPaperTask(final Context context, PigeonApi.Result<Boolean> resultCallback, boolean goToHome) {
+            this.mContext = context;
+            this.resultCallback = resultCallback;
+            this.goToHome = goToHome;
         }
 
         private Bitmap compressBitmap(Bitmap original) {
@@ -144,8 +253,8 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
                                 int WITH_OTHER_APP_CODE = 733;
                                 Uri tempUri = getImageUri(mContext, compressedBitmap);
                                 Log.i("Arguments ", "configureFlutterEngine: " + "Saved image to storage");
-                                File finalFile = new File(getRealPathFromURI(tempUri));
-                                Uri contentURI = getImageContentUri(mContext, finalFile.getAbsolutePath());
+                                File finalFile = new File(PigeonApiImpl.getRealPathFromURI(mContext, tempUri));
+                                Uri contentURI = PigeonApiImpl.getImageContentUri(mContext, finalFile.getAbsolutePath());
                                 Log.i("Arguments ", "configureFlutterEngine: " + "Opening crop intent");
                                 Intent setWall = new Intent(Intent.ACTION_ATTACH_DATA);
                                 setWall.setDataAndType(contentURI, "image/*");
@@ -228,8 +337,33 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         protected void onPostExecute(Boolean result) {
             if (result) {
                 Log.d("AsyncWallpaper", "Wallpaper set successfully");
+                if (resultCallback != null) {
+                    resultCallback.success(true);
+                }
+                
+                // Navigate to home screen only if wallpaper was set successfully and goToHome is true
+                if (goToHome) {
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            goToHomeScreen(mContext);
+                        }
+                    }, 1000);
+                }
             } else {
                 Log.e("AsyncWallpaper", "Failed to set wallpaper");
+                if (resultCallback != null) {
+                    resultCallback.error(new Exception("Failed to set wallpaper"));
+                }
+            }
+        }
+
+        private static void goToHomeScreen(Context context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.addCategory(Intent.CATEGORY_HOME);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
             }
         }
 
@@ -259,10 +393,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
                 out.flush();
                 out.close();
 
+                // Get content URI for the file
+                Uri contentUri = PigeonApiImpl.getImageContentUri(mContext, file.getAbsolutePath());
+                if (contentUri == null) {
+                    Log.e("AsyncWallpaper", "Failed to get content URI for wallpaper file");
+                    return;
+                }
+
                 // Create an intent to set the wallpaper
                 Intent intent = new Intent(Intent.ACTION_ATTACH_DATA);
                 intent.addCategory(Intent.CATEGORY_DEFAULT);
-                intent.setDataAndType(Uri.fromFile(file), "image/jpeg");
+                intent.setDataAndType(contentUri, "image/jpeg");
                 intent.putExtra("mimeType", "image/jpeg");
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -270,7 +411,7 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
                 // Start the activity
                 mContext.startActivity(intent);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e("AsyncWallpaper", "Error setting wallpaper for MIUI", e);
             }
         }
 
@@ -349,46 +490,6 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
             }
         }
 
-        public String getRealPathFromURI(Uri uri) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // For Android 10+, we can't get the real path directly
-                // Instead, we'll create a temporary file and copy the content
-                try {
-                    String[] projection = {MediaStore.Images.Media.DISPLAY_NAME};
-                    Cursor cursor = mContext.getContentResolver().query(uri, projection, null, null, null);
-                    if (cursor != null && cursor.moveToFirst()) {
-                        String displayName = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME));
-                        cursor.close();
-                        
-                        File tempFile = new File(mContext.getCacheDir(), displayName);
-                        try (FileOutputStream out = new FileOutputStream(tempFile)) {
-                            try (FileInputStream in = (FileInputStream) mContext.getContentResolver().openInputStream(uri)) {
-                                byte[] buffer = new byte[1024];
-                                int length;
-                                while ((length = in.read(buffer)) > 0) {
-                                    out.write(buffer, 0, length);
-                                }
-                            }
-                        }
-                        return tempFile.getAbsolutePath();
-                    }
-                } catch (Exception e) {
-                    Log.e("SetWallPaperTask", "Error getting real path", e);
-                }
-                return null;
-            } else {
-                // Legacy approach for older Android versions
-                Cursor cursor = mContext.getContentResolver().query(uri, null, null, null, null);
-                if (cursor != null && cursor.moveToFirst()) {
-                    int idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
-                    String path = cursor.getString(idx);
-                    cursor.close();
-                    return path;
-                }
-                return null;
-            }
-        }
-
         void fixMediaDir() {
             // For Android 10+, we don't need to create directories manually
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -417,10 +518,25 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         private final boolean enableEffects;
         private static final int MAX_IMAGE_DIMENSION = 2048; // Maximum dimension for compressed images
         private static final int COMPRESSION_QUALITY = 85; // JPEG compression quality (0-100)
+        private PigeonApi.Result<Boolean> resultCallback;
+        private boolean goToHome;
 
         public SetMaterialYouWallpaperTask(final Context context, boolean enableEffects) {
             this.mContext = context;
             this.enableEffects = enableEffects;
+        }
+        
+        public SetMaterialYouWallpaperTask(final Context context, boolean enableEffects, PigeonApi.Result<Boolean> resultCallback) {
+            this.mContext = context;
+            this.enableEffects = enableEffects;
+            this.resultCallback = resultCallback;
+        }
+        
+        public SetMaterialYouWallpaperTask(final Context context, boolean enableEffects, PigeonApi.Result<Boolean> resultCallback, boolean goToHome) {
+            this.mContext = context;
+            this.enableEffects = enableEffects;
+            this.resultCallback = resultCallback;
+            this.goToHome = goToHome;
         }
 
         private Bitmap compressBitmap(Bitmap original) {
@@ -531,19 +647,44 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         protected void onPostExecute(Boolean result) {
             if (result) {
                 Log.d("MaterialYou", "Material You wallpaper set successfully");
+                if (resultCallback != null) {
+                    resultCallback.success(true);
+                }
+                
+                // Navigate to home screen only if wallpaper was set successfully and goToHome is true
+                if (goToHome) {
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            goToHomeScreen(mContext);
+                        }
+                    }, 1000);
+                }
             } else {
                 Log.e("MaterialYou", "Failed to set Material You wallpaper");
+                if (resultCallback != null) {
+                    resultCallback.error(new Exception("Failed to set Material You wallpaper"));
+                }
+            }
+        }
+        
+        private static void goToHomeScreen(Context context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.addCategory(Intent.CATEGORY_HOME);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
             }
         }
     }
 
-    @Override
-    public String getPlatformVersion() {
-        return "Android " + Build.VERSION.RELEASE;
+    @java.lang.Override
+    public void getPlatformVersion(@NonNull PigeonApi.Result<String> result) {
+        result.success("Android " + Build.VERSION.RELEASE);
     }
-    
-    @Override
-    public Map<String, Object> checkMaterialYouSupport() {
+
+    @java.lang.Override
+    public void checkMaterialYouSupport(@NonNull PigeonApi.Result<Map<String, Object>> result) {
         Map<String, Object> deviceInfo = new HashMap<>();
         deviceInfo.put("androidVersion", Build.VERSION.RELEASE);
         deviceInfo.put("sdkInt", Build.VERSION.SDK_INT);
@@ -563,33 +704,25 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         }
         
         deviceInfo.put("supportsMaterialYou", supportsMaterialYou);
-        return deviceInfo;
+        result.success(deviceInfo);
     }
 
-    @Override
-    public Boolean setHomeWallpaperFromUrl(String url, Boolean goToHome) {
+    @java.lang.Override
+    public void setHomeWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "3")); // "3" is for home wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
             public void onBitmapFailed(Exception e, Drawable errorDrawable) {
                 Log.e("AsyncWallpaper", "Failed to load image", e);
+                // Report failure to Flutter
+                result.error(e);
             }
 
             @Override
@@ -598,12 +731,15 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
             }
         };
         
-        // Load the image using Picasso
-        Picasso.get().load(url).into(target);
-        
-        return true;
+        try {
+            // Load the image using Picasso
+            Picasso.get().load(url).into(target);
+        } catch (Exception e) {
+            Log.e("AsyncWallpaper", "Error loading image", e);
+            result.error(e);
+        }
     }
-    
+
     private void goToHomeScreen() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Intent intent = new Intent(Intent.ACTION_MAIN);
@@ -613,25 +749,15 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         }
     }
 
-    @Override
-    public Boolean setLockWallpaperFromUrl(String url, Boolean goToHome) {
+    @java.lang.Override
+    public void setLockWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "2")); // "2" is for lock wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -647,29 +773,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso
         Picasso.get().load(url).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setBothWallpaperFromUrl(String url, Boolean goToHome) {
+    @java.lang.Override
+    public void setBothWallpaperFromUrl(@NonNull String url, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "4")); // "4" is for both home and lock wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -685,29 +799,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso
         Picasso.get().load(url).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setWallpaper(String url, Boolean goToHome) {
+    @java.lang.Override
+    public void setWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "1")); // "1" is for default wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -723,29 +825,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso
         Picasso.get().load(url).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setHomeWallpaperFromFile(String filePath, Boolean goToHome) {
+    @java.lang.Override
+    public void setHomeWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded from file");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "3")); // "3" is for home wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -761,29 +851,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso with file:// prefix
         Picasso.get().load("file://" + filePath).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setLockWallpaperFromFile(String filePath, Boolean goToHome) {
+    @java.lang.Override
+    public void setLockWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded from file");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "2")); // "2" is for lock wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -799,29 +877,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso with file:// prefix
         Picasso.get().load("file://" + filePath).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setBothWallpaperFromFile(String filePath, Boolean goToHome) {
+    @java.lang.Override
+    public void setBothWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded from file");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "4")); // "4" is for both home and lock wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -837,29 +903,17 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso with file:// prefix
         Picasso.get().load("file://" + filePath).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setWallpaperFromFile(String filePath, Boolean goToHome) {
+    @java.lang.Override
+    public void setWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         // Create a Target to handle the bitmap loading
         Target target = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.i("AsyncWallpaper", "Image Downloaded from file");
-                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context);
+                SetWallPaperTask setWallPaperTask = new SetWallPaperTask(context, result, goToHome);
                 setWallPaperTask.execute(new Pair<>(resource, "1")); // "1" is for default wallpaper
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
@@ -875,12 +929,10 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         
         // Load the image using Picasso with file:// prefix
         Picasso.get().load("file://" + filePath).into(target);
-        
-        return true;
     }
 
-    @Override
-    public Boolean setLiveWallpaper(String filePath, Boolean goToHome) {
+    @java.lang.Override
+    public void setLiveWallpaper(@NonNull String filePath, @NonNull Boolean goToHome, @NonNull PigeonApi.Result<Boolean> result) {
         try {
             // Create a file in the app's files directory
             File videoFile = new File(context.getFilesDir(), "live_wallpaper.mp4");
@@ -904,14 +956,14 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
                 }
                 
                 Log.i("AsyncWallpaper", "Live wallpaper set successfully");
-                return true;
+                result.success(true);
             } else {
                 Log.e("AsyncWallpaper", "Failed to copy video file");
-                return false;
+                result.error(new Exception("Failed to copy video file"));
             }
         } catch (Exception e) {
             Log.e("AsyncWallpaper", "Error setting live wallpaper", e);
-            return false;
+            result.error(e);
         }
     }
 
@@ -943,8 +995,8 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
         }
     }
 
-    @Override
-    public Boolean openWallpaperChooser() {
+    @java.lang.Override
+    public void openWallpaperChooser(@NonNull PigeonApi.Result<Boolean> result) {
         try {
             // Create a VideoLiveWallpaper instance
             VideoLiveWallpaper videoLiveWallpaper = new VideoLiveWallpaper();
@@ -953,36 +1005,27 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
             videoLiveWallpaper.openWallpaperChooser(context);
             
             Log.i("AsyncWallpaper", "Wallpaper chooser opened successfully");
-            return true;
+            result.success(true);
         } catch (Exception e) {
             Log.e("AsyncWallpaper", "Error opening wallpaper chooser", e);
-            return false;
+            result.error(e);
         }
     }
-    
-    @Override
-    public Boolean setMaterialYouWallpaper(String url, Boolean goToHome, Boolean enableEffects) {
+
+    @java.lang.Override
+    public void setMaterialYouWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull Boolean enableEffects, @NonNull PigeonApi.Result<Boolean> result) {
         Picasso.get().load(url).into(new Target() {
             @Override
             public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
                 Log.d("MaterialYou", "Bitmap loaded successfully, size: " + resource.getWidth() + "x" + resource.getHeight());
-                SetMaterialYouWallpaperTask task = new SetMaterialYouWallpaperTask(context, enableEffects);
+                SetMaterialYouWallpaperTask task = new SetMaterialYouWallpaperTask(context, enableEffects, result, goToHome);
                 task.execute(resource);
-                
-                // If goToHome is true, navigate to home screen after a short delay
-                if (goToHome) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            goToHomeScreen();
-                        }
-                    }, 1000);
-                }
             }
 
             @Override
             public void onBitmapFailed(Exception e, Drawable errorDrawable) {
                 Log.e("MaterialYou", "Failed to load bitmap", e);
+                result.error(e);
             }
 
             @Override
@@ -990,6 +1033,5 @@ public class PigeonApiImpl implements PigeonApi.WallpaperApi {
                 Log.d("MaterialYou", "Preparing to load image");
             }
         });
-        return true;
     }
 }

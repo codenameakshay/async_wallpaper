@@ -187,7 +187,8 @@ public class VideoLiveWallpaper extends WallpaperService {
                         mediaPlayer.setDataSource(videoFile.getAbsolutePath());
                     } else {
                         Log.e("VideoEngine", "Video file not found: " + videoFile.getAbsolutePath());
-                        return;
+                        mediaPlayer.release();
+                        mediaPlayer = null;
                     }
                     
                     mediaPlayer.setLooping(true);

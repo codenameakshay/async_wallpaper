@@ -27,6 +27,7 @@ import java.nio.channels.FileChannel;
 
 
 public class VideoLiveWallpaper extends WallpaperService {
+    private static final String TAG = "VideoLiveWallpaper";
 
     public static final String VIDEO_PARAMS_CONTROL_ACTION = "com.codenameakshay.async_wallpaper";
     public static final String KEY_ACTION = "music";
@@ -41,7 +42,7 @@ public class VideoLiveWallpaper extends WallpaperService {
         try {
             WallpaperManager.getInstance(context).clear();
         } catch (IOException e) {
-            Log.e("VideoLiveWallpaper", "Error clearing wallpaper", e);
+            Log.e(TAG, "Error clearing wallpaper", e);
         }
     }
 
@@ -52,7 +53,7 @@ public class VideoLiveWallpaper extends WallpaperService {
         try {
             WallpaperManager.getInstance(context).clear();
         } catch (IOException e) {
-            Log.e("VideoLiveWallpaper", "Error clearing wallpaper", e);
+            Log.e(TAG, "Error clearing wallpaper", e);
         }
     }
 
@@ -118,7 +119,7 @@ public class VideoLiveWallpaper extends WallpaperService {
                         }
                     }
                 } catch (Exception e) {
-                    Log.e("VideoEngine", "Error updating playback settings", e);
+                    Log.e(TAG, "Error updating playback settings", e);
                 }
             }
         }
@@ -162,7 +163,7 @@ public class VideoLiveWallpaper extends WallpaperService {
                     mediaPlayer.reset();
                     mediaPlayer.release();
                 } catch (Exception e) {
-                    Log.e("VideoEngine", "Error releasing MediaPlayer", e);
+                    Log.e(TAG, "Error releasing MediaPlayer", e);
                 } finally {
                     mediaPlayer = null;
                 }
@@ -186,7 +187,7 @@ public class VideoLiveWallpaper extends WallpaperService {
                     if (videoFile.exists()) {
                         mediaPlayer.setDataSource(videoFile.getAbsolutePath());
                     } else {
-                        Log.e("VideoEngine", "Video file not found: " + videoFile.getAbsolutePath());
+                        Log.e(TAG, "Video file not found: " + videoFile.getAbsolutePath());
                         mediaPlayer.release();
                         mediaPlayer = null;
                     }
@@ -203,7 +204,7 @@ public class VideoLiveWallpaper extends WallpaperService {
                     Log.d("VideoEngine", "MediaPlayer started successfully");
                 }
             } catch (IOException e) {
-                Log.e("VideoEngine", "Error initializing MediaPlayer", e);
+                Log.e(TAG, "Error initializing MediaPlayer", e);
             }
         }
 
@@ -233,7 +234,7 @@ public class VideoLiveWallpaper extends WallpaperService {
                     unregisterReceiver(broadcastReceiver);
                     isReceiverRegistered = false;
                 } catch (Exception e) {
-                    Log.e("VideoEngine", "Error unregistering receiver", e);
+                    Log.e(TAG, "Error unregistering receiver", e);
                 }
             }
         }

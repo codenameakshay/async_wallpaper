@@ -100,16 +100,16 @@ public class PigeonApi {
     Boolean setWallpaper(@NonNull String url, @NonNull Boolean goToHome);
 
     @NonNull 
-    Boolean setLockWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    Boolean setHomeWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
 
     @NonNull 
-    Boolean setHomeWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
+    Boolean setLockWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
 
     @NonNull 
     Boolean setBothWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
 
     @NonNull 
-    Boolean setWallpaperFromFile(@NonNull String url, @NonNull Boolean goToHome);
+    Boolean setWallpaperFromFile(@NonNull String filePath, @NonNull Boolean goToHome);
 
     @NonNull 
     Boolean setMaterialYouWallpaper(@NonNull String url, @NonNull Boolean goToHome, @NonNull Boolean enableEffects);
@@ -271,7 +271,7 @@ public class PigeonApi {
       {
         BasicMessageChannel<Object> channel =
             new BasicMessageChannel<>(
-                binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromFile" + messageChannelSuffix, getCodec());
+                binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromFile" + messageChannelSuffix, getCodec());
         if (api != null) {
           channel.setMessageHandler(
               (message, reply) -> {
@@ -280,7 +280,7 @@ public class PigeonApi {
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
                 try {
-                  Boolean output = api.setLockWallpaperFromFile(filePathArg, goToHomeArg);
+                  Boolean output = api.setHomeWallpaperFromFile(filePathArg, goToHomeArg);
                   wrapped.add(0, output);
                 }
  catch (Throwable exception) {
@@ -295,7 +295,7 @@ public class PigeonApi {
       {
         BasicMessageChannel<Object> channel =
             new BasicMessageChannel<>(
-                binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromFile" + messageChannelSuffix, getCodec());
+                binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromFile" + messageChannelSuffix, getCodec());
         if (api != null) {
           channel.setMessageHandler(
               (message, reply) -> {
@@ -304,7 +304,7 @@ public class PigeonApi {
                 String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
                 try {
-                  Boolean output = api.setHomeWallpaperFromFile(filePathArg, goToHomeArg);
+                  Boolean output = api.setLockWallpaperFromFile(filePathArg, goToHomeArg);
                   wrapped.add(0, output);
                 }
  catch (Throwable exception) {
@@ -349,10 +349,10 @@ public class PigeonApi {
               (message, reply) -> {
                 ArrayList<Object> wrapped = new ArrayList<>();
                 ArrayList<Object> args = (ArrayList<Object>) message;
-                String urlArg = (String) args.get(0);
+                String filePathArg = (String) args.get(0);
                 Boolean goToHomeArg = (Boolean) args.get(1);
                 try {
-                  Boolean output = api.setWallpaperFromFile(urlArg, goToHomeArg);
+                  Boolean output = api.setWallpaperFromFile(filePathArg, goToHomeArg);
                   wrapped.add(0, output);
                 }
  catch (Throwable exception) {

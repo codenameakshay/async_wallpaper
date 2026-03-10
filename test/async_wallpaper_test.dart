@@ -1,23 +1,38 @@
-import 'package:flutter/services.dart';
+import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:async_wallpaper/async_wallpaper.dart';
-
 void main() {
-  const channel = MethodChannel('async_wallpaper');
-  TestWidgetsFlutterBinding.ensureInitialized();
+  group('AsyncWallpaper input validation', () {
+    test('fails for empty static wallpaper source', () async {
+      final WallpaperResult result = await AsyncWallpaper.setWallpaper(
+        const WallpaperRequest(
+          target: WallpaperTarget.both,
+          sourceType: WallpaperSourceType.url,
+          source: '',
+        ),
+      );
 
-  setUp(() {
-    channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      return '42';
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
-  });
 
-  tearDown(() {
-    channel.setMockMethodCallHandler(null);
-  });
+    test('fails for empty Material You URL', () async {
+      final WallpaperResult result =
+          await AsyncWallpaper.setMaterialYouWallpaper(
+            const MaterialYouWallpaperRequest(url: ''),
+          );
 
-  test('getPlatformVersion', () async {
-    expect(await AsyncWallpaper.platformVersion, '42');
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
+
+    test('fails for empty live wallpaper file path', () async {
+      final WallpaperResult result = await AsyncWallpaper.setLiveWallpaper(
+        const LiveWallpaperRequest(filePath: ''),
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
   });
 }

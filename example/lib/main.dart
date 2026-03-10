@@ -1,36 +1,14 @@
-import 'dart:async';
-
 import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-const _brandBlue = Color(0xFF1E88E5);
-
-// Sample image URLs for the carousel
-final List<String> imageUrls = [
+const List<String> imageUrls = <String>[
   'https://images.unsplash.com/photo-1635593701810-3156162e184f',
   'https://images.unsplash.com/photo-1744132116976-0a68511b70f6',
   'https://images.unsplash.com/photo-1741018605802-e394cf20a435',
   'https://images.unsplash.com/photo-1743953273017-6a5e0c14ce40',
   'https://images.unsplash.com/photo-1695067439143-81a61a8c904a',
-];
-
-class ImageInfo {
-  final String title;
-  final String url;
-
-  const ImageInfo(this.title, this.url);
-}
-
-final List<ImageInfo> imageInfos = [
-  ImageInfo('Wallpaper 1', imageUrls[0]),
-  ImageInfo('Wallpaper 2', imageUrls[1]),
-  ImageInfo('Wallpaper 3', imageUrls[2]),
-  ImageInfo('Wallpaper 4', imageUrls[3]),
-  ImageInfo('Wallpaper 5', imageUrls[4]),
 ];
 
 void main() {
@@ -42,29 +20,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use DynamicColorBuilder to support Material You theming
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        ColorScheme lightColorScheme;
-        ColorScheme darkColorScheme;
-
-        // Use dynamic color scheme if available, otherwise fall back to a generated scheme
-        if (lightDynamic != null && darkDynamic != null) {
-          lightColorScheme = lightDynamic.harmonized();
-          darkColorScheme = darkDynamic.harmonized();
-        } else {
-          lightColorScheme = ColorScheme.fromSeed(seedColor: _brandBlue);
-          darkColorScheme = ColorScheme.fromSeed(
-            seedColor: _brandBlue,
-            brightness: Brightness.dark,
-          );
-        }
-
-        // Configure the MaterialApp with themes and home page
+        final ColorScheme scheme =
+            lightDynamic ?? ColorScheme.fromSeed(seedColor: Colors.blue);
         return MaterialApp(
-          restorationScopeId: 'async_wallpaper_app',
-          theme: ThemeData(colorScheme: lightColorScheme),
-          darkTheme: ThemeData(colorScheme: darkColorScheme),
+          title: 'Async Wallpaper Example',
+          theme: ThemeData(colorScheme: scheme),
           home: const HomePage(),
         );
       },
@@ -72,7 +34,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Main page of the application
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -80,405 +41,260 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with RestorationMixin {
-  // Restorable state variables for various wallpaper operations
-  final RestorableString _platformVersion = RestorableString('Unknown');
-  final RestorableString _wallpaperFileNative = RestorableString('Unknown');
-  final RestorableString _wallpaperFileHome = RestorableString('Unknown');
-  final RestorableString _wallpaperFileLock = RestorableString('Unknown');
-  final RestorableString _wallpaperFileBoth = RestorableString('Unknown');
-  final RestorableString _wallpaperUrlNative = RestorableString('Unknown');
-  final RestorableString _wallpaperUrlHome = RestorableString('Unknown');
-  final RestorableString _wallpaperUrlLock = RestorableString('Unknown');
-  final RestorableString _wallpaperUrlBoth = RestorableString('Unknown');
-  final RestorableString _liveWallpaper = RestorableString('Unknown');
-  final RestorableString _wallpaperChooser = RestorableString('Unknown');
-  final RestorableString _materialYouWallpaper = RestorableString('Unknown');
-  final RestorableInt _currentImageIndex = RestorableInt(0);
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
+  bool _goHome = false;
+  String _status = 'Idle';
+  String? _activeAction;
 
-  // URLs for static and live wallpapers
-  // String url = imageUrls[0]; // Default to first image
-  String liveUrl = 'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+  bool _isActionLoading(String action) => _activeAction == action;
 
-  // Carousel controller
-  final CarouselController _carouselController = CarouselController(initialItem: 0);
-
-  late bool goToHome;
-  String? _loadingOption;
-
-  @override
-  void initState() {
-    super.initState();
-    goToHome = false;
-    initPlatformState();
-  }
-
-  // Initialize platform state
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion = await AsyncWallpaper.platformVersion;
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
+  Future<void> _runAction(
+    String action,
+    String operation,
+    Future<WallpaperResult> Function() body,
+  ) async {
+    if (_activeAction != null) {
+      return;
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
     setState(() {
-      _platformVersion.value = platformVersion;
+      _activeAction = action;
+      _status = '$operation in progress...';
+    });
+
+    try {
+      final WallpaperResult result = await body();
+      _setStatus(result, operation);
+    } catch (error) {
+      setState(() {
+        _status = '$operation failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _activeAction = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _setFromUrl() async {
+    await _runAction('url', 'URL wallpaper', () {
+      return AsyncWallpaper.setWallpaper(
+        WallpaperRequest(
+          target: WallpaperTarget.both,
+          sourceType: WallpaperSourceType.url,
+          source: imageUrls[_selectedIndex],
+          goToHome: _goHome,
+        ),
+      );
     });
   }
 
-  // Generic method to set wallpaper and update UI
-  Future<void> setWallpaper(Function wallpaperSetter, RestorableString status, String optionLabel) async {
-    setState(() {
-      _loadingOption = optionLabel;
-      status.value = 'Loading';
+  Future<void> _setFromFile() async {
+    await _runAction('file', 'File wallpaper', () async {
+      final file = await DefaultCacheManager().getSingleFile(
+        imageUrls[_selectedIndex],
+      );
+      return AsyncWallpaper.setWallpaper(
+        WallpaperRequest(
+          target: WallpaperTarget.both,
+          sourceType: WallpaperSourceType.file,
+          source: file.path,
+          goToHome: _goHome,
+        ),
+      );
     });
+  }
 
-    String result;
-    try {
-      result = await wallpaperSetter() ? 'Wallpaper set' : 'Failed to set wallpaper.';
-    } on PlatformException {
-      result = 'Failed to set wallpaper.';
-    }
+  Future<void> _setLiveWallpaper() async {
+    await _runAction('live', 'Live wallpaper', () async {
+      const String liveUrl =
+          'https://github.com/codenameakshay/sample-data/raw/main/video3.mp4';
+      final file = await DefaultCacheManager().getSingleFile(liveUrl);
+      return AsyncWallpaper.setLiveWallpaper(
+        LiveWallpaperRequest(filePath: file.path, goToHome: _goHome),
+      );
+    });
+  }
 
-    if (!mounted) return;
+  Future<void> _openChooser() async {
+    await _runAction('chooser', 'Wallpaper chooser', () {
+      return AsyncWallpaper.openWallpaperChooser();
+    });
+  }
 
+  void _setStatus(WallpaperResult result, String operation) {
     setState(() {
-      _loadingOption = null;
-      status.value = result;
+      _status = result.isSuccess
+          ? '$operation succeeded'
+          : '$operation failed: ${result.error?.message ?? 'unknown'}';
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Define wallpaper options with their respective functions
-    final List<Map<String, dynamic>> wallpaperOptions = [
-      {
-        'label': 'File Native',
-        'subtitle': 'Set wallpaper using a file on native screen',
-        'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
-              return AsyncWallpaper.setWallpaperFromFileNative(
-                filePath: file.path,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperFileNative, 'File Native'),
-        'status': _wallpaperFileNative
-      },
-      {
-        'label': 'File Home',
-        'subtitle': 'Set wallpaper using a file on home screen',
-        'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
-              return AsyncWallpaper.setWallpaperFromFile(
-                filePath: file.path,
-                wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperFileHome, 'File Home'),
-        'status': _wallpaperFileHome
-      },
-      {
-        'label': 'File Lock',
-        'subtitle': 'Set wallpaper using a file on lock screen',
-        'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
-              return AsyncWallpaper.setWallpaperFromFile(
-                filePath: file.path,
-                wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperFileLock, 'File Lock'),
-        'status': _wallpaperFileLock
-      },
-      {
-        'label': 'File Both',
-        'subtitle': 'Set wallpaper using a file on both screens',
-        'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(imageUrls[_currentImageIndex.value]);
-              return AsyncWallpaper.setWallpaperFromFile(
-                filePath: file.path,
-                wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperFileBoth, 'File Both'),
-        'status': _wallpaperFileBoth
-      },
-      {
-        'label': 'URL Native',
-        'subtitle': 'Set wallpaper using URL on native screen',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.setWallpaperNative(
-                url: imageUrls[_currentImageIndex.value],
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperUrlNative, 'URL Native'),
-        'status': _wallpaperUrlNative
-      },
-      {
-        'label': 'URL Home',
-        'subtitle': 'Set wallpaper using URL on home screen',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.setWallpaper(
-                url: imageUrls[_currentImageIndex.value],
-                wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperUrlHome, 'URL Home'),
-        'status': _wallpaperUrlHome
-      },
-      {
-        'label': 'URL Lock',
-        'subtitle': 'Set wallpaper using URL on lock screen',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.setWallpaper(
-                url: imageUrls[_currentImageIndex.value],
-                wallpaperLocation: AsyncWallpaper.LOCK_SCREEN,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperUrlLock, 'URL Lock'),
-        'status': _wallpaperUrlLock
-      },
-      {
-        'label': 'URL Both',
-        'subtitle': 'Set wallpaper using URL on both screens',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.setWallpaper(
-                url: imageUrls[_currentImageIndex.value],
-                wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperUrlBoth, 'URL Both'),
-        'status': _wallpaperUrlBoth
-      },
-      {
-        'label': 'Live Wallpaper',
-        'subtitle': 'Set live wallpaper',
-        'onTap': () => setWallpaper(() async {
-              var file = await DefaultCacheManager().getSingleFile(liveUrl);
-              return AsyncWallpaper.setLiveWallpaper(
-                filePath: file.path,
-                goToHome: goToHome,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _liveWallpaper, 'Live Wallpaper'),
-        'status': _liveWallpaper
-      },
-      {
-        'label': 'Wallpaper Chooser',
-        'subtitle': 'Open wallpaper chooser',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.openWallpaperChooser(
-                goToHome: goToHome,
-                toastDetails: ToastDetails.wallpaperChooser(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _wallpaperChooser, 'Wallpaper Chooser'),
-        'status': _wallpaperChooser
-      },
-      {
-        'label': 'Material You',
-        'subtitle': 'Set Material You wallpaper (Android 12+)',
-        'onTap': () => setWallpaper(() {
-              return AsyncWallpaper.setMaterialYouWallpaperFromUrl(
-                url: imageUrls[_currentImageIndex.value],
-                goToHome: goToHome,
-                enableEffects: true,
-                toastDetails: ToastDetails.success(),
-                errorToastDetails: ToastDetails.error(),
-              );
-            }, _materialYouWallpaper, 'Material You'),
-        'status': _materialYouWallpaper
-      },
-    ];
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dynamic Wallpaper App'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            // Switch to toggle 'Go to home' option
-            SwitchListTile(
-              title: const Text('Go to home'),
-              value: goToHome,
-              onChanged: (value) {
-                setState(() {
-                  goToHome = value;
-                });
+      appBar: AppBar(title: const Text('Async Wallpaper v3 Example')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          DropdownButton<int>(
+            value: _selectedIndex,
+            items: List<DropdownMenuItem<int>>.generate(
+              imageUrls.length,
+              (int i) => DropdownMenuItem<int>(
+                value: i,
+                child: Text('Sample image ${i + 1}'),
+              ),
+            ),
+            onChanged: (int? value) {
+              if (value != null) {
+                setState(() => _selectedIndex = value);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                imageUrls[_selectedIndex],
+                fit: BoxFit.cover,
+                loadingBuilder:
+                    (
+                      BuildContext context,
+                      Widget child,
+                      ImageChunkEvent? progress,
+                    ) {
+                      if (progress == null) {
+                        return child;
+                      }
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                errorBuilder:
+                    (BuildContext context, Object error, StackTrace? trace) {
+                      return const Center(child: Text('Preview unavailable'));
+                    },
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: imageUrls.length,
+              separatorBuilder: (BuildContext context, int index) =>
+                  const SizedBox(width: 8),
+              itemBuilder: (BuildContext context, int index) {
+                final bool isSelected = index == _selectedIndex;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedIndex = index),
+                  child: Container(
+                    width: 96,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        imageUrls[index],
+                        fit: BoxFit.cover,
+                        loadingBuilder:
+                            (
+                              BuildContext context,
+                              Widget child,
+                              ImageChunkEvent? progress,
+                            ) {
+                              if (progress == null) {
+                                return child;
+                              }
+                              return const Center(
+                                child: SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              );
+                            },
+                        errorBuilder:
+                            (
+                              BuildContext context,
+                              Object error,
+                              StackTrace? trace,
+                            ) {
+                              return const ColoredBox(
+                                color: Color(0x22000000),
+                                child: Center(
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
+                              );
+                            },
+                      ),
+                    ),
+                  ),
+                );
               },
             ),
-            // Image carousel
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: 180),
-              child: CarouselView(
-                controller: _carouselController,
-                itemExtent: MediaQuery.of(context).size.width * 0.8,
-                itemSnapping: true,
-                onTap: (index) {
-                  setState(() {
-                    _currentImageIndex.value = index;
-                  });
-                },
-                children: imageInfos.map((ImageInfo image) {
-                  return HeroLayoutCard(
-                    imageInfo: image,
-                    isSelected: _currentImageIndex.value == imageInfos.indexOf(image),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Grid of wallpaper options
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 8.0,
-                crossAxisSpacing: 8.0,
-                childAspectRatio: 1.0, // Make buttons square
-                children: wallpaperOptions.map((option) {
-                  return ElevatedButton(
-                    onPressed: _loadingOption == null ? option['onTap'] : null,
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                    ),
-                    child: _loadingOption == option['label']
-                        ? const Center(child: CircularProgressIndicator())
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(option['label'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4.0),
-                              Text(
-                                option['subtitle'],
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              const SizedBox(height: 8.0),
-                              Text(
-                                option['status'].value,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
+          ),
+          SwitchListTile(
+            title: const Text('Go to home after apply'),
+            value: _goHome,
+            onChanged: (bool value) => setState(() => _goHome = value),
+          ),
+          FilledButton(
+            onPressed: _activeAction == null ? _setFromUrl : null,
+            child: _isActionLoading('url')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Set From URL'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _activeAction == null ? _setFromFile : null,
+            child: _isActionLoading('file')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Set From File'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _activeAction == null ? _setLiveWallpaper : null,
+            child: _isActionLoading('live')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Set Live Wallpaper'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _activeAction == null ? _openChooser : null,
+            child: _isActionLoading('chooser')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Open Wallpaper Chooser'),
+          ),
+          const SizedBox(height: 16),
+          Text('Status: $_status'),
+        ],
       ),
-    );
-  }
-
-  // Restoration
-  @override
-  String? get restorationId => '_HomePageState';
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
-    registerForRestoration(_platformVersion, 'platform_version');
-    registerForRestoration(_wallpaperFileNative, 'wallpaper_file_native');
-    registerForRestoration(_wallpaperFileHome, 'wallpaper_file_home');
-    registerForRestoration(_wallpaperFileLock, 'wallpaper_file_lock');
-    registerForRestoration(_wallpaperFileBoth, 'wallpaper_file_both');
-    registerForRestoration(_wallpaperUrlNative, 'wallpaper_url_native');
-    registerForRestoration(_wallpaperUrlHome, 'wallpaper_url_home');
-    registerForRestoration(_wallpaperUrlLock, 'wallpaper_url_lock');
-    registerForRestoration(_wallpaperUrlBoth, 'wallpaper_url_both');
-    registerForRestoration(_liveWallpaper, 'live_wallpaper');
-    registerForRestoration(_wallpaperChooser, 'wallpaper_chooser');
-    registerForRestoration(_materialYouWallpaper, 'material_you_wallpaper');
-    registerForRestoration(_currentImageIndex, 'current_image_index');
-  }
-}
-
-class HeroLayoutCard extends StatelessWidget {
-  const HeroLayoutCard({
-    super.key,
-    required this.imageInfo,
-    required this.isSelected,
-  });
-
-  final ImageInfo imageInfo;
-  final bool isSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    return Stack(
-      alignment: AlignmentDirectional.bottomStart,
-      children: <Widget>[
-        ClipRect(
-          child: OverflowBox(
-            maxWidth: width * 7 / 8,
-            minWidth: width * 7 / 8,
-            child: CachedNetworkImage(
-              imageUrl: imageInfo.url,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              errorWidget: (context, url, error) => const Icon(Icons.error),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(18.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                imageInfo.title,
-                overflow: TextOverflow.clip,
-                softWrap: false,
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-            ],
-          ),
-        ),
-        if (isSelected)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
-          ),
-      ],
     );
   }
 }

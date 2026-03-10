@@ -13,6 +13,8 @@ class MaterialYouSupportData {
     kotlinOut:
         'android/src/main/kotlin/com/codenameakshay/async_wallpaper/PigeonApi.kt',
     kotlinOptions: KotlinOptions(package: 'com.codenameakshay.async_wallpaper'),
+    swiftOut: 'ios/Classes/PigeonApi.g.swift',
+    swiftOptions: SwiftOptions(),
   ),
 )
 @HostApi()
@@ -55,4 +57,7 @@ abstract class WallpaperApi {
 
   @async
   bool openWallpaperChooser();
+
+  @async
+  bool downloadWallpaper(String url);
 }

@@ -17,8 +17,7 @@ import com.squareup.picasso.Picasso
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.IOException
-import java.io.OutputStream
+import java.net.URL
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -178,6 +177,48 @@ class PigeonApiImpl(
         true
       }.getOrElse {
         Log.e(TAG, "openWallpaperChooser failed", it)
+        false
+      }
+      postBoolean(callback, success)
+    }
+  }
+
+  override fun downloadWallpaper(url: String, callback: (Result<Boolean>) -> Unit) {
+    ioExecutor.execute {
+      val success = runCatching {
+        val imageBytes = URL(url).openStream().use { it.readBytes() }
+        val resolver = context.contentResolver
+        val fileName = "wallpaper_${System.currentTimeMillis()}.jpg"
+        val values = ContentValues().apply {
+          put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+          put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(
+              MediaStore.Images.Media.RELATIVE_PATH,
+              "${Environment.DIRECTORY_PICTURES}/AsyncWallpaper",
+            )
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+          }
+        }
+
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+          ?: return@runCatching false
+
+        val written = resolver.openOutputStream(uri)?.use { output ->
+          output.write(imageBytes)
+          true
+        } ?: false
+
+        if (written && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          val finalizeValues = ContentValues().apply {
+            put(MediaStore.Images.Media.IS_PENDING, 0)
+          }
+          resolver.update(uri, finalizeValues, null, null)
+        }
+
+        written
+      }.getOrElse {
+        Log.e(TAG, "downloadWallpaper failed", it)
         false
       }
       postBoolean(callback, success)

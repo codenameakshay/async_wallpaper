@@ -147,6 +147,7 @@ interface WallpaperApi {
   fun setMaterialYouWallpaper(url: String, goToHome: Boolean, enableEffects: Boolean, callback: (Result<Boolean>) -> Unit)
   fun setLiveWallpaper(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
   fun openWallpaperChooser(callback: (Result<Boolean>) -> Unit)
+  fun downloadWallpaper(url: String, callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by WallpaperApi. */
@@ -409,6 +410,26 @@ interface WallpaperApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.openWallpaperChooser{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.downloadWallpaper$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val urlArg = args[0] as String
+            api.downloadWallpaper(urlArg) { result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

@@ -1,11 +1,12 @@
 # async_wallpaper
 
-Android wallpaper plugin for Flutter with support for:
+Flutter wallpaper plugin with support for:
 
 - static wallpaper from URL or file path
 - home, lock, or both targets
 - live wallpaper from local video file
 - opening Android wallpaper chooser
+- downloading wallpapers to Photos (iOS and Android)
 
 ## Demo
 
@@ -26,12 +27,13 @@ Android wallpaper plugin for Flutter with support for:
 - Flutter `>=3.41.4`
 - Dart `>=3.9.0 <4.0.0`
 - Android `minSdk 24`
+- iOS `13.0+` (download support only)
 
 ## Installation
 
 ```yaml
 dependencies:
-  async_wallpaper: ^3.0.0
+  async_wallpaper: ^3.1.0
 ```
 
 ## Usage
@@ -90,6 +92,30 @@ await AsyncWallpaper.openWallpaperChooser();
 
 ```dart
 final MaterialYouSupport support = await AsyncWallpaper.checkMaterialYouSupport();
+```
+
+### Download wallpaper (iOS + Android)
+
+```dart
+final WallpaperResult result = await AsyncWallpaper.downloadWallpaper(
+  const DownloadWallpaperRequest(
+    url: 'https://example.com/wallpaper.jpg',
+  ),
+);
+```
+
+### Platform behavior
+
+- Android: wallpaper apply APIs + live wallpaper + chooser + download.
+- iOS: download API supported; apply/live/chooser APIs return `unsupported`.
+
+### iOS permission
+
+For iOS downloads to Photos, add this key to your app `Info.plist`:
+
+```xml
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>Allows saving downloaded wallpapers to your Photos library.</string>
 ```
 
 ## Migration from 2.x

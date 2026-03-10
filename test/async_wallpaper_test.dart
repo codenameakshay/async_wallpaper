@@ -34,5 +34,14 @@ void main() {
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
+
+    test('fails for empty download wallpaper URL', () async {
+      final WallpaperResult result = await AsyncWallpaper.downloadWallpaper(
+        const DownloadWallpaperRequest(url: ''),
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
   });
 }

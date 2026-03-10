@@ -1,5 +1,6 @@
 import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
@@ -125,6 +126,14 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _downloadFromUrl() async {
+    await _runAction('download', 'Wallpaper download', () {
+      return AsyncWallpaper.downloadWallpaper(
+        DownloadWallpaperRequest(url: imageUrls[_selectedIndex]),
+      );
+    });
+  }
+
   void _setStatus(WallpaperResult result, String operation) {
     setState(() {
       _status = result.isSuccess
@@ -135,6 +144,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
     return Scaffold(
       appBar: AppBar(title: const Text('Async Wallpaper v3 Example')),
       body: ListView(
@@ -250,10 +260,21 @@ class _HomePageState extends State<HomePage> {
           SwitchListTile(
             title: const Text('Go to home after apply'),
             value: _goHome,
-            onChanged: (bool value) => setState(() => _goHome = value),
+            onChanged: isIos
+                ? null
+                : (bool value) => setState(() => _goHome = value),
           ),
           FilledButton(
-            onPressed: _activeAction == null ? _setFromUrl : null,
+            onPressed: _activeAction == null ? _downloadFromUrl : null,
+            child: _isActionLoading('download')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Download Wallpaper'),
+          ),
+          FilledButton(
+            onPressed: !isIos && _activeAction == null ? _setFromUrl : null,
             child: _isActionLoading('url')
                 ? const SizedBox.square(
                     dimension: 18,
@@ -263,7 +284,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           FilledButton(
-            onPressed: _activeAction == null ? _setFromFile : null,
+            onPressed: !isIos && _activeAction == null ? _setFromFile : null,
             child: _isActionLoading('file')
                 ? const SizedBox.square(
                     dimension: 18,
@@ -273,7 +294,9 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           FilledButton(
-            onPressed: _activeAction == null ? _setLiveWallpaper : null,
+            onPressed: !isIos && _activeAction == null
+                ? _setLiveWallpaper
+                : null,
             child: _isActionLoading('live')
                 ? const SizedBox.square(
                     dimension: 18,
@@ -283,7 +306,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: _activeAction == null ? _openChooser : null,
+            onPressed: !isIos && _activeAction == null ? _openChooser : null,
             child: _isActionLoading('chooser')
                 ? const SizedBox.square(
                     dimension: 18,
@@ -291,6 +314,12 @@ class _HomePageState extends State<HomePage> {
                   )
                 : const Text('Open Wallpaper Chooser'),
           ),
+          if (isIos) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text(
+              'iOS supports download only. Apply actions are unavailable by platform design.',
+            ),
+          ],
           const SizedBox(height: 16),
           Text('Status: $_status'),
         ],

@@ -1,4 +1,5 @@
 import 'package:async_wallpaper/pigeon_impl_api.dart';
+import 'package:flutter/foundation.dart';
 
 /// Target location where a static wallpaper should be applied.
 enum WallpaperTarget { home, lock, both }
@@ -45,6 +46,13 @@ class LiveWallpaperRequest {
   final bool goToHome;
 }
 
+/// Typed input for download-only operations.
+class DownloadWallpaperRequest {
+  const DownloadWallpaperRequest({required this.url});
+
+  final String url;
+}
+
 /// Error returned by package operations.
 class WallpaperError {
   const WallpaperError({
@@ -88,10 +96,28 @@ class AsyncWallpaper {
   AsyncWallpaper._();
 
   static final WallpaperApi _api = WallpaperApi();
+  static bool get _isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool get _isIOS =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static const WallpaperResult _unsupportedResult = WallpaperResult.failure(
+    WallpaperError(
+      code: WallpaperErrorCode.unsupported,
+      message: 'This operation is not supported on this platform.',
+    ),
+  );
 
   static Future<String> get platformVersion => _api.getPlatformVersion();
 
   static Future<MaterialYouSupport> checkMaterialYouSupport() async {
+    if (!_isAndroid) {
+      return const MaterialYouSupport(
+        isSupported: false,
+        androidVersion: 'Unsupported on this platform',
+        sdkInt: 0,
+      );
+    }
     final MaterialYouSupportData data = await _api.checkMaterialYouSupport();
     return MaterialYouSupport(
       isSupported: data.isSupported == true,
@@ -101,6 +127,9 @@ class AsyncWallpaper {
   }
 
   static Future<WallpaperResult> setWallpaper(WallpaperRequest request) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     if (request.source.trim().isEmpty) {
       return const WallpaperResult.failure(
         WallpaperError(
@@ -134,6 +163,9 @@ class AsyncWallpaper {
   static Future<WallpaperResult> setMaterialYouWallpaper(
     MaterialYouWallpaperRequest request,
   ) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     if (request.url.trim().isEmpty) {
       return const WallpaperResult.failure(
         WallpaperError(
@@ -171,6 +203,9 @@ class AsyncWallpaper {
   static Future<WallpaperResult> setLiveWallpaper(
     LiveWallpaperRequest request,
   ) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     if (request.filePath.trim().isEmpty) {
       return const WallpaperResult.failure(
         WallpaperError(
@@ -205,6 +240,9 @@ class AsyncWallpaper {
   }
 
   static Future<WallpaperResult> openWallpaperChooser() async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     try {
       final bool success = await _api.openWallpaperChooser();
       return success
@@ -220,6 +258,42 @@ class AsyncWallpaper {
         WallpaperError(
           code: WallpaperErrorCode.unknown,
           message: 'Unexpected exception while opening wallpaper chooser.',
+          details: error,
+        ),
+      );
+    }
+  }
+
+  static Future<WallpaperResult> downloadWallpaper(
+    DownloadWallpaperRequest request,
+  ) async {
+    if (!_isAndroid && !_isIOS) {
+      return _unsupportedResult;
+    }
+    if (request.url.trim().isEmpty) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Wallpaper URL cannot be empty.',
+        ),
+      );
+    }
+
+    try {
+      final bool success = await _api.downloadWallpaper(request.url);
+      return success
+          ? const WallpaperResult.success()
+          : const WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: 'Failed to download wallpaper.',
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: 'Unexpected exception while downloading wallpaper.',
           details: error,
         ),
       );

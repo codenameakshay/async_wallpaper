@@ -1,3 +1,11 @@
+## 3.1.0
+
+- Add basic iOS support with download-only capability (save wallpaper to Photos).
+- Add cross-platform `downloadWallpaper(...)` API (iOS + Android).
+- Add iOS plugin implementation using Swift + Pigeon host bindings.
+- Existing apply/live/chooser operations now return typed `unsupported` on iOS.
+- Add iOS example runner and Photos permission usage description for demo app.
+
 ## 3.0.0
 
 - Upgrade baseline to Flutter 3.41.4 via FVM.

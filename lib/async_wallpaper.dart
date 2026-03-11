@@ -1,3 +1,7 @@
+/// Flutter API for applying Android wallpapers asynchronously.
+// ignore: unnecessary_library_name
+library async_wallpaper;
+
 import 'package:async_wallpaper/pigeon_impl_api.dart';
 
 /// Target location where a static wallpaper should be applied.
@@ -145,13 +149,19 @@ class WallpaperRotationStatus {
   final String? lastError;
 }
 
+/// Entry point for all plugin operations.
+///
+/// All methods are Android-only and return typed results to simplify
+/// error handling in Flutter applications.
 class AsyncWallpaper {
   AsyncWallpaper._();
 
   static final WallpaperApi _api = WallpaperApi();
 
+  /// Returns the Android platform version string.
   static Future<String> get platformVersion => _api.getPlatformVersion();
 
+  /// Returns Material You support details for the current device.
   static Future<MaterialYouSupport> checkMaterialYouSupport() async {
     final MaterialYouSupportData data = await _api.checkMaterialYouSupport();
     return MaterialYouSupport(
@@ -161,6 +171,7 @@ class AsyncWallpaper {
     );
   }
 
+  /// Applies a static wallpaper from a URL or file based on [request].
   static Future<WallpaperResult> setWallpaper(WallpaperRequest request) async {
     if (request.source.trim().isEmpty) {
       return const WallpaperResult.failure(
@@ -192,6 +203,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Applies a Material You wallpaper from a URL.
   static Future<WallpaperResult> setMaterialYouWallpaper(
     MaterialYouWallpaperRequest request,
   ) async {
@@ -229,6 +241,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Applies a live wallpaper from a local video file.
   static Future<WallpaperResult> setLiveWallpaper(
     LiveWallpaperRequest request,
   ) async {
@@ -265,6 +278,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Opens Android's native wallpaper chooser screen.
   static Future<WallpaperResult> openWallpaperChooser() async {
     try {
       final bool success = await _api.openWallpaperChooser();
@@ -287,6 +301,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Starts wallpaper rotation with the provided playlist and trigger settings.
   static Future<WallpaperResult> startWallpaperRotation(
     WallpaperRotationRequest request,
   ) async {
@@ -371,6 +386,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Stops wallpaper rotation and cancels configured background triggers.
   static Future<WallpaperResult> stopWallpaperRotation() async {
     try {
       final bool success = await _api.stopWallpaperRotation();
@@ -393,6 +409,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Returns the current wallpaper rotation status.
   static Future<WallpaperRotationStatus> getWallpaperRotationStatus() async {
     final WallpaperRotationStatusData data = await _api
         .getWallpaperRotationStatus();
@@ -407,6 +424,7 @@ class AsyncWallpaper {
     );
   }
 
+  /// Immediately rotates to the next wallpaper in the current playlist.
   static Future<WallpaperResult> rotateWallpaperNow() async {
     try {
       final bool success = await _api.rotateWallpaperNow();

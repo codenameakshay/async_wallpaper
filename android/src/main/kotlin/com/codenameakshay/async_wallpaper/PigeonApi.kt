@@ -109,12 +109,156 @@ data class MaterialYouSupportData (
 
   override fun hashCode(): Int = toList().hashCode()
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class RotationSourceData (
+  val source: String? = null,
+  val sourceType: Long? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): RotationSourceData {
+      val source = pigeonVar_list[0] as String?
+      val sourceType = pigeonVar_list[1] as Long?
+      return RotationSourceData(source, sourceType)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      source,
+      sourceType,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is RotationSourceData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class WallpaperRotationConfigData (
+  val sources: List<RotationSourceData?>? = null,
+  val target: Long? = null,
+  val intervalMinutes: Long? = null,
+  val enableIntervalTrigger: Boolean? = null,
+  val enableChargingTrigger: Boolean? = null,
+  val enableTimeOfDayTrigger: Boolean? = null,
+  val activeHoursStart: Long? = null,
+  val activeHoursEnd: Long? = null,
+  val orderType: Long? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): WallpaperRotationConfigData {
+      val sources = pigeonVar_list[0] as List<RotationSourceData?>?
+      val target = pigeonVar_list[1] as Long?
+      val intervalMinutes = pigeonVar_list[2] as Long?
+      val enableIntervalTrigger = pigeonVar_list[3] as Boolean?
+      val enableChargingTrigger = pigeonVar_list[4] as Boolean?
+      val enableTimeOfDayTrigger = pigeonVar_list[5] as Boolean?
+      val activeHoursStart = pigeonVar_list[6] as Long?
+      val activeHoursEnd = pigeonVar_list[7] as Long?
+      val orderType = pigeonVar_list[8] as Long?
+      return WallpaperRotationConfigData(sources, target, intervalMinutes, enableIntervalTrigger, enableChargingTrigger, enableTimeOfDayTrigger, activeHoursStart, activeHoursEnd, orderType)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      sources,
+      target,
+      intervalMinutes,
+      enableIntervalTrigger,
+      enableChargingTrigger,
+      enableTimeOfDayTrigger,
+      activeHoursStart,
+      activeHoursEnd,
+      orderType,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is WallpaperRotationConfigData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class WallpaperRotationStatusData (
+  val isRunning: Boolean? = null,
+  val nextRunEpochMs: Long? = null,
+  val currentIndex: Long? = null,
+  val cachedCount: Long? = null,
+  val totalCount: Long? = null,
+  val lastError: String? = null,
+  val effectiveIntervalMinutes: Long? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): WallpaperRotationStatusData {
+      val isRunning = pigeonVar_list[0] as Boolean?
+      val nextRunEpochMs = pigeonVar_list[1] as Long?
+      val currentIndex = pigeonVar_list[2] as Long?
+      val cachedCount = pigeonVar_list[3] as Long?
+      val totalCount = pigeonVar_list[4] as Long?
+      val lastError = pigeonVar_list[5] as String?
+      val effectiveIntervalMinutes = pigeonVar_list[6] as Long?
+      return WallpaperRotationStatusData(isRunning, nextRunEpochMs, currentIndex, cachedCount, totalCount, lastError, effectiveIntervalMinutes)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      isRunning,
+      nextRunEpochMs,
+      currentIndex,
+      cachedCount,
+      totalCount,
+      lastError,
+      effectiveIntervalMinutes,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is WallpaperRotationStatusData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
 private open class PigeonApiPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
       129.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           MaterialYouSupportData.fromList(it)
+        }
+      }
+      130.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          RotationSourceData.fromList(it)
+        }
+      }
+      131.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WallpaperRotationConfigData.fromList(it)
+        }
+      }
+      132.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WallpaperRotationStatusData.fromList(it)
         }
       }
       else -> super.readValueOfType(type, buffer)
@@ -124,6 +268,18 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
     when (value) {
       is MaterialYouSupportData -> {
         stream.write(129)
+        writeValue(stream, value.toList())
+      }
+      is RotationSourceData -> {
+        stream.write(130)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationConfigData -> {
+        stream.write(131)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationStatusData -> {
+        stream.write(132)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -147,6 +303,10 @@ interface WallpaperApi {
   fun setMaterialYouWallpaper(url: String, goToHome: Boolean, enableEffects: Boolean, callback: (Result<Boolean>) -> Unit)
   fun setLiveWallpaper(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
   fun openWallpaperChooser(callback: (Result<Boolean>) -> Unit)
+  fun startWallpaperRotation(config: WallpaperRotationConfigData, callback: (Result<Boolean>) -> Unit)
+  fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit)
+  fun getWallpaperRotationStatus(callback: (Result<WallpaperRotationStatusData>) -> Unit)
+  fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by WallpaperApi. */
@@ -409,6 +569,80 @@ interface WallpaperApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.openWallpaperChooser{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.startWallpaperRotation$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val configArg = args[0] as WallpaperRotationConfigData
+            api.startWallpaperRotation(configArg) { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.stopWallpaperRotation$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.stopWallpaperRotation{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getWallpaperRotationStatus$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.getWallpaperRotationStatus{ result: Result<WallpaperRotationStatusData> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.rotateWallpaperNow$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.rotateWallpaperNow{ result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

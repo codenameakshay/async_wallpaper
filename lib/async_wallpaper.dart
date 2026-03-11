@@ -6,6 +6,12 @@ enum WallpaperTarget { home, lock, both }
 /// Input type for static wallpaper operations.
 enum WallpaperSourceType { url, file }
 
+/// Rotation ordering strategy.
+enum WallpaperRotationOrder { sequential, shuffle }
+
+/// Triggers that can drive rotation.
+enum WallpaperRotationTrigger { interval, charging, timeOfDay }
+
 /// Error category surfaced by the package API.
 enum WallpaperErrorCode { invalidInput, platformFailure, unsupported, unknown }
 
@@ -45,6 +51,40 @@ class LiveWallpaperRequest {
   final bool goToHome;
 }
 
+/// Single source entry in a rotation playlist.
+class WallpaperRotationSource {
+  const WallpaperRotationSource({
+    required this.sourceType,
+    required this.source,
+  });
+
+  final WallpaperSourceType sourceType;
+  final String source;
+}
+
+/// Typed input for wallpaper rotation operations.
+class WallpaperRotationRequest {
+  const WallpaperRotationRequest({
+    required this.sources,
+    required this.target,
+    required this.intervalMinutes,
+    this.order = WallpaperRotationOrder.sequential,
+    this.triggers = const <WallpaperRotationTrigger>{
+      WallpaperRotationTrigger.interval,
+    },
+    this.activeHoursStart = 6,
+    this.activeHoursEnd = 23,
+  });
+
+  final List<WallpaperRotationSource> sources;
+  final WallpaperTarget target;
+  final int intervalMinutes;
+  final WallpaperRotationOrder order;
+  final Set<WallpaperRotationTrigger> triggers;
+  final int activeHoursStart;
+  final int activeHoursEnd;
+}
+
 /// Error returned by package operations.
 class WallpaperError {
   const WallpaperError({
@@ -82,6 +122,27 @@ class MaterialYouSupport {
   final bool isSupported;
   final String androidVersion;
   final int sdkInt;
+}
+
+/// Current status of wallpaper rotation.
+class WallpaperRotationStatus {
+  const WallpaperRotationStatus({
+    required this.isRunning,
+    required this.nextRunEpochMs,
+    required this.currentIndex,
+    required this.cachedCount,
+    required this.totalCount,
+    required this.effectiveIntervalMinutes,
+    this.lastError,
+  });
+
+  final bool isRunning;
+  final int nextRunEpochMs;
+  final int currentIndex;
+  final int cachedCount;
+  final int totalCount;
+  final int effectiveIntervalMinutes;
+  final String? lastError;
 }
 
 class AsyncWallpaper {
@@ -220,6 +281,148 @@ class AsyncWallpaper {
         WallpaperError(
           code: WallpaperErrorCode.unknown,
           message: 'Unexpected exception while opening wallpaper chooser.',
+          details: error,
+        ),
+      );
+    }
+  }
+
+  static Future<WallpaperResult> startWallpaperRotation(
+    WallpaperRotationRequest request,
+  ) async {
+    if (request.sources.isEmpty) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation sources cannot be empty.',
+        ),
+      );
+    }
+    final bool hasInvalidSource = request.sources.any(
+      (WallpaperRotationSource source) => source.source.trim().isEmpty,
+    );
+    if (hasInvalidSource) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation source entries cannot be empty.',
+        ),
+      );
+    }
+    if (request.intervalMinutes < 15) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation interval must be at least 15 minutes.',
+        ),
+      );
+    }
+    if (request.triggers.isEmpty) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'At least one rotation trigger is required.',
+        ),
+      );
+    }
+
+    try {
+      final WallpaperRotationConfigData config = WallpaperRotationConfigData(
+        sources: request.sources
+            .map(
+              (WallpaperRotationSource source) => RotationSourceData(
+                source: source.source,
+                sourceType: source.sourceType.index,
+              ),
+            )
+            .toList(),
+        target: request.target.index,
+        intervalMinutes: request.intervalMinutes,
+        enableIntervalTrigger: request.triggers.contains(
+          WallpaperRotationTrigger.interval,
+        ),
+        enableChargingTrigger: request.triggers.contains(
+          WallpaperRotationTrigger.charging,
+        ),
+        enableTimeOfDayTrigger: request.triggers.contains(
+          WallpaperRotationTrigger.timeOfDay,
+        ),
+        activeHoursStart: request.activeHoursStart,
+        activeHoursEnd: request.activeHoursEnd,
+        orderType: request.order.index,
+      );
+      final bool success = await _api.startWallpaperRotation(config);
+      return success
+          ? const WallpaperResult.success()
+          : const WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: 'Failed to start wallpaper rotation.',
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: 'Unexpected exception while starting wallpaper rotation.',
+          details: error,
+        ),
+      );
+    }
+  }
+
+  static Future<WallpaperResult> stopWallpaperRotation() async {
+    try {
+      final bool success = await _api.stopWallpaperRotation();
+      return success
+          ? const WallpaperResult.success()
+          : const WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: 'Failed to stop wallpaper rotation.',
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: 'Unexpected exception while stopping wallpaper rotation.',
+          details: error,
+        ),
+      );
+    }
+  }
+
+  static Future<WallpaperRotationStatus> getWallpaperRotationStatus() async {
+    final WallpaperRotationStatusData data = await _api
+        .getWallpaperRotationStatus();
+    return WallpaperRotationStatus(
+      isRunning: data.isRunning == true,
+      nextRunEpochMs: data.nextRunEpochMs ?? 0,
+      currentIndex: data.currentIndex ?? 0,
+      cachedCount: data.cachedCount ?? 0,
+      totalCount: data.totalCount ?? 0,
+      effectiveIntervalMinutes: data.effectiveIntervalMinutes ?? 0,
+      lastError: data.lastError,
+    );
+  }
+
+  static Future<WallpaperResult> rotateWallpaperNow() async {
+    try {
+      final bool success = await _api.rotateWallpaperNow();
+      return success
+          ? const WallpaperResult.success()
+          : const WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: 'Failed to rotate wallpaper now.',
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: 'Unexpected exception while rotating wallpaper.',
           details: error,
         ),
       );

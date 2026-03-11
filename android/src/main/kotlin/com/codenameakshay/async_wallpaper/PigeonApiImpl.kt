@@ -27,6 +27,9 @@ class PigeonApiImpl(
   private val ioExecutor: ExecutorService = Executors.newCachedThreadPool(),
   private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) : WallpaperApi {
+  private val rotationStore = WallpaperRotationStore(context)
+  private val rotationEngine = WallpaperRotationEngine(context, rotationStore)
+
   override fun getPlatformVersion(callback: (Result<String>) -> Unit) {
     callback(Result.success("Android ${Build.VERSION.RELEASE}"))
   }
@@ -184,6 +187,93 @@ class PigeonApiImpl(
     }
   }
 
+  override fun startWallpaperRotation(
+    config: WallpaperRotationConfigData,
+    callback: (Result<Boolean>) -> Unit,
+  ) {
+    ioExecutor.execute {
+      val success = runCatching {
+        val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
+        if (intervalMinutes < MIN_ROTATION_INTERVAL_MINUTES) {
+          false
+        } else {
+          val started = rotationEngine.startRotation(config)
+          if (started) {
+            if (config.enableIntervalTrigger == true) {
+              WallpaperRotationScheduler.schedulePeriodic(context, intervalMinutes)
+              rotationStore.setNextRunEpochMs(
+                System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
+              )
+            } else {
+              WallpaperRotationScheduler.cancelPeriodic(context)
+              rotationStore.setNextRunEpochMs(0L)
+            }
+            val needsMonitor = config.enableChargingTrigger == true || config.enableTimeOfDayTrigger == true
+            if (needsMonitor) {
+              Log.d(TAG, "Starting rotation monitor service")
+              WallpaperRotationMonitorService.start(context)
+            } else {
+              WallpaperRotationMonitorService.stop(context)
+            }
+          }
+          started
+        }
+      }.getOrElse {
+        Log.e(TAG, "startWallpaperRotation failed", it)
+        false
+      }
+      postBoolean(callback, success)
+    }
+  }
+
+  override fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit) {
+    ioExecutor.execute {
+      val success = runCatching {
+        WallpaperRotationScheduler.cancelPeriodic(context)
+        WallpaperRotationMonitorService.stop(context)
+        rotationStore.stopRotation()
+        rotationEngine.clearRotationCache()
+        true
+      }.getOrElse {
+        Log.e(TAG, "stopWallpaperRotation failed", it)
+        false
+      }
+      postBoolean(callback, success)
+    }
+  }
+
+  override fun getWallpaperRotationStatus(
+    callback: (Result<WallpaperRotationStatusData>) -> Unit,
+  ) {
+    val status = runCatching {
+      rotationStore.getStatusData()
+    }.getOrElse {
+      Log.e(TAG, "getWallpaperRotationStatus failed", it)
+      WallpaperRotationStatusData(
+        isRunning = false,
+        nextRunEpochMs = 0L,
+        currentIndex = 0L,
+        cachedCount = 0L,
+        totalCount = 0L,
+        lastError = it.message,
+        effectiveIntervalMinutes = 0L,
+      )
+    }
+    callback(Result.success(status))
+  }
+
+  override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
+    ioExecutor.execute {
+      val success = runCatching {
+        rotationEngine.applyNextWallpaper()
+      }.getOrElse {
+        Log.e(TAG, "rotateWallpaperNow failed", it)
+        false
+      }
+      postBoolean(callback, success)
+    }
+  }
+
   private fun setWallpaperFromUrl(
     url: String,
     goToHome: Boolean,
@@ -295,5 +385,6 @@ class PigeonApiImpl(
     private const val TAG = "AsyncWallpaper"
     private const val GO_HOME_DELAY_MS = 1500L
     private const val LIVE_WALLPAPER_FILE_NAME = "file.mp4"
+    private const val MIN_ROTATION_INTERVAL_MINUTES = 15
   }
 }

@@ -6,6 +6,33 @@ class MaterialYouSupportData {
   int? sdkInt;
 }
 
+class RotationSourceData {
+  String? source;
+  int? sourceType;
+}
+
+class WallpaperRotationConfigData {
+  List<RotationSourceData?>? sources;
+  int? target;
+  int? intervalMinutes;
+  bool? enableIntervalTrigger;
+  bool? enableChargingTrigger;
+  bool? enableTimeOfDayTrigger;
+  int? activeHoursStart;
+  int? activeHoursEnd;
+  int? orderType;
+}
+
+class WallpaperRotationStatusData {
+  bool? isRunning;
+  int? nextRunEpochMs;
+  int? currentIndex;
+  int? cachedCount;
+  int? totalCount;
+  String? lastError;
+  int? effectiveIntervalMinutes;
+}
+
 @ConfigurePigeon(
   PigeonOptions(
     dartOut: 'lib/pigeon_impl_api.dart',
@@ -55,4 +82,16 @@ abstract class WallpaperApi {
 
   @async
   bool openWallpaperChooser();
+
+  @async
+  bool startWallpaperRotation(WallpaperRotationConfigData config);
+
+  @async
+  bool stopWallpaperRotation();
+
+  @async
+  WallpaperRotationStatusData getWallpaperRotationStatus();
+
+  @async
+  bool rotateWallpaperNow();
 }

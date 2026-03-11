@@ -34,5 +34,58 @@ void main() {
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
+
+    test('fails for empty rotation source list', () async {
+      final WallpaperResult result =
+          await AsyncWallpaper.startWallpaperRotation(
+            const WallpaperRotationRequest(
+              sources: <WallpaperRotationSource>[],
+              target: WallpaperTarget.both,
+              intervalMinutes: 60,
+            ),
+          );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
+
+    test('fails for rotation interval below fifteen minutes', () async {
+      final WallpaperResult result =
+          await AsyncWallpaper.startWallpaperRotation(
+            const WallpaperRotationRequest(
+              sources: <WallpaperRotationSource>[
+                WallpaperRotationSource(
+                  sourceType: WallpaperSourceType.url,
+                  source: 'https://example.com/a.jpg',
+                ),
+              ],
+              target: WallpaperTarget.both,
+              intervalMinutes: 10,
+            ),
+          );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
+
+    test('fails for empty rotation triggers', () async {
+      final WallpaperResult result =
+          await AsyncWallpaper.startWallpaperRotation(
+            const WallpaperRotationRequest(
+              sources: <WallpaperRotationSource>[
+                WallpaperRotationSource(
+                  sourceType: WallpaperSourceType.url,
+                  source: 'https://example.com/a.jpg',
+                ),
+              ],
+              target: WallpaperTarget.both,
+              intervalMinutes: 60,
+              triggers: <WallpaperRotationTrigger>{},
+            ),
+          );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+    });
   });
 }

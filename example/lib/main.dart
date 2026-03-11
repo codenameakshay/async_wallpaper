@@ -44,8 +44,16 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   bool _goHome = false;
+  bool _rotationShuffle = false;
+  bool _rotationIntervalTrigger = true;
+  bool _rotationChargingTrigger = false;
+  bool _rotationTimeOfDayTrigger = false;
+  int _rotationIntervalMinutes = 60;
+  int _activeHoursStart = 6;
+  int _activeHoursEnd = 23;
   String _status = 'Idle';
   String? _activeAction;
+  WallpaperRotationStatus? _rotationStatus;
 
   bool _isActionLoading(String action) => _activeAction == action;
 
@@ -123,6 +131,71 @@ class _HomePageState extends State<HomePage> {
     await _runAction('chooser', 'Wallpaper chooser', () {
       return AsyncWallpaper.openWallpaperChooser();
     });
+  }
+
+  Future<void> _startRotation() async {
+    await _runAction('rotation-start', 'Start rotation', () {
+      final Set<WallpaperRotationTrigger> triggers = <WallpaperRotationTrigger>{
+        if (_rotationIntervalTrigger) WallpaperRotationTrigger.interval,
+        if (_rotationChargingTrigger) WallpaperRotationTrigger.charging,
+        if (_rotationTimeOfDayTrigger) WallpaperRotationTrigger.timeOfDay,
+      };
+      return AsyncWallpaper.startWallpaperRotation(
+        WallpaperRotationRequest(
+          sources: imageUrls
+              .map(
+                (String url) => WallpaperRotationSource(
+                  sourceType: WallpaperSourceType.url,
+                  source: url,
+                ),
+              )
+              .toList(),
+          target: WallpaperTarget.both,
+          intervalMinutes: _rotationIntervalMinutes,
+          order: _rotationShuffle
+              ? WallpaperRotationOrder.shuffle
+              : WallpaperRotationOrder.sequential,
+          triggers: triggers,
+          activeHoursStart: _activeHoursStart,
+          activeHoursEnd: _activeHoursEnd,
+        ),
+      );
+    });
+    await _refreshRotationStatus();
+  }
+
+  Future<void> _stopRotation() async {
+    await _runAction('rotation-stop', 'Stop rotation', () {
+      return AsyncWallpaper.stopWallpaperRotation();
+    });
+    await _refreshRotationStatus();
+  }
+
+  Future<void> _rotateNow() async {
+    await _runAction('rotation-now', 'Rotate now', () {
+      return AsyncWallpaper.rotateWallpaperNow();
+    });
+    await _refreshRotationStatus();
+  }
+
+  Future<void> _refreshRotationStatus() async {
+    try {
+      final WallpaperRotationStatus status =
+          await AsyncWallpaper.getWallpaperRotationStatus();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rotationStatus = status;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Status fetch failed: $error';
+      });
+    }
   }
 
   void _setStatus(WallpaperResult result, String operation) {
@@ -290,6 +363,138 @@ class _HomePageState extends State<HomePage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Open Wallpaper Chooser'),
+          ),
+          const Divider(height: 24),
+          Text('Rotation', style: Theme.of(context).textTheme.titleMedium),
+          Row(
+            children: <Widget>[
+              const Text('Interval minutes:'),
+              const SizedBox(width: 8),
+              DropdownButton<int>(
+                value: _rotationIntervalMinutes,
+                items: const <int>[15, 30, 60, 120]
+                    .map(
+                      (int value) => DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (int? value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() => _rotationIntervalMinutes = value);
+                },
+              ),
+            ],
+          ),
+          SwitchListTile(
+            title: const Text('Interval trigger'),
+            value: _rotationIntervalTrigger,
+            onChanged: (bool value) {
+              setState(() => _rotationIntervalTrigger = value);
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Charging trigger'),
+            value: _rotationChargingTrigger,
+            onChanged: (bool value) {
+              setState(() => _rotationChargingTrigger = value);
+            },
+          ),
+          SwitchListTile(
+            title: const Text('Time-of-day trigger'),
+            value: _rotationTimeOfDayTrigger,
+            onChanged: (bool value) {
+              setState(() => _rotationTimeOfDayTrigger = value);
+            },
+          ),
+          Row(
+            children: <Widget>[
+              const Text('Active hours:'),
+              const SizedBox(width: 8),
+              DropdownButton<int>(
+                value: _activeHoursStart,
+                items: List<int>.generate(24, (int i) => i)
+                    .map(
+                      (int value) => DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value:00'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (int? value) {
+                  if (value == null) return;
+                  setState(() => _activeHoursStart = value);
+                },
+              ),
+              const Text(' - '),
+              DropdownButton<int>(
+                value: _activeHoursEnd,
+                items: List<int>.generate(24, (int i) => i)
+                    .map(
+                      (int value) => DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value:00'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (int? value) {
+                  if (value == null) return;
+                  setState(() => _activeHoursEnd = value);
+                },
+              ),
+            ],
+          ),
+          SwitchListTile(
+            title: const Text('Shuffle order'),
+            value: _rotationShuffle,
+            onChanged: (bool value) => setState(() => _rotationShuffle = value),
+          ),
+          FilledButton(
+            onPressed: _activeAction == null ? _startRotation : null,
+            child: _isActionLoading('rotation-start')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Start Rotation'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _activeAction == null ? _rotateNow : null,
+            child: _isActionLoading('rotation-now')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Rotate Now'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _activeAction == null ? _stopRotation : null,
+            child: _isActionLoading('rotation-stop')
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Stop Rotation'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _activeAction == null ? _refreshRotationStatus : null,
+            child: const Text('Refresh Rotation Status'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _rotationStatus == null
+                ? 'Rotation status: unavailable'
+                : 'Rotation status: running=${_rotationStatus!.isRunning}, '
+                      'index=${_rotationStatus!.currentIndex}, '
+                      'cached=${_rotationStatus!.cachedCount}/${_rotationStatus!.totalCount}, '
+                      'next=${_rotationStatus!.nextRunEpochMs}, '
+                      'error=${_rotationStatus!.lastError ?? '-'}',
           ),
           const SizedBox(height: 16),
           Text('Status: $_status'),

@@ -1,3 +1,13 @@
+## 3.1.0
+
+- Add Android wallpaper rotation APIs: start, stop, status, and rotate now.
+- Add mixed rotation playlist support for URL and file sources with local caching.
+- Add rotation order modes: sequential and shuffle.
+- Add rotation triggers for interval, charging connected, and time-of-day windows.
+- Enforce minimum rotation interval of 15 minutes.
+- Add active hours configuration for time-of-day trigger.
+- Update example app and docs with rotation controls.
+
 ## 3.0.0
 
 - Upgrade baseline to Flutter 3.41.4 via FVM.

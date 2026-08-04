@@ -1,3 +1,7 @@
+#
+# To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
+# Run `pod lib lint async_wallpaper.podspec` to validate before publishing.
+#
 Pod::Spec.new do |s|
   s.name             = 'async_wallpaper'
   s.version          = '3.1.0'
@@ -7,13 +11,10 @@ A Flutter plugin for wallpaper operations. Android supports apply/live wallpaper
 while iOS supports wallpaper download to Photos.
                        DESC
   s.homepage         = 'https://github.com/codenameakshay/async_wallpaper'
-  s.license          = { :file => 'LICENSE' }
+  s.license          = { :file => '../LICENSE' }
   s.author           = { 'codenameakshay' => 'contact@hashstudios.dev' }
   s.source           = { :path => '.' }
-  # Keep the legacy root podspec usable while sharing the Swift Package
-  # Manager source layout below. The files in this directory are symlinks to
-  # ios/Classes, so CocoaPods and Swift Package Manager compile one source set.
-  s.source_files     = 'ios/async_wallpaper/Sources/async_wallpaper/**/*'
+  s.source_files     = 'async_wallpaper/Sources/async_wallpaper/**/*'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
   s.pod_target_xcconfig = {

@@ -9,11 +9,11 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     WallpaperApiSetup.setUp(binaryMessenger: registrar.messenger(), api: instance)
   }
 
-  public func getPlatformVersion(completion: @escaping (Result<String, Error>) -> Void) {
+  func getPlatformVersion(completion: @escaping (Result<String, Error>) -> Void) {
     completion(.success("iOS \(UIDevice.current.systemVersion)"))
   }
 
-  public func checkMaterialYouSupport(
+  func checkMaterialYouSupport(
     completion: @escaping (Result<MaterialYouSupportData, Error>) -> Void
   ) {
     completion(
@@ -27,7 +27,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     )
   }
 
-  public func getCapabilities(
+  func getCapabilities(
     completion: @escaping (Result<WallpaperCapabilitiesData, Error>) -> Void
   ) {
     completion(
@@ -49,35 +49,35 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     )
   }
 
-  public func applyWallpaper(
+  func applyWallpaper(
     request: StaticWallpaperRequestData,
     completion: @escaping (Result<OperationResultData, Error>) -> Void
   ) {
     completion(.success(unsupportedResult(target: request.target, operation: "static wallpaper")))
   }
 
-  public func prepareVideoWallpaper(
+  func prepareVideoWallpaper(
     request: VideoWallpaperRequestData,
     completion: @escaping (Result<OperationResultData, Error>) -> Void
   ) {
     completion(.success(unsupportedResult(target: request.target, operation: "video wallpaper")))
   }
 
-  public func openLiveWallpaperPreview(
+  func openLiveWallpaperPreview(
     request: VideoWallpaperRequestData,
     completion: @escaping (Result<OperationResultData, Error>) -> Void
   ) {
     completion(.success(unsupportedResult(target: request.target, operation: "live wallpaper preview")))
   }
 
-  public func applyOpenGlWallpaper(
+  func applyOpenGlWallpaper(
     request: OpenGlWallpaperRequestData,
     completion: @escaping (Result<OperationResultData, Error>) -> Void
   ) {
     completion(.success(unsupportedResult(target: request.target, operation: "OpenGL wallpaper")))
   }
 
-  public func setHomeWallpaperFromUrl(
+  func setHomeWallpaperFromUrl(
     url: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -85,7 +85,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setLockWallpaperFromUrl(
+  func setLockWallpaperFromUrl(
     url: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -93,7 +93,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setBothWallpaperFromUrl(
+  func setBothWallpaperFromUrl(
     url: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -101,7 +101,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setWallpaper(
+  func setWallpaper(
     url: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -109,7 +109,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setHomeWallpaperFromFile(
+  func setHomeWallpaperFromFile(
     filePath: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -117,7 +117,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setLockWallpaperFromFile(
+  func setLockWallpaperFromFile(
     filePath: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -125,7 +125,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setBothWallpaperFromFile(
+  func setBothWallpaperFromFile(
     filePath: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -133,7 +133,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setWallpaperFromFile(
+  func setWallpaperFromFile(
     filePath: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -141,7 +141,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setMaterialYouWallpaper(
+  func setMaterialYouWallpaper(
     url: String,
     goToHome: Bool,
     enableEffects: Bool,
@@ -150,7 +150,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func setLiveWallpaper(
+  func setLiveWallpaper(
     filePath: String,
     goToHome: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
@@ -158,11 +158,11 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
-  public func openWallpaperChooser(completion: @escaping (Result<Bool, Error>) -> Void) {
+  func openWallpaperChooser(completion: @escaping (Result<Bool, Error>) -> Void) {
     completion(.success(false))
   }
 
-  public func downloadWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+  func downloadWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void) {
     guard let remoteUrl = URL(string: url) else {
       completion(.success(false))
       return

@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'async_wallpaper'
-  s.version          = '3.1.0'
+  s.version          = '3.2.0'
   s.summary          = 'Flutter wallpaper plugin with Android apply and cross-platform download support.'
   s.description      = <<-DESC
 A Flutter plugin for wallpaper operations. Android supports apply/live wallpaper flows,

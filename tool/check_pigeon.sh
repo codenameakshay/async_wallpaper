@@ -2,10 +2,9 @@
 
 # Regenerate Pigeon bindings and verify that the tracked copies are current.
 #
-# Pigeon 25.3.0 emits trailing whitespace in its Dart output. We intentionally
-# normalize copies of both versions before comparing so that generator-only
-# whitespace does not make CI fail. The working tree is restored even when
-# generation or comparison fails.
+# The generated Dart bindings are formatted before comparison so the tracked
+# copy can stay freshness-safe under repo-wide `dart format` checks. The
+# working tree is restored even when generation or comparison fails.
 
 set -eu
 
@@ -66,16 +65,6 @@ copy_to_temp() {
   cp -p "$source_file" "$destination_file"
 }
 
-normalize_dart() {
-  source_file=$1
-  destination_file=$2
-
-  # Avoid non-portable sed -i behavior and keep normalization out of the
-  # working tree. dart format then makes line wrapping deterministic.
-  awk '{ sub(/[[:blank:]]+$/, ""); print }' "$source_file" > "$destination_file"
-  run_dart format --output=write "$destination_file" >/dev/null
-}
-
 cleanup() {
   status=$?
   trap - 0 1 2 3 15
@@ -106,16 +95,13 @@ if ! run_dart run pigeon --input "$INPUT"; then
   die "Pigeon generation failed; the original tracked outputs will be restored"
 fi
 
+run_dart format --output=write "$DART_GENERATED_FILE" >/dev/null
+
 for generated_file in $GENERATED_FILES; do
   copy_to_temp "$BACKUP_DIR/original/$generated_file" \
     "$BACKUP_DIR/expected/$generated_file"
   copy_to_temp "$generated_file" "$BACKUP_DIR/actual/$generated_file"
 done
-
-normalize_dart "$BACKUP_DIR/original/$DART_GENERATED_FILE" \
-  "$BACKUP_DIR/expected/$DART_GENERATED_FILE"
-normalize_dart "$DART_GENERATED_FILE" \
-  "$BACKUP_DIR/actual/$DART_GENERATED_FILE"
 
 has_drift=0
 for generated_file in $GENERATED_FILES; do

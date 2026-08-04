@@ -36,9 +36,7 @@ jobs:
       - name: Verify Dart formatting
         shell: bash
         run: |
-          # Pigeon 25.3.0 emits trailing whitespace in this generated file.
-          # tool/check_pigeon.sh checks it after deterministic normalization.
-          git ls-files -z -- '*.dart' ':(exclude)lib/pigeon_impl_api.dart' |
+          git ls-files -z -- '*.dart' |
             xargs -0 dart format --output=none --set-exit-if-changed
 
       - name: Analyze package

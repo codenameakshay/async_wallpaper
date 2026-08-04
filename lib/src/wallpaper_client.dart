@@ -460,82 +460,100 @@ OpenGlLiveWallpaperRequest openGlWallpaperRequestFromData(
 
 /// Internal seam between the public facade and platform transport.
 abstract interface class WallpaperClient {
-  /// Applies a legacy static wallpaper request.
+  /// Applies a legacy static wallpaper request through the structured API.
   Future<WallpaperOperationResult> apply(WallpaperRequest request);
 
   /// Returns the platform's wallpaper capability snapshot.
   Future<WallpaperCapabilities> getCapabilities();
+
+  /// Applies a structured static wallpaper request.
+  Future<WallpaperOperationResult> applyWallpaper(
+    StaticWallpaperRequest request,
+  );
+
+  /// Prepares a video live wallpaper without claiming it was applied.
+  Future<WallpaperOperationResult> prepareVideoWallpaper(
+    VideoWallpaperRequest request,
+  );
+
+  /// Opens the system live-wallpaper preview flow.
+  Future<WallpaperOperationResult> openLiveWallpaperPreview(
+    VideoWallpaperRequest request,
+  );
+
+  /// Applies a shader-based OpenGL live wallpaper.
+  Future<WallpaperOperationResult> applyOpenGlWallpaper(
+    OpenGlLiveWallpaperRequest request,
+  );
 }
 
-/// Transitional adapter for the source-compatible 3.1 boolean endpoints.
+/// Default Pigeon-backed client for structured wallpaper operations.
 ///
-/// Boolean replies remain legacy compatibility signals, not structured host
-/// results. The 3.2 transport mappings above are used by the structured facade
-/// added in Task 5.
+/// The [apply] member remains as a source-compatible adapter for callers that
+/// still construct [WallpaperRequest]. It deliberately uses the same
+/// structured host endpoint as [applyWallpaper], so it cannot discard truthful
+/// target-level outcomes.
 class LegacyWallpaperClient implements WallpaperClient {
   LegacyWallpaperClient({WallpaperApi? api}) : _api = api ?? WallpaperApi();
 
   final WallpaperApi _api;
 
   @override
-  Future<WallpaperOperationResult> apply(WallpaperRequest request) async {
-    final bool success = await _applyLegacyRequest(request);
-
-    return WallpaperOperationResult(
-      status: success
-          ? WallpaperOperationStatus.applied
-          : WallpaperOperationStatus.failed,
-      requestedTarget: request.target,
-      errorCode: success ? null : 'platform-failure',
-      errorMessage: success ? null : 'Failed to set wallpaper on Android.',
-    );
-  }
+  Future<WallpaperOperationResult> apply(WallpaperRequest request) =>
+      applyWallpaper(_legacyRequestToStaticRequest(request));
 
   @override
   Future<WallpaperCapabilities> getCapabilities() async {
     return capabilitiesFromData(await _api.getCapabilities());
   }
 
-  Future<bool> _applyLegacyRequest(WallpaperRequest request) {
-    switch (request.sourceType) {
-      case WallpaperSourceType.url:
-        switch (request.target) {
-          case WallpaperTarget.home:
-            return _api.setHomeWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.lock:
-            return _api.setLockWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.both:
-            return _api.setBothWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-        }
-      case WallpaperSourceType.file:
-        switch (request.target) {
-          case WallpaperTarget.home:
-            return _api.setHomeWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.lock:
-            return _api.setLockWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.both:
-            return _api.setBothWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-        }
-    }
+  @override
+  Future<WallpaperOperationResult> applyWallpaper(
+    StaticWallpaperRequest request,
+  ) async {
+    return operationResultFromData(
+      await _api.applyWallpaper(staticWallpaperRequestToData(request)),
+    );
   }
+
+  @override
+  Future<WallpaperOperationResult> prepareVideoWallpaper(
+    VideoWallpaperRequest request,
+  ) async {
+    return operationResultFromData(
+      await _api.prepareVideoWallpaper(videoWallpaperRequestToData(request)),
+    );
+  }
+
+  @override
+  Future<WallpaperOperationResult> openLiveWallpaperPreview(
+    VideoWallpaperRequest request,
+  ) async {
+    return operationResultFromData(
+      await _api.openLiveWallpaperPreview(videoWallpaperRequestToData(request)),
+    );
+  }
+
+  @override
+  Future<WallpaperOperationResult> applyOpenGlWallpaper(
+    OpenGlLiveWallpaperRequest request,
+  ) async {
+    return operationResultFromData(
+      await _api.applyOpenGlWallpaper(openGlWallpaperRequestToData(request)),
+    );
+  }
+}
+
+StaticWallpaperRequest _legacyRequestToStaticRequest(WallpaperRequest request) {
+  final WallpaperSource source = switch (request.sourceType) {
+    WallpaperSourceType.url => WallpaperSource.url(request.source),
+    WallpaperSourceType.file => WallpaperSource.filePath(request.source),
+  };
+  return StaticWallpaperRequest(
+    source: source,
+    target: request.target,
+    goToHome: request.goToHome,
+  );
 }
 
 TargetStatusData _targetStatusToData(WallpaperTargetStatus status) {

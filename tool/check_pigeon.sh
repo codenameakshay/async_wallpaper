@@ -27,8 +27,27 @@ DART_GENERATED_FILE='lib/pigeon_impl_api.dart'
 
 [ -f "$INPUT" ] || die "missing Pigeon input: $INPUT"
 command -v git >/dev/null 2>&1 || die 'git is required to verify tracked outputs'
-command -v dart >/dev/null 2>&1 || die 'dart is required; install Flutter and make its Dart SDK available'
 [ -f '.dart_tool/package_config.json' ] || die "dependencies are not installed; run 'flutter pub get' from $REPO_ROOT first"
+
+if [ -f '.fvmrc' ] && command -v fvm >/dev/null 2>&1; then
+  USE_FVM=1
+  DART_LABEL='fvm dart'
+  fvm dart --version >/dev/null 2>&1 || \
+    die "FVM could not run the Dart SDK pinned by .fvmrc; run 'fvm install' first"
+else
+  USE_FVM=0
+  DART_LABEL='dart'
+  command -v dart >/dev/null 2>&1 || \
+    die 'dart is required; install Flutter and make its Dart SDK available'
+fi
+
+run_dart() {
+  if [ "$USE_FVM" -eq 1 ]; then
+    fvm dart "$@"
+  else
+    dart "$@"
+  fi
+}
 
 for generated_file in $GENERATED_FILES; do
   [ -f "$generated_file" ] || die "missing tracked Pigeon output: $generated_file"
@@ -54,7 +73,7 @@ normalize_dart() {
   # Avoid non-portable sed -i behavior and keep normalization out of the
   # working tree. dart format then makes line wrapping deterministic.
   awk '{ sub(/[[:blank:]]+$/, ""); print }' "$source_file" > "$destination_file"
-  dart format --output=write "$destination_file" >/dev/null
+  run_dart format --output=write "$destination_file" >/dev/null
 }
 
 cleanup() {
@@ -83,7 +102,7 @@ for generated_file in $GENERATED_FILES; do
 done
 RESTORE_FILES=1
 
-if ! dart run pigeon --input "$INPUT"; then
+if ! run_dart run pigeon --input "$INPUT"; then
   die "Pigeon generation failed; the original tracked outputs will be restored"
 fi
 
@@ -111,7 +130,7 @@ for generated_file in $GENERATED_FILES; do
 done
 
 if [ "$has_drift" -ne 0 ]; then
-  die "regenerate bindings with 'dart run pigeon --input $INPUT' and commit the resulting tracked outputs"
+  die "regenerate bindings with '$DART_LABEL run pigeon --input $INPUT' and commit the resulting tracked outputs"
 fi
 
 printf '%s\n' 'Pigeon-generated bindings are up to date.'

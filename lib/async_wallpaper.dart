@@ -1,101 +1,19 @@
 import 'package:async_wallpaper/pigeon_impl_api.dart';
 import 'package:flutter/foundation.dart';
 
-/// Target location where a static wallpaper should be applied.
-enum WallpaperTarget { home, lock, both }
+import 'src/models.dart';
+import 'src/wallpaper_client.dart';
 
-/// Input type for static wallpaper operations.
-enum WallpaperSourceType { url, file }
-
-/// Error category surfaced by the package API.
-enum WallpaperErrorCode { invalidInput, platformFailure, unsupported, unknown }
-
-/// Typed input for static wallpaper operations.
-class WallpaperRequest {
-  const WallpaperRequest({
-    required this.target,
-    required this.sourceType,
-    required this.source,
-    this.goToHome = false,
-  });
-
-  final WallpaperTarget target;
-  final WallpaperSourceType sourceType;
-  final String source;
-  final bool goToHome;
-}
-
-/// Typed input for Material You wallpaper operations.
-class MaterialYouWallpaperRequest {
-  const MaterialYouWallpaperRequest({
-    required this.url,
-    this.goToHome = false,
-    this.enableEffects = false,
-  });
-
-  final String url;
-  final bool goToHome;
-  final bool enableEffects;
-}
-
-/// Typed input for live wallpaper operations.
-class LiveWallpaperRequest {
-  const LiveWallpaperRequest({required this.filePath, this.goToHome = false});
-
-  final String filePath;
-  final bool goToHome;
-}
-
-/// Typed input for download-only operations.
-class DownloadWallpaperRequest {
-  const DownloadWallpaperRequest({required this.url});
-
-  final String url;
-}
-
-/// Error returned by package operations.
-class WallpaperError {
-  const WallpaperError({
-    required this.code,
-    required this.message,
-    this.details,
-  });
-
-  final WallpaperErrorCode code;
-  final String message;
-  final Object? details;
-}
-
-/// Typed operation result.
-class WallpaperResult {
-  const WallpaperResult._({required this.isSuccess, this.error});
-
-  const WallpaperResult.success() : this._(isSuccess: true);
-
-  const WallpaperResult.failure(WallpaperError error)
-    : this._(isSuccess: false, error: error);
-
-  final bool isSuccess;
-  final WallpaperError? error;
-}
-
-/// Structured Material You support info.
-class MaterialYouSupport {
-  const MaterialYouSupport({
-    required this.isSupported,
-    required this.androidVersion,
-    required this.sdkInt,
-  });
-
-  final bool isSupported;
-  final String androidVersion;
-  final int sdkInt;
-}
+export 'src/models.dart';
 
 class AsyncWallpaper {
   AsyncWallpaper._();
 
   static final WallpaperApi _api = WallpaperApi();
+  static final WallpaperClient _defaultClient = LegacyWallpaperClient(
+    api: _api,
+  );
+  static WallpaperClient _client = _defaultClient;
   static bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   static bool get _isIOS =>
@@ -109,6 +27,22 @@ class AsyncWallpaper {
   );
 
   static Future<String> get platformVersion => _api.getPlatformVersion();
+
+  /// Overrides the platform client for tests.
+  @visibleForTesting
+  static void debugSetClient(WallpaperClient client) {
+    _client = client;
+  }
+
+  /// Restores the default platform client after a test override.
+  @visibleForTesting
+  static void debugResetClient() {
+    _client = _defaultClient;
+  }
+
+  /// Whether a test client currently overrides the default platform client.
+  @visibleForTesting
+  static bool get debugHasClientOverride => !identical(_client, _defaultClient);
 
   static Future<MaterialYouSupport> checkMaterialYouSupport() async {
     if (!_isAndroid) {
@@ -140,15 +74,8 @@ class AsyncWallpaper {
     }
 
     try {
-      final bool success = await _setWallpaperInternal(request);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to set wallpaper on Android.',
-              ),
-            );
+      final WallpaperOperationResult operation = await _client.apply(request);
+      return _legacyResultFromOperation(operation);
     } catch (error) {
       return WallpaperResult.failure(
         WallpaperError(
@@ -300,44 +227,43 @@ class AsyncWallpaper {
     }
   }
 
-  static Future<bool> _setWallpaperInternal(WallpaperRequest request) {
-    switch (request.sourceType) {
-      case WallpaperSourceType.url:
-        switch (request.target) {
-          case WallpaperTarget.home:
-            return _api.setHomeWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.lock:
-            return _api.setLockWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.both:
-            return _api.setBothWallpaperFromUrl(
-              request.source,
-              request.goToHome,
-            );
-        }
-      case WallpaperSourceType.file:
-        switch (request.target) {
-          case WallpaperTarget.home:
-            return _api.setHomeWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.lock:
-            return _api.setLockWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-          case WallpaperTarget.both:
-            return _api.setBothWallpaperFromFile(
-              request.source,
-              request.goToHome,
-            );
-        }
+  static WallpaperResult _legacyResultFromOperation(
+    WallpaperOperationResult operation,
+  ) {
+    if (_isLegacySuccess(operation)) {
+      return const WallpaperResult.success();
+    }
+
+    return WallpaperResult.failure(
+      WallpaperError(
+        code: operation.status == WallpaperOperationStatus.unsupported
+            ? WallpaperErrorCode.unsupported
+            : WallpaperErrorCode.platformFailure,
+        message:
+            operation.errorMessage ?? 'Failed to set wallpaper on Android.',
+        details: operation.errorDetails,
+      ),
+    );
+  }
+
+  static bool _isLegacySuccess(WallpaperOperationResult operation) {
+    if (operation.status != WallpaperOperationStatus.applied) {
+      return false;
+    }
+
+    bool isAppliedOrAbsent(WallpaperTargetResult? targetResult) {
+      return targetResult == null ||
+          targetResult.status == WallpaperTargetStatus.applied;
+    }
+
+    switch (operation.requestedTarget) {
+      case WallpaperTarget.home:
+        return isAppliedOrAbsent(operation.home);
+      case WallpaperTarget.lock:
+        return isAppliedOrAbsent(operation.lock);
+      case WallpaperTarget.both:
+        return isAppliedOrAbsent(operation.home) &&
+            isAppliedOrAbsent(operation.lock);
     }
   }
 }

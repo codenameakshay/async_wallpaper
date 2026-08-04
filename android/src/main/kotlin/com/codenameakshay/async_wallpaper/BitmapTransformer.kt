@@ -1,0 +1,369 @@
+package com.codenameakshay.async_wallpaper
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+/** An integer rectangle expressed as left, top, right, and bottom edges. */
+data class RectSpec(
+  val left: Int,
+  val top: Int,
+  val right: Int,
+  val bottom: Int,
+) {
+  val width: Int
+    get() = right - left
+
+  val height: Int
+    get() = bottom - top
+}
+
+/** Pure geometry describing one bitmap draw into an output canvas. */
+data class BitmapTransformSpec(
+  val sourceRect: RectSpec,
+  val destinationRect: RectSpec,
+  val outputWidth: Int,
+  val outputHeight: Int,
+)
+
+/**
+ * Pure Kotlin scaling and crop math.
+ *
+ * `centerCrop` crops source pixels before drawing, while `fill` keeps the full source rectangle
+ * and lets its scaled destination extend beyond the output canvas. Both cover the target without
+ * distortion, but keeping them distinct preserves the caller's requested rendering semantics.
+ */
+object BitmapTransformMath {
+  /**
+   * Computes geometry for [mode]. [focalX] and [focalY] are normalized source coordinates and
+   * are clamped to [0, 1]; non-finite values fall back to the image center.
+   */
+  fun calculate(
+    mode: WallpaperScaleModeData,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+    focalX: Float = DEFAULT_FOCAL_POINT,
+    focalY: Float = DEFAULT_FOCAL_POINT,
+  ): BitmapTransformSpec {
+    requireValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)
+    val clampedFocalX = clampFocalPoint(focalX)
+    val clampedFocalY = clampFocalPoint(focalY)
+
+    return when (mode) {
+      WallpaperScaleModeData.CENTER_CROP -> {
+        BitmapTransformSpec(
+          sourceRect = calculateCenterCrop(
+            sourceWidth,
+            sourceHeight,
+            targetWidth,
+            targetHeight,
+            clampedFocalX,
+            clampedFocalY,
+          ),
+          destinationRect = RectSpec(0, 0, targetWidth, targetHeight),
+          outputWidth = targetWidth,
+          outputHeight = targetHeight,
+        )
+      }
+      WallpaperScaleModeData.FIT_CENTER -> {
+        BitmapTransformSpec(
+          sourceRect = RectSpec(0, 0, sourceWidth, sourceHeight),
+          destinationRect = fitCenterDestination(
+            sourceWidth,
+            sourceHeight,
+            targetWidth,
+            targetHeight,
+          ),
+          outputWidth = targetWidth,
+          outputHeight = targetHeight,
+        )
+      }
+      WallpaperScaleModeData.CENTER -> {
+        val cropWidth = min(sourceWidth, targetWidth)
+        val cropHeight = min(sourceHeight, targetHeight)
+        val sourceLeft = cropStart(sourceWidth, cropWidth, clampedFocalX)
+        val sourceTop = cropStart(sourceHeight, cropHeight, clampedFocalY)
+        val destinationLeft = (targetWidth - cropWidth) / 2
+        val destinationTop = (targetHeight - cropHeight) / 2
+        BitmapTransformSpec(
+          sourceRect = RectSpec(
+            left = sourceLeft,
+            top = sourceTop,
+            right = sourceLeft + cropWidth,
+            bottom = sourceTop + cropHeight,
+          ),
+          destinationRect = RectSpec(
+            left = destinationLeft,
+            top = destinationTop,
+            right = destinationLeft + cropWidth,
+            bottom = destinationTop + cropHeight,
+          ),
+          outputWidth = targetWidth,
+          outputHeight = targetHeight,
+        )
+      }
+      WallpaperScaleModeData.FILL -> {
+        val destination = fillDestination(
+          sourceWidth,
+          sourceHeight,
+          targetWidth,
+          targetHeight,
+          clampedFocalX,
+          clampedFocalY,
+        )
+        BitmapTransformSpec(
+          sourceRect = RectSpec(0, 0, sourceWidth, sourceHeight),
+          destinationRect = destination,
+          outputWidth = targetWidth,
+          outputHeight = targetHeight,
+        )
+      }
+      WallpaperScaleModeData.STRETCH -> {
+        BitmapTransformSpec(
+          sourceRect = RectSpec(0, 0, sourceWidth, sourceHeight),
+          destinationRect = RectSpec(0, 0, targetWidth, targetHeight),
+          outputWidth = targetWidth,
+          outputHeight = targetHeight,
+        )
+      }
+    }
+  }
+
+  /** Returns null instead of throwing when either source or target dimensions are invalid. */
+  fun calculateOrNull(
+    mode: WallpaperScaleModeData,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+    focalX: Float = DEFAULT_FOCAL_POINT,
+    focalY: Float = DEFAULT_FOCAL_POINT,
+  ): BitmapTransformSpec? {
+    if (!hasValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
+      return null
+    }
+    return calculate(mode, sourceWidth, sourceHeight, targetWidth, targetHeight, focalX, focalY)
+  }
+
+  /**
+   * Returns the source rectangle whose aspect ratio matches the target. This is intentionally
+   * exposed as a small pure operation for callers that need crop hints without drawing a bitmap.
+   */
+  fun calculateCenterCrop(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+    focalX: Float = DEFAULT_FOCAL_POINT,
+    focalY: Float = DEFAULT_FOCAL_POINT,
+  ): RectSpec {
+    requireValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)
+    val cropWidth: Int
+    val cropHeight: Int
+    if (isSourceWiderThanTarget(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
+      cropWidth = scaledDimension(sourceHeight, targetWidth, targetHeight, sourceWidth)
+      cropHeight = sourceHeight
+    } else {
+      cropWidth = sourceWidth
+      cropHeight = scaledDimension(sourceWidth, targetHeight, targetWidth, sourceHeight)
+    }
+
+    val left = cropStart(sourceWidth, cropWidth, clampFocalPoint(focalX))
+    val top = cropStart(sourceHeight, cropHeight, clampFocalPoint(focalY))
+    return RectSpec(left, top, left + cropWidth, top + cropHeight)
+  }
+
+  /** Clamps normalized focal coordinates and treats NaN/infinity as the visual center. */
+  fun clampFocalPoint(value: Float): Float {
+    return if (value.isNaN() || value.isInfinite()) {
+      DEFAULT_FOCAL_POINT
+    } else {
+      value.coerceIn(0f, 1f)
+    }
+  }
+
+  private fun fitCenterDestination(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+  ): RectSpec {
+    val destinationWidth: Int
+    val destinationHeight: Int
+    if (isSourceWiderThanTarget(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
+      destinationWidth = targetWidth
+      destinationHeight = scaledDimension(sourceHeight, targetWidth, sourceWidth, targetHeight)
+    } else {
+      destinationWidth = scaledDimension(sourceWidth, targetHeight, sourceHeight, targetWidth)
+      destinationHeight = targetHeight
+    }
+    val left = (targetWidth - destinationWidth) / 2
+    val top = (targetHeight - destinationHeight) / 2
+    return RectSpec(left, top, left + destinationWidth, top + destinationHeight)
+  }
+
+  private fun fillDestination(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+    focalX: Float,
+    focalY: Float,
+  ): RectSpec {
+    val destinationWidth: Int
+    val destinationHeight: Int
+    if (isSourceWiderThanTarget(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
+      destinationWidth = scaledDimension(sourceWidth, targetHeight, sourceHeight, Int.MAX_VALUE)
+      destinationHeight = targetHeight
+    } else {
+      destinationWidth = targetWidth
+      destinationHeight = scaledDimension(sourceHeight, targetWidth, sourceWidth, Int.MAX_VALUE)
+    }
+    val left = focusedDestinationStart(targetWidth, destinationWidth, focalX)
+    val top = focusedDestinationStart(targetHeight, destinationHeight, focalY)
+    return RectSpec(left, top, left + destinationWidth, top + destinationHeight)
+  }
+
+  private fun isSourceWiderThanTarget(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+  ): Boolean {
+    return sourceWidth.toLong() * targetHeight > sourceHeight.toLong() * targetWidth
+  }
+
+  private fun scaledDimension(
+    sourceDimension: Int,
+    multiplier: Int,
+    divisor: Int,
+    upperBound: Int,
+  ): Int {
+    val scaled = (sourceDimension.toDouble() * multiplier / divisor).roundToInt()
+    return scaled.coerceIn(1, upperBound)
+  }
+
+  private fun cropStart(total: Int, crop: Int, focalPoint: Float): Int {
+    val desired = (total * focalPoint - crop / 2f).roundToInt()
+    return desired.coerceIn(0, total - crop)
+  }
+
+  private fun focusedDestinationStart(canvas: Int, destination: Int, focalPoint: Float): Int {
+    if (destination <= canvas) {
+      return (canvas - destination) / 2
+    }
+    val desired = (canvas / 2f - destination * focalPoint).roundToInt()
+    return desired.coerceIn(canvas - destination, 0)
+  }
+
+  private fun requireValidDimensions(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+  ) {
+    require(hasValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
+      "Source and target dimensions must be positive."
+    }
+  }
+
+  private fun hasValidDimensions(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetWidth: Int,
+    targetHeight: Int,
+  ): Boolean {
+    return sourceWidth > 0 && sourceHeight > 0 && targetWidth > 0 && targetHeight > 0
+  }
+
+  private const val DEFAULT_FOCAL_POINT = 0.5f
+}
+
+/** Convenience top-level alias for crop-hint callers and JVM-only geometry tests. */
+fun calculateCenterCrop(
+  sourceWidth: Int,
+  sourceHeight: Int,
+  targetWidth: Int,
+  targetHeight: Int,
+  focalX: Float = 0.5f,
+  focalY: Float = 0.5f,
+): RectSpec = BitmapTransformMath.calculateCenterCrop(
+  sourceWidth,
+  sourceHeight,
+  targetWidth,
+  targetHeight,
+  focalX,
+  focalY,
+)
+
+/** Applies [BitmapTransformMath] geometry using Android's bitmap and canvas APIs. */
+object BitmapTransformer {
+  /** Calculates and applies a scale mode in one call. */
+  fun transform(
+    bitmap: Bitmap,
+    mode: WallpaperScaleModeData,
+    targetWidth: Int,
+    targetHeight: Int,
+    focalX: Float = 0.5f,
+    focalY: Float = 0.5f,
+    backgroundColor: Int = Color.BLACK,
+  ): Bitmap {
+    val geometry = BitmapTransformMath.calculate(
+      mode,
+      bitmap.width,
+      bitmap.height,
+      targetWidth,
+      targetHeight,
+      focalX,
+      focalY,
+    )
+    return apply(bitmap, geometry, backgroundColor)
+  }
+
+  /** Draws [bitmap] according to pure [geometry] without taking ownership of the source bitmap. */
+  fun apply(
+    bitmap: Bitmap,
+    geometry: BitmapTransformSpec,
+    backgroundColor: Int = Color.BLACK,
+  ): Bitmap {
+    require(!bitmap.isRecycled) { "Cannot transform a recycled bitmap." }
+    require(geometry.outputWidth > 0 && geometry.outputHeight > 0) {
+      "Output dimensions must be positive."
+    }
+    require(geometry.sourceRect.isWithin(bitmap.width, bitmap.height)) {
+      "Source rectangle must be within bitmap bounds."
+    }
+    require(geometry.destinationRect.width > 0 && geometry.destinationRect.height > 0) {
+      "Destination rectangle must have positive dimensions."
+    }
+
+    val output = Bitmap.createBitmap(
+      geometry.outputWidth,
+      geometry.outputHeight,
+      Bitmap.Config.ARGB_8888,
+    )
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
+    Canvas(output).apply {
+      drawColor(backgroundColor)
+      drawBitmap(
+        bitmap,
+        geometry.sourceRect.toAndroidRect(),
+        geometry.destinationRect.toAndroidRect(),
+        paint,
+      )
+    }
+    return output
+  }
+
+  private fun RectSpec.isWithin(width: Int, height: Int): Boolean {
+    return left >= 0 && top >= 0 && right <= width && bottom <= height && this.width > 0 && this.height > 0
+  }
+
+  private fun RectSpec.toAndroidRect(): Rect = Rect(left, top, right, bottom)
+}

@@ -1,3 +1,17 @@
+## 3.2.0
+
+- Add structured Android static-wallpaper requests with URL, file-path, content-URI, and byte sources.
+- Add explicit image scale modes and direct/system-cropper/system-picker/automatic apply strategies.
+- Add truthful `WallpaperOperationResult` and per-target home/lock outcomes instead of treating a UI launch as an applied wallpaper.
+- Add `getCapabilities()` for static, live, OpenGL, target, picker, foreground, OEM, and GLES availability checks.
+- Add typed video preparation and live-preview APIs; preparation and Android user confirmation are now distinct statuses.
+- Add bounded OpenGL ES 2.0 live-wallpaper support with shader validation and typed OpenGL requests.
+- Serialize native wallpaper operations, preserve partial both-target results, and make direct static application safe for headless/background execution.
+- Retain `goToHome` request fields for source compatibility while removing package-side automatic navigation.
+- Make the live-wallpaper manifest feature optional, remove broad media/storage permissions, and expose overrideable live-wallpaper branding resources.
+- Keep 3.1 APIs source-compatible; mark the legacy live-wallpaper shortcut deprecated in favor of structured results.
+- Refresh the example, migration/API docs, Android compatibility notes, and the 3.2 issue-resolution ledger.
+
 ## 3.1.0
 
 - Add basic iOS support with download-only capability (save wallpaper to Photos).

@@ -95,6 +95,23 @@ class WallpaperRequest {
   final bool goToHome;
 }
 
+/// Typed request for the structured static wallpaper API.
+class StaticWallpaperRequest {
+  const StaticWallpaperRequest({
+    required this.source,
+    required this.target,
+    this.scaleMode = WallpaperScaleMode.centerCrop,
+    this.strategy = WallpaperApplyStrategy.automatic,
+    this.goToHome = false,
+  });
+
+  final WallpaperSource source;
+  final WallpaperTarget target;
+  final WallpaperScaleMode scaleMode;
+  final WallpaperApplyStrategy strategy;
+  final bool goToHome;
+}
+
 /// Typed input for Material You wallpaper operations.
 class MaterialYouWallpaperRequest {
   const MaterialYouWallpaperRequest({

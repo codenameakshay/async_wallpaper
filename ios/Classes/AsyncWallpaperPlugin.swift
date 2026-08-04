@@ -27,6 +27,56 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     )
   }
 
+  public func getCapabilities(
+    completion: @escaping (Result<WallpaperCapabilitiesData, Error>) -> Void
+  ) {
+    completion(
+      .success(
+        WallpaperCapabilitiesData(
+          supportsStaticWallpaper: false,
+          supportsLiveWallpaper: false,
+          supportsOpenGlLiveWallpaper: false,
+          supportsHomeWallpaper: false,
+          supportsLockWallpaper: false,
+          supportsBothWallpapers: false,
+          canSetWallpaper: false,
+          hasSystemWallpaperPicker: false,
+          requiresForeground: false,
+          manufacturer: "Apple",
+          sdkInt: 0
+        )
+      )
+    )
+  }
+
+  public func applyWallpaper(
+    request: StaticWallpaperRequestData,
+    completion: @escaping (Result<OperationResultData, Error>) -> Void
+  ) {
+    completion(.success(unsupportedResult(target: request.target, operation: "static wallpaper")))
+  }
+
+  public func prepareVideoWallpaper(
+    request: VideoWallpaperRequestData,
+    completion: @escaping (Result<OperationResultData, Error>) -> Void
+  ) {
+    completion(.success(unsupportedResult(target: request.target, operation: "video wallpaper")))
+  }
+
+  public func openLiveWallpaperPreview(
+    request: VideoWallpaperRequestData,
+    completion: @escaping (Result<OperationResultData, Error>) -> Void
+  ) {
+    completion(.success(unsupportedResult(target: request.target, operation: "live wallpaper preview")))
+  }
+
+  public func applyOpenGlWallpaper(
+    request: OpenGlWallpaperRequestData,
+    completion: @escaping (Result<OperationResultData, Error>) -> Void
+  ) {
+    completion(.success(unsupportedResult(target: request.target, operation: "OpenGL wallpaper")))
+  }
+
   public func setHomeWallpaperFromUrl(
     url: String,
     goToHome: Bool,
@@ -166,5 +216,17 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
         completion(false)
       }
     }
+  }
+
+  private func unsupportedResult(
+    target: WallpaperTargetData?,
+    operation: String
+  ) -> OperationResultData {
+    OperationResultData(
+      status: .unsupported,
+      requestedTarget: target ?? .home,
+      errorCode: "not-implemented",
+      errorMessage: "The structured \(operation) endpoint is not available on iOS."
+    )
   }
 }

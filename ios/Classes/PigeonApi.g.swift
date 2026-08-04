@@ -128,6 +128,398 @@ func deepHashPigeonApi(value: Any?, hasher: inout Hasher) {
 
     
 
+/// The location and representation of a wallpaper asset.
+enum WallpaperSourceKindData: Int {
+  case url = 0
+  case filePath = 1
+  case contentUri = 2
+  case bytes = 3
+}
+
+/// The display target requested for a wallpaper operation.
+enum WallpaperTargetData: Int {
+  case home = 0
+  case lock = 1
+  case both = 2
+}
+
+/// The way an image or video should be scaled to fit its target display.
+enum WallpaperScaleModeData: Int {
+  case centerCrop = 0
+  case fitCenter = 1
+  case center = 2
+  case fill = 3
+  case stretch = 4
+}
+
+/// The Android application strategy requested by the caller.
+enum WallpaperApplyStrategyData: Int {
+  case direct = 0
+  case systemCropper = 1
+  case systemPicker = 2
+  case automatic = 3
+}
+
+/// The outcome of a complete platform wallpaper operation.
+enum OperationStatusData: Int {
+  case applied = 0
+  case previewOpened = 1
+  case awaitingUserConfirmation = 2
+  case cancelled = 3
+  case failed = 4
+  case unsupported = 5
+  case foregroundRequired = 6
+}
+
+/// The outcome for one wallpaper target within an operation.
+enum TargetStatusData: Int {
+  case applied = 0
+  case failed = 1
+  case unsupported = 2
+  case notAttempted = 3
+}
+
+/// A static, content-provider, or in-memory wallpaper source.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct WallpaperSourceData: Hashable {
+  var kind: WallpaperSourceKindData? = nil
+  var url: String? = nil
+  var filePath: String? = nil
+  var contentUri: String? = nil
+  var bytes: FlutterStandardTypedData? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> WallpaperSourceData? {
+    let kind: WallpaperSourceKindData? = nilOrValue(pigeonVar_list[0])
+    let url: String? = nilOrValue(pigeonVar_list[1])
+    let filePath: String? = nilOrValue(pigeonVar_list[2])
+    let contentUri: String? = nilOrValue(pigeonVar_list[3])
+    let bytes: FlutterStandardTypedData? = nilOrValue(pigeonVar_list[4])
+
+    return WallpaperSourceData(
+      kind: kind,
+      url: url,
+      filePath: filePath,
+      contentUri: contentUri,
+      bytes: bytes
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      kind,
+      url,
+      filePath,
+      contentUri,
+      bytes,
+    ]
+  }
+  static func == (lhs: WallpaperSourceData, rhs: WallpaperSourceData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Result details for one target display.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct TargetResultData: Hashable {
+  var status: TargetStatusData? = nil
+  var errorCode: String? = nil
+  var errorMessage: String? = nil
+  var errorDetails: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> TargetResultData? {
+    let status: TargetStatusData? = nilOrValue(pigeonVar_list[0])
+    let errorCode: String? = nilOrValue(pigeonVar_list[1])
+    let errorMessage: String? = nilOrValue(pigeonVar_list[2])
+    let errorDetails: String? = nilOrValue(pigeonVar_list[3])
+
+    return TargetResultData(
+      status: status,
+      errorCode: errorCode,
+      errorMessage: errorMessage,
+      errorDetails: errorDetails
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      status,
+      errorCode,
+      errorMessage,
+      errorDetails,
+    ]
+  }
+  static func == (lhs: TargetResultData, rhs: TargetResultData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// A truthful, structured result from the host platform.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct OperationResultData: Hashable {
+  var status: OperationStatusData? = nil
+  var requestedTarget: WallpaperTargetData? = nil
+  var home: TargetResultData? = nil
+  var lock: TargetResultData? = nil
+  var errorCode: String? = nil
+  var errorMessage: String? = nil
+  var errorDetails: String? = nil
+  var fallbackUsed: Bool? = nil
+  var fallbackStrategy: WallpaperApplyStrategyData? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> OperationResultData? {
+    let status: OperationStatusData? = nilOrValue(pigeonVar_list[0])
+    let requestedTarget: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
+    let home: TargetResultData? = nilOrValue(pigeonVar_list[2])
+    let lock: TargetResultData? = nilOrValue(pigeonVar_list[3])
+    let errorCode: String? = nilOrValue(pigeonVar_list[4])
+    let errorMessage: String? = nilOrValue(pigeonVar_list[5])
+    let errorDetails: String? = nilOrValue(pigeonVar_list[6])
+    let fallbackUsed: Bool? = nilOrValue(pigeonVar_list[7])
+    let fallbackStrategy: WallpaperApplyStrategyData? = nilOrValue(pigeonVar_list[8])
+
+    return OperationResultData(
+      status: status,
+      requestedTarget: requestedTarget,
+      home: home,
+      lock: lock,
+      errorCode: errorCode,
+      errorMessage: errorMessage,
+      errorDetails: errorDetails,
+      fallbackUsed: fallbackUsed,
+      fallbackStrategy: fallbackStrategy
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      status,
+      requestedTarget,
+      home,
+      lock,
+      errorCode,
+      errorMessage,
+      errorDetails,
+      fallbackUsed,
+      fallbackStrategy,
+    ]
+  }
+  static func == (lhs: OperationResultData, rhs: OperationResultData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Capability snapshot reported by the host platform.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct WallpaperCapabilitiesData: Hashable {
+  var supportsStaticWallpaper: Bool? = nil
+  var supportsLiveWallpaper: Bool? = nil
+  var supportsOpenGlLiveWallpaper: Bool? = nil
+  var supportsHomeWallpaper: Bool? = nil
+  var supportsLockWallpaper: Bool? = nil
+  var supportsBothWallpapers: Bool? = nil
+  var canSetWallpaper: Bool? = nil
+  var hasSystemWallpaperPicker: Bool? = nil
+  var requiresForeground: Bool? = nil
+  var manufacturer: String? = nil
+  var sdkInt: Int64? = nil
+  var openGlVersion: String? = nil
+  var openGlRenderer: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> WallpaperCapabilitiesData? {
+    let supportsStaticWallpaper: Bool? = nilOrValue(pigeonVar_list[0])
+    let supportsLiveWallpaper: Bool? = nilOrValue(pigeonVar_list[1])
+    let supportsOpenGlLiveWallpaper: Bool? = nilOrValue(pigeonVar_list[2])
+    let supportsHomeWallpaper: Bool? = nilOrValue(pigeonVar_list[3])
+    let supportsLockWallpaper: Bool? = nilOrValue(pigeonVar_list[4])
+    let supportsBothWallpapers: Bool? = nilOrValue(pigeonVar_list[5])
+    let canSetWallpaper: Bool? = nilOrValue(pigeonVar_list[6])
+    let hasSystemWallpaperPicker: Bool? = nilOrValue(pigeonVar_list[7])
+    let requiresForeground: Bool? = nilOrValue(pigeonVar_list[8])
+    let manufacturer: String? = nilOrValue(pigeonVar_list[9])
+    let sdkInt: Int64? = nilOrValue(pigeonVar_list[10])
+    let openGlVersion: String? = nilOrValue(pigeonVar_list[11])
+    let openGlRenderer: String? = nilOrValue(pigeonVar_list[12])
+
+    return WallpaperCapabilitiesData(
+      supportsStaticWallpaper: supportsStaticWallpaper,
+      supportsLiveWallpaper: supportsLiveWallpaper,
+      supportsOpenGlLiveWallpaper: supportsOpenGlLiveWallpaper,
+      supportsHomeWallpaper: supportsHomeWallpaper,
+      supportsLockWallpaper: supportsLockWallpaper,
+      supportsBothWallpapers: supportsBothWallpapers,
+      canSetWallpaper: canSetWallpaper,
+      hasSystemWallpaperPicker: hasSystemWallpaperPicker,
+      requiresForeground: requiresForeground,
+      manufacturer: manufacturer,
+      sdkInt: sdkInt,
+      openGlVersion: openGlVersion,
+      openGlRenderer: openGlRenderer
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      supportsStaticWallpaper,
+      supportsLiveWallpaper,
+      supportsOpenGlLiveWallpaper,
+      supportsHomeWallpaper,
+      supportsLockWallpaper,
+      supportsBothWallpapers,
+      canSetWallpaper,
+      hasSystemWallpaperPicker,
+      requiresForeground,
+      manufacturer,
+      sdkInt,
+      openGlVersion,
+      openGlRenderer,
+    ]
+  }
+  static func == (lhs: WallpaperCapabilitiesData, rhs: WallpaperCapabilitiesData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Parameters for an image wallpaper operation.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct StaticWallpaperRequestData: Hashable {
+  var source: WallpaperSourceData? = nil
+  var target: WallpaperTargetData? = nil
+  var scaleMode: WallpaperScaleModeData? = nil
+  var strategy: WallpaperApplyStrategyData? = nil
+  var goToHome: Bool? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> StaticWallpaperRequestData? {
+    let source: WallpaperSourceData? = nilOrValue(pigeonVar_list[0])
+    let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
+    let scaleMode: WallpaperScaleModeData? = nilOrValue(pigeonVar_list[2])
+    let strategy: WallpaperApplyStrategyData? = nilOrValue(pigeonVar_list[3])
+    let goToHome: Bool? = nilOrValue(pigeonVar_list[4])
+
+    return StaticWallpaperRequestData(
+      source: source,
+      target: target,
+      scaleMode: scaleMode,
+      strategy: strategy,
+      goToHome: goToHome
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      source,
+      target,
+      scaleMode,
+      strategy,
+      goToHome,
+    ]
+  }
+  static func == (lhs: StaticWallpaperRequestData, rhs: StaticWallpaperRequestData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Parameters for preparing or previewing a video live wallpaper.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct VideoWallpaperRequestData: Hashable {
+  var source: WallpaperSourceData? = nil
+  var target: WallpaperTargetData? = nil
+  var scaleMode: WallpaperScaleModeData? = nil
+  var goToHome: Bool? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> VideoWallpaperRequestData? {
+    let source: WallpaperSourceData? = nilOrValue(pigeonVar_list[0])
+    let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
+    let scaleMode: WallpaperScaleModeData? = nilOrValue(pigeonVar_list[2])
+    let goToHome: Bool? = nilOrValue(pigeonVar_list[3])
+
+    return VideoWallpaperRequestData(
+      source: source,
+      target: target,
+      scaleMode: scaleMode,
+      goToHome: goToHome
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      source,
+      target,
+      scaleMode,
+      goToHome,
+    ]
+  }
+  static func == (lhs: VideoWallpaperRequestData, rhs: VideoWallpaperRequestData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Parameters for applying a shader-based OpenGL live wallpaper.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct OpenGlWallpaperRequestData: Hashable {
+  var fragmentShader: String? = nil
+  var textures: [WallpaperSourceData?]? = nil
+  var target: WallpaperTargetData? = nil
+  var frameRate: Int64? = nil
+  var goToHome: Bool? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> OpenGlWallpaperRequestData? {
+    let fragmentShader: String? = nilOrValue(pigeonVar_list[0])
+    let textures: [WallpaperSourceData?]? = nilOrValue(pigeonVar_list[1])
+    let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[2])
+    let frameRate: Int64? = nilOrValue(pigeonVar_list[3])
+    let goToHome: Bool? = nilOrValue(pigeonVar_list[4])
+
+    return OpenGlWallpaperRequestData(
+      fragmentShader: fragmentShader,
+      textures: textures,
+      target: target,
+      frameRate: frameRate,
+      goToHome: goToHome
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      fragmentShader,
+      textures,
+      target,
+      frameRate,
+      goToHome,
+    ]
+  }
+  static func == (lhs: OpenGlWallpaperRequestData, rhs: OpenGlWallpaperRequestData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
 /// Generated class from Pigeon that represents data sent in messages.
 struct MaterialYouSupportData: Hashable {
   var isSupported: Bool? = nil
@@ -165,6 +557,56 @@ private class PigeonApiPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
     case 129:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return WallpaperSourceKindData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 130:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return WallpaperTargetData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 131:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return WallpaperScaleModeData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 132:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return WallpaperApplyStrategyData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 133:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return OperationStatusData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 134:
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return TargetStatusData(rawValue: enumResultAsInt)
+      }
+      return nil
+    case 135:
+      return WallpaperSourceData.fromList(self.readValue() as! [Any?])
+    case 136:
+      return TargetResultData.fromList(self.readValue() as! [Any?])
+    case 137:
+      return OperationResultData.fromList(self.readValue() as! [Any?])
+    case 138:
+      return WallpaperCapabilitiesData.fromList(self.readValue() as! [Any?])
+    case 139:
+      return StaticWallpaperRequestData.fromList(self.readValue() as! [Any?])
+    case 140:
+      return VideoWallpaperRequestData.fromList(self.readValue() as! [Any?])
+    case 141:
+      return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
+    case 142:
       return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -174,8 +616,47 @@ private class PigeonApiPigeonCodecReader: FlutterStandardReader {
 
 private class PigeonApiPigeonCodecWriter: FlutterStandardWriter {
   override func writeValue(_ value: Any) {
-    if let value = value as? MaterialYouSupportData {
+    if let value = value as? WallpaperSourceKindData {
       super.writeByte(129)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperTargetData {
+      super.writeByte(130)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperScaleModeData {
+      super.writeByte(131)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperApplyStrategyData {
+      super.writeByte(132)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? OperationStatusData {
+      super.writeByte(133)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? TargetStatusData {
+      super.writeByte(134)
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperSourceData {
+      super.writeByte(135)
+      super.writeValue(value.toList())
+    } else if let value = value as? TargetResultData {
+      super.writeByte(136)
+      super.writeValue(value.toList())
+    } else if let value = value as? OperationResultData {
+      super.writeByte(137)
+      super.writeValue(value.toList())
+    } else if let value = value as? WallpaperCapabilitiesData {
+      super.writeByte(138)
+      super.writeValue(value.toList())
+    } else if let value = value as? StaticWallpaperRequestData {
+      super.writeByte(139)
+      super.writeValue(value.toList())
+    } else if let value = value as? VideoWallpaperRequestData {
+      super.writeByte(140)
+      super.writeValue(value.toList())
+    } else if let value = value as? OpenGlWallpaperRequestData {
+      super.writeByte(141)
+      super.writeValue(value.toList())
+    } else if let value = value as? MaterialYouSupportData {
+      super.writeByte(142)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -202,6 +683,17 @@ class PigeonApiPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 protocol WallpaperApi {
   func getPlatformVersion(completion: @escaping (Result<String, Error>) -> Void)
   func checkMaterialYouSupport(completion: @escaping (Result<MaterialYouSupportData, Error>) -> Void)
+  /// Returns the platform's structured wallpaper capabilities.
+  func getCapabilities(completion: @escaping (Result<WallpaperCapabilitiesData, Error>) -> Void)
+  /// Applies a static wallpaper using the structured 3.2 transport contract.
+  func applyWallpaper(request: StaticWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
+  /// Prepares a video live wallpaper without claiming that it was applied.
+  func prepareVideoWallpaper(request: VideoWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
+  /// Opens the live-wallpaper UI and reports that distinct outcome.
+  func openLiveWallpaperPreview(request: VideoWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
+  /// Applies a shader-based OpenGL live wallpaper.
+  func applyOpenGlWallpaper(request: OpenGlWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
+  /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
   func setHomeWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
   func setLockWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
   func setBothWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
@@ -252,6 +744,95 @@ class WallpaperApiSetup {
     } else {
       checkMaterialYouSupportChannel.setMessageHandler(nil)
     }
+    /// Returns the platform's structured wallpaper capabilities.
+    let getCapabilitiesChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getCapabilities\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getCapabilitiesChannel.setMessageHandler { _, reply in
+        api.getCapabilities { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      getCapabilitiesChannel.setMessageHandler(nil)
+    }
+    /// Applies a static wallpaper using the structured 3.2 transport contract.
+    let applyWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      applyWallpaperChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! StaticWallpaperRequestData
+        api.applyWallpaper(request: requestArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      applyWallpaperChannel.setMessageHandler(nil)
+    }
+    /// Prepares a video live wallpaper without claiming that it was applied.
+    let prepareVideoWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.prepareVideoWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      prepareVideoWallpaperChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! VideoWallpaperRequestData
+        api.prepareVideoWallpaper(request: requestArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      prepareVideoWallpaperChannel.setMessageHandler(nil)
+    }
+    /// Opens the live-wallpaper UI and reports that distinct outcome.
+    let openLiveWallpaperPreviewChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.openLiveWallpaperPreview\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      openLiveWallpaperPreviewChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! VideoWallpaperRequestData
+        api.openLiveWallpaperPreview(request: requestArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      openLiveWallpaperPreviewChannel.setMessageHandler(nil)
+    }
+    /// Applies a shader-based OpenGL live wallpaper.
+    let applyOpenGlWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyOpenGlWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      applyOpenGlWallpaperChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! OpenGlWallpaperRequestData
+        api.applyOpenGlWallpaper(request: requestArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      applyOpenGlWallpaperChannel.setMessageHandler(nil)
+    }
+    /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
     let setHomeWallpaperFromUrlChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromUrl\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setHomeWallpaperFromUrlChannel.setMessageHandler { message, reply in

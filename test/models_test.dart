@@ -59,6 +59,32 @@ void main() {
     );
   });
 
+  test('constructs an immutable structured static wallpaper request', () {
+    final Uint8List input = Uint8List.fromList(<int>[4, 5, 6]);
+    final StaticWallpaperRequest request = StaticWallpaperRequest(
+      source: WallpaperSource.bytes(input),
+      target: WallpaperTarget.lock,
+      scaleMode: WallpaperScaleMode.fill,
+      strategy: WallpaperApplyStrategy.direct,
+      goToHome: true,
+    );
+    const StaticWallpaperRequest defaults = StaticWallpaperRequest(
+      source: WallpaperSource.url('https://example.com/default.jpg'),
+      target: WallpaperTarget.home,
+    );
+
+    input[0] = 9;
+
+    expect(request.source.bytes, Uint8List.fromList(<int>[4, 5, 6]));
+    expect(request.target, WallpaperTarget.lock);
+    expect(request.scaleMode, WallpaperScaleMode.fill);
+    expect(request.strategy, WallpaperApplyStrategy.direct);
+    expect(request.goToHome, isTrue);
+    expect(defaults.scaleMode, WallpaperScaleMode.centerCrop);
+    expect(defaults.strategy, WallpaperApplyStrategy.automatic);
+    expect(defaults.goToHome, isFalse);
+  });
+
   test('declares every operation and target status', () {
     expect(
       WallpaperOperationStatus.values,

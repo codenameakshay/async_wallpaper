@@ -39,6 +39,57 @@ class PigeonApiImpl(
     callback(Result.success(data))
   }
 
+  override fun getCapabilities(callback: (Result<WallpaperCapabilitiesData>) -> Unit) {
+    // The structured engines are added incrementally after the transport
+    // contract. Until then, avoid advertising capabilities that this host
+    // cannot fulfill through the new endpoints.
+    callback(
+      Result.success(
+        WallpaperCapabilitiesData(
+          supportsStaticWallpaper = false,
+          supportsLiveWallpaper = false,
+          supportsOpenGlLiveWallpaper = false,
+          supportsHomeWallpaper = false,
+          supportsLockWallpaper = false,
+          supportsBothWallpapers = false,
+          canSetWallpaper = false,
+          hasSystemWallpaperPicker = false,
+          requiresForeground = false,
+          manufacturer = Build.MANUFACTURER,
+          sdkInt = Build.VERSION.SDK_INT.toLong(),
+        ),
+      ),
+    )
+  }
+
+  override fun applyWallpaper(
+    request: StaticWallpaperRequestData,
+    callback: (Result<OperationResultData>) -> Unit,
+  ) {
+    callback(Result.success(unsupportedResult(request.target, "static wallpaper")))
+  }
+
+  override fun prepareVideoWallpaper(
+    request: VideoWallpaperRequestData,
+    callback: (Result<OperationResultData>) -> Unit,
+  ) {
+    callback(Result.success(unsupportedResult(request.target, "video wallpaper")))
+  }
+
+  override fun openLiveWallpaperPreview(
+    request: VideoWallpaperRequestData,
+    callback: (Result<OperationResultData>) -> Unit,
+  ) {
+    callback(Result.success(unsupportedResult(request.target, "live wallpaper preview")))
+  }
+
+  override fun applyOpenGlWallpaper(
+    request: OpenGlWallpaperRequestData,
+    callback: (Result<OperationResultData>) -> Unit,
+  ) {
+    callback(Result.success(unsupportedResult(request.target, "OpenGL wallpaper")))
+  }
+
   override fun setHomeWallpaperFromUrl(
     url: String,
     goToHome: Boolean,
@@ -294,6 +345,18 @@ class PigeonApiImpl(
 
   private fun postBoolean(callback: (Result<Boolean>) -> Unit, value: Boolean) {
     mainHandler.post { callback(Result.success(value)) }
+  }
+
+  private fun unsupportedResult(
+    target: WallpaperTargetData?,
+    operation: String,
+  ): OperationResultData {
+    return OperationResultData(
+      status = OperationStatusData.UNSUPPORTED,
+      requestedTarget = target ?: WallpaperTargetData.HOME,
+      errorCode = "not-implemented",
+      errorMessage = "The structured $operation endpoint is not available yet.",
+    )
   }
 
   private fun copyFile(from: File, to: File) {

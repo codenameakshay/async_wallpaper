@@ -11,6 +11,7 @@
 - Make the live-wallpaper manifest feature optional, remove broad media/storage permissions, and expose overrideable live-wallpaper branding resources.
 - Keep 3.1 APIs source-compatible; mark the legacy live-wallpaper shortcut deprecated in favor of structured results.
 - Refresh the example, migration/API docs, Android compatibility notes, and the 3.2 issue-resolution ledger.
+- OpenGL/video live-wallpaper flows are syntax- and state-machine-tested; GPU compile/link and OEM preview target selection still require physical device verification (see docs/android-compatibility.md).
 
 ## 3.1.0
 

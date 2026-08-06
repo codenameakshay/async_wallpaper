@@ -376,6 +376,7 @@ class AsyncWallpaper {
     }
   }
 
+  /// Maps structured [WallpaperOperationResult] to legacy [WallpaperResult]: `invalid-input`/`foregroundRequired`/`unsupported` become [WallpaperErrorCode.invalidInput]/[WallpaperErrorCode.unsupported]; only `applied`/`previewOpened`/`awaitingUserConfirmation` are treated as success for the legacy boolean contract.
   static WallpaperOperationResult _unsupportedOperation(
     WallpaperTarget target,
   ) {

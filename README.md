@@ -205,6 +205,10 @@ Live-wallpaper support is optional in the manifest (`android:required="false"`) 
 
 More detail, including OEM limits and an Android target matrix, is in [Android compatibility](docs/android-compatibility.md).
 
+### Hardware and OEM verification matrix
+
+> `3.2.0` OpenGL ES 2.0 live-wallpaper rendering (`GlRenderer`, `ShaderProgramValidator`) and video live-wallpaper preview target selection are validated by syntax/unit tests (`ShaderContractTest`, `VideoStateMachineTest`) but require physical device verification. No CI emulator compiles/links a real GPU driver, and Android does not offer a cross-OEM API to force a live wallpaper onto home, lock, or both. Check `getCapabilities()` before showing the action, handle `previewOpened`/`awaitingUserConfirmation`/`foregroundRequired` as normal outcomes, and report `capabilities` + `WallpaperOperationResult` + device model, Android version, and OEM skin when filing OEM-specific reports.
+
 ### iOS download permission
 
 Add a Photos usage description to the host app before calling `downloadWallpaper` on iOS:
@@ -235,7 +239,7 @@ Move new code to the structured APIs for richer sources and truthful results:
 | `setLiveWallpaper(LiveWallpaperRequest(filePath: …))` | `setVideoWallpaper(VideoWallpaperRequest(source: …))`, then `openLiveWallpaperPreview(...)` in foreground UI |
 | External toast configuration | Render your own app feedback from the returned result |
 
-`goToHome` remains on request types so existing source code compiles, but 3.2 intentionally ignores it and never navigates the app to Home. If an app needs navigation after a verified result, it must own that foreground UX itself.
+`goToHome` remains on request types (`StaticWallpaperRequest`, `VideoWallpaperRequest`, `OpenGlLiveWallpaperRequest`, `WallpaperRequest`, `LiveWallpaperRequest`, `MaterialYouWallpaperRequest`) so existing source code compiles, but 3.2 intentionally ignores it and never navigates the app to Home. Inspect `WallpaperOperationResult` and own any foreground navigation in the app (e.g., `Navigator.pop`, home intent) after a verified result. WorkManager/headless callers must not use `systemCropper`/`systemPicker`/`openLiveWallpaperPreview`; those return `foregroundRequired` without an `Activity`.
 
 ## Further documentation
 

@@ -96,7 +96,11 @@ final result = await AsyncWallpaper.applyWallpaper(
 
 Do not call cropper/picker, `openLiveWallpaperPreview`, video activation, or OpenGL activation from a worker. They enter Android system UI and need a foreground user flow. In 3.2, `goToHome` remains only for source compatibility and is intentionally ignored; the plugin never performs automatic navigation. If foreground/UI requirements cannot be met, treat `foregroundRequired` as a normal final outcome and surface an in-app action later.
 
+> Migration: `goToHome` is retained on `StaticWallpaperRequest`/`VideoWallpaperRequest`/`OpenGlLiveWallpaperRequest`/`WallpaperRequest`/`LiveWallpaperRequest`/`MaterialYouWallpaperRequest` only so existing source still compiles; the engine intentionally ignores it and never navigates to Home. Inspect `WallpaperOperationResult` and own any foreground navigation in the app (e.g., `Navigator.pop`, home intent) after a verified result.
+
 ## Video live wallpapers
+
+Video live wallpapers are muted by default; no foreground service is used. Playback is visibility-aware (paused when not visible) and lifecycle-safe.
 
 Video preparation validates a playable video track, MIME type, dimensions, rotation, and duration before atomically replacing the active asset. A failed candidate does not replace a previously valid active video. Playback is visibility-aware, muted by default, and releases its player through one lifecycle path; it does not start a foreground service.
 
@@ -116,6 +120,8 @@ Consequently:
 This limitation is documented rather than hidden because Android does not expose a portable API to force a live-wallpaper target across OEM preview implementations.
 
 ## OpenGL live wallpapers
+
+> GPU shader compile/link and live-wallpaper target selection are not validated by CI emulators; verify on physical devices and handle `previewOpened`/`awaitingUserConfirmation` as normal outcomes.
 
 OpenGL live wallpaper support requires `supportsOpenGlLiveWallpaper`. The renderer uses an EGL/OpenGL ES 2.0 context on its own render thread, renders only while visible, and releases resources on that thread when the wallpaper surface changes or is destroyed.
 

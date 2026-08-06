@@ -493,7 +493,16 @@ class AsyncWallpaper {
                 message: 'Failed to rotate wallpaper now.',
               ),
             );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: 'Unexpected exception while rotating wallpaper now.',
+          details: error,
+        ),
+      );
     }
+  }
 
   static Future<WallpaperOperationResult> _runOperation({
     required WallpaperTarget target,

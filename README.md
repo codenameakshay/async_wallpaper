@@ -133,7 +133,7 @@ Add to `Info.plist` for download:
 - From 2.x: `HOME_SCREEN` etc. → `WallpaperTarget`. Boolean setters → typed requests. Toasts removed.
 - From 3.1: `WallpaperRequest(sourceType+source)` → `StaticWallpaperRequest(source: WallpaperSource...)`. Boolean success → `WallpaperOperationResult`. `goToHome` does nothing.
 
-Details: `docs/android-compatibility.md`, `docs/issues-3.2.0.md`.
+Details: `doc/android-compatibility.md`, `doc/issues-3.2.0.md`.
 
 ## Bugs and Feature Requests
 

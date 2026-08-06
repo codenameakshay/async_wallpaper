@@ -32,7 +32,7 @@ The demo intentionally has no “go home” option. The 3.2 API retains `goToHom
 - Android's live-wallpaper preview chooses the final home/lock/both target. The plugin cannot force a lock or both target across OEMs.
 - iOS supports `downloadWallpaper` only; applying wallpapers and live/OpenGL flows return `unsupported`.
 
-See the package [README](../README.md) and [Android compatibility guide](../docs/android-compatibility.md) for source, permission, branding, and OEM details.
+See the package [README](../README.md) and [Android compatibility guide](../doc/android-compatibility.md) for source, permission, branding, and OEM details.
 
 ## Tests
 

@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Dart, tests, and generated bindings
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Get root dependencies
+        run: flutter pub get
+
+      - name: Get example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Verify Dart formatting
+        shell: bash
+        run: |
+          git ls-files -z -- '*.dart' |
+            xargs -0 dart format --output=none --set-exit-if-changed
+
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Test package
+        run: flutter test
+
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+
+      - name: Test example
+        working-directory: example
+        run: flutter test
+
+      - name: Verify Pigeon bindings
+        run: tool/check_pigeon.sh
+
+  android:
+    name: Android unit tests, lint, and debug build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.14 and its cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+
+      - name: Get root dependencies
+        run: flutter pub get
+
+      - name: Get example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Configure Android and bootstrap its ignored wrapper
+        shell: bash
+        run: |
+          android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$android_sdk" ]]; then
+            echo "Neither ANDROID_HOME nor ANDROID_SDK_ROOT is configured." >&2
+            exit 1
+          fi
+          flutter_root="$(cd "$(dirname "$(command -v flutter)")/.." && pwd)"
+          {
+            printf 'sdk.dir=%s\n' "$android_sdk"
+            printf 'flutter.sdk=%s\n' "$flutter_root"
+          } > example/android/local.properties
+          if [[ ! -x example/android/gradlew || ! -f example/android/gradle/wrapper/gradle-wrapper.jar ]]; then
+            gradle -p example/android wrapper --gradle-version 8.14
+          fi
+
+      - name: Run Android unit tests, lint, and debug build
+        working-directory: example/android
+        run: ./gradlew --no-daemon test lint assembleDebug
+
+  ios:
+    name: iOS simulator build
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Get root dependencies
+        run: flutter pub get
+
+      - name: Get example dependencies
+        working-directory: example
+        run: flutter pub get
+
+      - name: Build example for an iOS simulator
+        working-directory: example
+        run: flutter build ios --simulator --debug

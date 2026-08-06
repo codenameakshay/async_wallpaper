@@ -1,3 +1,18 @@
+## 3.2.0
+
+- Add structured Android static-wallpaper requests with URL, file-path, content-URI, and byte sources.
+- Add explicit image scale modes and direct/system-cropper/system-picker/automatic apply strategies.
+- Add truthful `WallpaperOperationResult` and per-target home/lock outcomes instead of treating a UI launch as an applied wallpaper.
+- Add `getCapabilities()` for static, live, OpenGL, target, picker, foreground, OEM, and GLES availability checks.
+- Add typed video preparation and live-preview APIs; preparation and Android user confirmation are now distinct statuses.
+- Add bounded OpenGL ES 2.0 live-wallpaper support with shader validation and typed OpenGL requests.
+- Serialize native wallpaper operations, preserve partial both-target results, and make direct static application safe for headless/background execution.
+- Retain `goToHome` request fields for source compatibility while removing package-side automatic navigation.
+- Make the live-wallpaper manifest feature optional, remove broad media/storage permissions, and expose overrideable live-wallpaper branding resources.
+- Keep 3.1 APIs source-compatible; mark the legacy live-wallpaper shortcut deprecated in favor of structured results.
+- Refresh the example, migration/API docs, Android compatibility notes, and the 3.2 issue-resolution ledger.
+- OpenGL/video live-wallpaper flows are syntax- and state-machine-tested; GPU compile/link and OEM preview target selection still require physical device verification (see doc/android-compatibility.md).
+
 ## 3.1.0
 
 - Add Android wallpaper rotation APIs: start, stop, status, and rotate now.
@@ -6,6 +21,11 @@
 - Add rotation triggers for interval, charging connected, and time-of-day windows.
 - Enforce minimum rotation interval of 15 minutes.
 - Add active hours configuration for time-of-day trigger.
+- Add basic iOS support with download-only capability (save wallpaper to Photos).
+- Add cross-platform `downloadWallpaper(...)` API (iOS + Android).
+- Add iOS plugin implementation using Swift + Pigeon host bindings.
+- Existing apply/live/chooser operations now return typed `unsupported` on iOS.
+- Add iOS example runner and Photos permission usage description for demo app.
 - Update example app and docs with rotation controls.
 
 ## 3.0.0

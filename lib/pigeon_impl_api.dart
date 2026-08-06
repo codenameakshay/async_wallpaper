@@ -33,6 +33,497 @@ bool _deepEquals(Object? a, Object? b) {
   return a == b;
 }
 
+/// The location and representation of a wallpaper asset.
+enum WallpaperSourceKindData { url, filePath, contentUri, bytes }
+
+/// The display target requested for a wallpaper operation.
+enum WallpaperTargetData { home, lock, both }
+
+/// The way an image or video should be scaled to fit its target display.
+enum WallpaperScaleModeData { centerCrop, fitCenter, center, fill, stretch }
+
+/// The Android application strategy requested by the caller.
+enum WallpaperApplyStrategyData {
+  direct,
+  systemCropper,
+  systemPicker,
+  automatic,
+}
+
+/// The outcome of a complete platform wallpaper operation.
+enum OperationStatusData {
+  applied,
+  previewOpened,
+  awaitingUserConfirmation,
+  cancelled,
+  failed,
+  unsupported,
+  foregroundRequired,
+}
+
+/// The outcome for one wallpaper target within an operation.
+enum TargetStatusData { applied, failed, unsupported, notAttempted }
+
+/// A static, content-provider, or in-memory wallpaper source.
+class WallpaperSourceData {
+  WallpaperSourceData({
+    this.kind,
+    this.url,
+    this.filePath,
+    this.contentUri,
+    this.bytes,
+  });
+
+  WallpaperSourceKindData? kind;
+
+  String? url;
+
+  String? filePath;
+
+  String? contentUri;
+
+  Uint8List? bytes;
+
+  List<Object?> _toList() {
+    return <Object?>[kind, url, filePath, contentUri, bytes];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static WallpaperSourceData decode(Object result) {
+    result as List<Object?>;
+    return WallpaperSourceData(
+      kind: result[0] as WallpaperSourceKindData?,
+      url: result[1] as String?,
+      filePath: result[2] as String?,
+      contentUri: result[3] as String?,
+      bytes: result[4] as Uint8List?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! WallpaperSourceData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// Result details for one target display.
+class TargetResultData {
+  TargetResultData({
+    this.status,
+    this.errorCode,
+    this.errorMessage,
+    this.errorDetails,
+  });
+
+  TargetStatusData? status;
+
+  String? errorCode;
+
+  String? errorMessage;
+
+  String? errorDetails;
+
+  List<Object?> _toList() {
+    return <Object?>[status, errorCode, errorMessage, errorDetails];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static TargetResultData decode(Object result) {
+    result as List<Object?>;
+    return TargetResultData(
+      status: result[0] as TargetStatusData?,
+      errorCode: result[1] as String?,
+      errorMessage: result[2] as String?,
+      errorDetails: result[3] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! TargetResultData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// A truthful, structured result from the host platform.
+class OperationResultData {
+  OperationResultData({
+    this.status,
+    this.requestedTarget,
+    this.home,
+    this.lock,
+    this.errorCode,
+    this.errorMessage,
+    this.errorDetails,
+    this.fallbackUsed,
+    this.fallbackStrategy,
+  });
+
+  OperationStatusData? status;
+
+  WallpaperTargetData? requestedTarget;
+
+  TargetResultData? home;
+
+  TargetResultData? lock;
+
+  String? errorCode;
+
+  String? errorMessage;
+
+  String? errorDetails;
+
+  bool? fallbackUsed;
+
+  WallpaperApplyStrategyData? fallbackStrategy;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      status,
+      requestedTarget,
+      home,
+      lock,
+      errorCode,
+      errorMessage,
+      errorDetails,
+      fallbackUsed,
+      fallbackStrategy,
+    ];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static OperationResultData decode(Object result) {
+    result as List<Object?>;
+    return OperationResultData(
+      status: result[0] as OperationStatusData?,
+      requestedTarget: result[1] as WallpaperTargetData?,
+      home: result[2] as TargetResultData?,
+      lock: result[3] as TargetResultData?,
+      errorCode: result[4] as String?,
+      errorMessage: result[5] as String?,
+      errorDetails: result[6] as String?,
+      fallbackUsed: result[7] as bool?,
+      fallbackStrategy: result[8] as WallpaperApplyStrategyData?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! OperationResultData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// Capability snapshot reported by the host platform.
+class WallpaperCapabilitiesData {
+  WallpaperCapabilitiesData({
+    this.supportsStaticWallpaper,
+    this.supportsLiveWallpaper,
+    this.supportsOpenGlLiveWallpaper,
+    this.supportsHomeWallpaper,
+    this.supportsLockWallpaper,
+    this.supportsBothWallpapers,
+    this.canSetWallpaper,
+    this.hasSystemWallpaperPicker,
+    this.requiresForeground,
+    this.manufacturer,
+    this.sdkInt,
+    this.openGlVersion,
+    this.openGlRenderer,
+  });
+
+  bool? supportsStaticWallpaper;
+
+  bool? supportsLiveWallpaper;
+
+  bool? supportsOpenGlLiveWallpaper;
+
+  bool? supportsHomeWallpaper;
+
+  bool? supportsLockWallpaper;
+
+  bool? supportsBothWallpapers;
+
+  bool? canSetWallpaper;
+
+  bool? hasSystemWallpaperPicker;
+
+  bool? requiresForeground;
+
+  String? manufacturer;
+
+  int? sdkInt;
+
+  String? openGlVersion;
+
+  String? openGlRenderer;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      supportsStaticWallpaper,
+      supportsLiveWallpaper,
+      supportsOpenGlLiveWallpaper,
+      supportsHomeWallpaper,
+      supportsLockWallpaper,
+      supportsBothWallpapers,
+      canSetWallpaper,
+      hasSystemWallpaperPicker,
+      requiresForeground,
+      manufacturer,
+      sdkInt,
+      openGlVersion,
+      openGlRenderer,
+    ];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static WallpaperCapabilitiesData decode(Object result) {
+    result as List<Object?>;
+    return WallpaperCapabilitiesData(
+      supportsStaticWallpaper: result[0] as bool?,
+      supportsLiveWallpaper: result[1] as bool?,
+      supportsOpenGlLiveWallpaper: result[2] as bool?,
+      supportsHomeWallpaper: result[3] as bool?,
+      supportsLockWallpaper: result[4] as bool?,
+      supportsBothWallpapers: result[5] as bool?,
+      canSetWallpaper: result[6] as bool?,
+      hasSystemWallpaperPicker: result[7] as bool?,
+      requiresForeground: result[8] as bool?,
+      manufacturer: result[9] as String?,
+      sdkInt: result[10] as int?,
+      openGlVersion: result[11] as String?,
+      openGlRenderer: result[12] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! WallpaperCapabilitiesData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// Parameters for an image wallpaper operation.
+class StaticWallpaperRequestData {
+  StaticWallpaperRequestData({
+    this.source,
+    this.target,
+    this.scaleMode,
+    this.strategy,
+    this.goToHome,
+  });
+
+  WallpaperSourceData? source;
+
+  WallpaperTargetData? target;
+
+  WallpaperScaleModeData? scaleMode;
+
+  WallpaperApplyStrategyData? strategy;
+
+  bool? goToHome;
+
+  List<Object?> _toList() {
+    return <Object?>[source, target, scaleMode, strategy, goToHome];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static StaticWallpaperRequestData decode(Object result) {
+    result as List<Object?>;
+    return StaticWallpaperRequestData(
+      source: result[0] as WallpaperSourceData?,
+      target: result[1] as WallpaperTargetData?,
+      scaleMode: result[2] as WallpaperScaleModeData?,
+      strategy: result[3] as WallpaperApplyStrategyData?,
+      goToHome: result[4] as bool?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! StaticWallpaperRequestData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// Parameters for preparing or previewing a video live wallpaper.
+class VideoWallpaperRequestData {
+  VideoWallpaperRequestData({
+    this.source,
+    this.target,
+    this.scaleMode,
+    this.goToHome,
+  });
+
+  WallpaperSourceData? source;
+
+  WallpaperTargetData? target;
+
+  WallpaperScaleModeData? scaleMode;
+
+  bool? goToHome;
+
+  List<Object?> _toList() {
+    return <Object?>[source, target, scaleMode, goToHome];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static VideoWallpaperRequestData decode(Object result) {
+    result as List<Object?>;
+    return VideoWallpaperRequestData(
+      source: result[0] as WallpaperSourceData?,
+      target: result[1] as WallpaperTargetData?,
+      scaleMode: result[2] as WallpaperScaleModeData?,
+      goToHome: result[3] as bool?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! VideoWallpaperRequestData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// Parameters for applying a shader-based OpenGL live wallpaper.
+class OpenGlWallpaperRequestData {
+  OpenGlWallpaperRequestData({
+    this.fragmentShader,
+    this.textures,
+    this.target,
+    this.frameRate,
+    this.goToHome,
+  });
+
+  String? fragmentShader;
+
+  List<WallpaperSourceData?>? textures;
+
+  WallpaperTargetData? target;
+
+  int? frameRate;
+
+  bool? goToHome;
+
+  List<Object?> _toList() {
+    return <Object?>[fragmentShader, textures, target, frameRate, goToHome];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static OpenGlWallpaperRequestData decode(Object result) {
+    result as List<Object?>;
+    return OpenGlWallpaperRequestData(
+      fragmentShader: result[0] as String?,
+      textures: (result[1] as List<Object?>?)?.cast<WallpaperSourceData?>(),
+      target: result[2] as WallpaperTargetData?,
+      frameRate: result[3] as int?,
+      goToHome: result[4] as bool?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! OpenGlWallpaperRequestData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
 class MaterialYouSupportData {
   MaterialYouSupportData({this.isSupported, this.androidVersion, this.sdkInt});
 
@@ -277,17 +768,56 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    } else if (value is MaterialYouSupportData) {
+    } else if (value is WallpaperSourceKindData) {
       buffer.putUint8(129);
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperTargetData) {
+      buffer.putUint8(130);
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperScaleModeData) {
+      buffer.putUint8(131);
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperApplyStrategyData) {
+      buffer.putUint8(132);
+      writeValue(buffer, value.index);
+    } else if (value is OperationStatusData) {
+      buffer.putUint8(133);
+      writeValue(buffer, value.index);
+    } else if (value is TargetStatusData) {
+      buffer.putUint8(134);
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperSourceData) {
+      buffer.putUint8(135);
+      writeValue(buffer, value.encode());
+    } else if (value is TargetResultData) {
+      buffer.putUint8(136);
+      writeValue(buffer, value.encode());
+    } else if (value is OperationResultData) {
+      buffer.putUint8(137);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperCapabilitiesData) {
+      buffer.putUint8(138);
+      writeValue(buffer, value.encode());
+    } else if (value is StaticWallpaperRequestData) {
+      buffer.putUint8(139);
+      writeValue(buffer, value.encode());
+    } else if (value is VideoWallpaperRequestData) {
+      buffer.putUint8(140);
+      writeValue(buffer, value.encode());
+    } else if (value is OpenGlWallpaperRequestData) {
+      buffer.putUint8(141);
+      writeValue(buffer, value.encode());
+    } else if (value is MaterialYouSupportData) {
+      buffer.putUint8(142);
       writeValue(buffer, value.encode());
     } else if (value is RotationSourceData) {
-      buffer.putUint8(130);
+      buffer.putUint8(143);
       writeValue(buffer, value.encode());
     } else if (value is WallpaperRotationConfigData) {
-      buffer.putUint8(131);
+      buffer.putUint8(144);
       writeValue(buffer, value.encode());
     } else if (value is WallpaperRotationStatusData) {
-      buffer.putUint8(132);
+      buffer.putUint8(145);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -298,12 +828,44 @@ class _PigeonCodec extends StandardMessageCodec {
   Object? readValueOfType(int type, ReadBuffer buffer) {
     switch (type) {
       case 129:
-        return MaterialYouSupportData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : WallpaperSourceKindData.values[value];
       case 130:
-        return RotationSourceData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : WallpaperTargetData.values[value];
       case 131:
-        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : WallpaperScaleModeData.values[value];
       case 132:
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : WallpaperApplyStrategyData.values[value];
+      case 133:
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : OperationStatusData.values[value];
+      case 134:
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : TargetStatusData.values[value];
+      case 135:
+        return WallpaperSourceData.decode(readValue(buffer)!);
+      case 136:
+        return TargetResultData.decode(readValue(buffer)!);
+      case 137:
+        return OperationResultData.decode(readValue(buffer)!);
+      case 138:
+        return WallpaperCapabilitiesData.decode(readValue(buffer)!);
+      case 139:
+        return StaticWallpaperRequestData.decode(readValue(buffer)!);
+      case 140:
+        return VideoWallpaperRequestData.decode(readValue(buffer)!);
+      case 141:
+        return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
+      case 142:
+        return MaterialYouSupportData.decode(readValue(buffer)!);
+      case 143:
+        return RotationSourceData.decode(readValue(buffer)!);
+      case 144:
+        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+      case 145:
         return WallpaperRotationStatusData.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -388,6 +950,178 @@ class WallpaperApi {
     }
   }
 
+  /// Returns the platform's structured wallpaper capabilities.
+  Future<WallpaperCapabilitiesData> getCapabilities() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.getCapabilities$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as WallpaperCapabilitiesData?)!;
+    }
+  }
+
+  /// Applies a static wallpaper using the structured 3.2 transport contract.
+  Future<OperationResultData> applyWallpaper(
+    StaticWallpaperRequestData request,
+  ) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyWallpaper$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[request],
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OperationResultData?)!;
+    }
+  }
+
+  /// Prepares a video live wallpaper without claiming that it was applied.
+  Future<OperationResultData> prepareVideoWallpaper(
+    VideoWallpaperRequestData request,
+  ) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.prepareVideoWallpaper$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[request],
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OperationResultData?)!;
+    }
+  }
+
+  /// Opens the live-wallpaper UI and reports that distinct outcome.
+  Future<OperationResultData> openLiveWallpaperPreview(
+    VideoWallpaperRequestData request,
+  ) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.openLiveWallpaperPreview$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[request],
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OperationResultData?)!;
+    }
+  }
+
+  /// Applies a shader-based OpenGL live wallpaper.
+  Future<OperationResultData> applyOpenGlWallpaper(
+    OpenGlWallpaperRequestData request,
+  ) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyOpenGlWallpaper$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[request],
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as OperationResultData?)!;
+    }
+  }
+
+  /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
   Future<bool> setHomeWallpaperFromUrl(String url, bool goToHome) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromUrl$pigeonVar_messageChannelSuffix';
@@ -722,6 +1456,38 @@ class WallpaperApi {
           binaryMessenger: pigeonVar_binaryMessenger,
         );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  Future<bool> downloadWallpaper(String url) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.downloadWallpaper$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[url],
+    );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {

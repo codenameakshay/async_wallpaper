@@ -1,13 +1,244 @@
+import 'dart:async';
+
+import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:async_wallpaper_example/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _FakeWallpaperDemoApi implements WallpaperDemoApi {
+  WallpaperCapabilities capabilities = const WallpaperCapabilities(
+    supportsStaticWallpaper: true,
+    supportsLiveWallpaper: true,
+    supportsOpenGlLiveWallpaper: true,
+    supportsHomeWallpaper: true,
+    supportsLockWallpaper: true,
+    supportsBothWallpapers: true,
+    canSetWallpaper: true,
+    hasSystemWallpaperPicker: true,
+    manufacturer: 'Example OEM',
+    sdkInt: 36,
+    openGlVersion: 'OpenGL ES 3.2',
+    openGlRenderer: 'Example GPU',
+  );
+  WallpaperOperationResult staticResult = const WallpaperOperationResult(
+    status: WallpaperOperationStatus.applied,
+    requestedTarget: WallpaperTarget.both,
+    home: WallpaperTargetResult(status: WallpaperTargetStatus.applied),
+    lock: WallpaperTargetResult(status: WallpaperTargetStatus.applied),
+  );
+  WallpaperOperationResult videoPreparationResult =
+      const WallpaperOperationResult(
+        status: WallpaperOperationStatus.awaitingUserConfirmation,
+        requestedTarget: WallpaperTarget.home,
+      );
+  WallpaperOperationResult videoPreviewResult = const WallpaperOperationResult(
+    status: WallpaperOperationStatus.previewOpened,
+    requestedTarget: WallpaperTarget.home,
+  );
+  WallpaperOperationResult openGlResult = const WallpaperOperationResult(
+    status: WallpaperOperationStatus.previewOpened,
+    requestedTarget: WallpaperTarget.home,
+  );
+
+  Completer<WallpaperOperationResult>? staticCompleter;
+  StaticWallpaperRequest? staticRequest;
+  int staticCalls = 0;
+  int videoPreparationCalls = 0;
+  int videoPreviewCalls = 0;
+
+  @override
+  Future<WallpaperOperationResult> applyWallpaper(
+    StaticWallpaperRequest request,
+  ) {
+    staticCalls += 1;
+    staticRequest = request;
+    return staticCompleter?.future ??
+        Future<WallpaperOperationResult>.value(staticResult);
+  }
+
+  @override
+  Future<WallpaperCapabilities> getCapabilities() {
+    return Future<WallpaperCapabilities>.value(capabilities);
+  }
+
+  @override
+  Future<WallpaperOperationResult> openLiveWallpaperPreview(
+    VideoWallpaperRequest request,
+  ) {
+    videoPreviewCalls += 1;
+    return Future<WallpaperOperationResult>.value(videoPreviewResult);
+  }
+
+  @override
+  Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
+    OpenGlLiveWallpaperRequest request,
+  ) {
+    return Future<WallpaperOperationResult>.value(openGlResult);
+  }
+
+  @override
+  Future<WallpaperOperationResult> setVideoWallpaper(
+    VideoWallpaperRequest request,
+  ) {
+    videoPreparationCalls += 1;
+    return Future<WallpaperOperationResult>.value(videoPreparationResult);
+  }
+}
+
+Widget _example(_FakeWallpaperDemoApi api) {
+  return MaterialApp(home: HomePage(api: api));
+}
+
+Future<void> _pumpExample(
+  WidgetTester tester,
+  _FakeWallpaperDemoApi api,
+) async {
+  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(_example(api));
+}
+
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+}
+
 void main() {
-  testWidgets('renders v3 example shell', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+  testWidgets('renders 3.2 source, target, scale, and strategy controls', (
+    WidgetTester tester,
+  ) async {
+    await _pumpExample(tester, _FakeWallpaperDemoApi());
+
+    expect(find.text('Async Wallpaper 3.2 example'), findsOneWidget);
+    expect(find.byKey(const Key('source-selector')), findsOneWidget);
+    expect(find.byKey(const Key('target-selector')), findsOneWidget);
+    expect(find.byKey(const Key('scale-selector')), findsOneWidget);
+    expect(find.byKey(const Key('strategy-selector')), findsOneWidget);
+    expect(find.byKey(const Key('url-source-input')), findsOneWidget);
+    expect(find.text('Open home after a successful flow'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('source-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('File path').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('file-source-input')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('source-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Content URI').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('uri-source-input')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('source-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Embedded bytes').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Embedded bytes: a bundled 1×1 PNG'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows capabilities and separate home and lock outcomes', (
+    WidgetTester tester,
+  ) async {
+    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+      ..staticResult = const WallpaperOperationResult(
+        status: WallpaperOperationStatus.applied,
+        requestedTarget: WallpaperTarget.both,
+        home: WallpaperTargetResult(status: WallpaperTargetStatus.applied),
+        lock: WallpaperTargetResult(
+          status: WallpaperTargetStatus.failed,
+          errorCode: 'lock-denied',
+        ),
+      );
+    await _pumpExample(tester, api);
+
+    await _tapVisible(
+      tester,
+      find.byKey(const Key('refresh-capabilities-button')),
+    );
+    await tester.pump();
+    expect(find.text('Manufacturer: Example OEM'), findsOneWidget);
+    expect(find.textContaining('Static: supported'), findsOneWidget);
+
+    await _tapVisible(tester, find.byKey(const Key('apply-static-button')));
+    await tester.pump();
+    expect(find.text('Home: applied'), findsOneWidget);
+    expect(find.text('Lock: failed — lock-denied'), findsOneWidget);
+    expect(find.text('Apply static wallpaper: applied'), findsOneWidget);
+    expect(api.staticRequest?.goToHome, isFalse);
+  });
+
+  testWidgets('reports video preparation and preview as distinct statuses', (
+    WidgetTester tester,
+  ) async {
+    await _pumpExample(tester, _FakeWallpaperDemoApi());
+
+    await _tapVisible(tester, find.byKey(const Key('prepare-video-button')));
+    await tester.pump();
+    expect(
+      find.text('Video preparation: awaitingUserConfirmation'),
+      findsOneWidget,
+    );
+
+    await _tapVisible(tester, find.byKey(const Key('preview-video-button')));
+    await tester.pump();
+    expect(find.text('Video preview: previewOpened'), findsOneWidget);
+  });
+
+  testWidgets('serializes actions while an operation is in flight', (
+    WidgetTester tester,
+  ) async {
+    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+      ..staticCompleter = Completer<WallpaperOperationResult>();
+    await _pumpExample(tester, api);
+
+    await _tapVisible(tester, find.byKey(const Key('apply-static-button')));
     await tester.pump();
 
-    expect(find.text('Async Wallpaper v3 Example'), findsOneWidget);
-    expect(find.byType(DropdownButton<int>), findsOneWidget);
+    expect(find.text('Applying static wallpaper…'), findsOneWidget);
+    expect(api.staticCalls, 1);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('apply-static-button')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('preview-video-button')))
+          .onPressed,
+      isNull,
+    );
+
+    expect(api.videoPreviewCalls, 0);
+
+    api.staticCompleter!.complete(api.staticResult);
+    await tester.pump();
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('apply-static-button')))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('does not update state after the example is disposed', (
+    WidgetTester tester,
+  ) async {
+    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+      ..staticCompleter = Completer<WallpaperOperationResult>();
+    await _pumpExample(tester, api);
+    await _tapVisible(tester, find.byKey(const Key('apply-static-button')));
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    api.staticCompleter!.complete(api.staticResult);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 }

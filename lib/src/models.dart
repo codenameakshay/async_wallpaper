@@ -13,6 +13,10 @@ enum WallpaperErrorCode { invalidInput, platformFailure, unsupported, unknown }
 ///
 /// Byte sources defensively copy their input and return a new copy on access.
 /// This keeps an operation request stable if a caller later mutates its buffer.
+/// For large images prefer filePath/contentUri; bytes is intended for small,
+/// thumbnail, or ephemeral in-memory assets (bounded by 32 MiB direct / 8 MiB
+/// per OpenGL texture). Each access copies the buffer, so holding large bytes
+/// in memory can increase GC/OOM risk on low-RAM devices.
 class WallpaperSource {
   /// Creates a network URL source.
   const WallpaperSource.url(String value)
@@ -92,6 +96,7 @@ class WallpaperRequest {
   final WallpaperTarget target;
   final WallpaperSourceType sourceType;
   final String source;
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
 
@@ -109,6 +114,7 @@ class StaticWallpaperRequest {
   final WallpaperTarget target;
   final WallpaperScaleMode scaleMode;
   final WallpaperApplyStrategy strategy;
+  /// Retained only for source compatibility since 3.2.0; the engine intentionally ignores it and never performs automatic navigation.
   final bool goToHome;
 }
 
@@ -121,6 +127,7 @@ class MaterialYouWallpaperRequest {
   });
 
   final String url;
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
   final bool enableEffects;
 }
@@ -130,6 +137,7 @@ class LiveWallpaperRequest {
   const LiveWallpaperRequest({required this.filePath, this.goToHome = false});
 
   final String filePath;
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
 
@@ -264,6 +272,7 @@ class VideoWallpaperRequest {
   final WallpaperSource source;
   final WallpaperTarget target;
   final WallpaperScaleMode scaleMode;
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
 
@@ -281,6 +290,7 @@ class OpenGlLiveWallpaperRequest {
   final List<WallpaperSource> _textures;
   final WallpaperTarget target;
   final int frameRate;
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 
   /// Immutable texture sources in the order exposed to the shader.

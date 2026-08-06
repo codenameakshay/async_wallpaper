@@ -96,6 +96,7 @@ class WallpaperRequest {
   final WallpaperTarget target;
   final WallpaperSourceType sourceType;
   final String source;
+
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
@@ -114,6 +115,7 @@ class StaticWallpaperRequest {
   final WallpaperTarget target;
   final WallpaperScaleMode scaleMode;
   final WallpaperApplyStrategy strategy;
+
   /// Retained only for source compatibility since 3.2.0; the engine intentionally ignores it and never performs automatic navigation.
   final bool goToHome;
 }
@@ -127,6 +129,7 @@ class MaterialYouWallpaperRequest {
   });
 
   final String url;
+
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
   final bool enableEffects;
@@ -137,6 +140,7 @@ class LiveWallpaperRequest {
   const LiveWallpaperRequest({required this.filePath, this.goToHome = false});
 
   final String filePath;
+
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
@@ -272,6 +276,7 @@ class VideoWallpaperRequest {
   final WallpaperSource source;
   final WallpaperTarget target;
   final WallpaperScaleMode scaleMode;
+
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
@@ -290,6 +295,7 @@ class OpenGlLiveWallpaperRequest {
   final List<WallpaperSource> _textures;
   final WallpaperTarget target;
   final int frameRate;
+
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 

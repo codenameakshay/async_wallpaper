@@ -9,12 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import com.squareup.picasso.Picasso
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
@@ -92,7 +91,7 @@ class PigeonApiImpl(
     callback(Result.success(AndroidCapabilities.snapshot(appContext)))
   }
 
-override fun startWallpaperRotation(
+  override fun startWallpaperRotation(
     config: WallpaperRotationConfigData,
     callback: (Result<Boolean>) -> Unit,
   ) {
@@ -131,7 +130,7 @@ override fun startWallpaperRotation(
     }
   }
 
-override fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit) {
+  override fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit) {
     ioExecutor.execute {
       val success = runCatching {
         WallpaperRotationScheduler.cancelPeriodic(appContext)
@@ -147,7 +146,7 @@ override fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit) {
     }
   }
 
-override fun getWallpaperRotationStatus(
+  override fun getWallpaperRotationStatus(
     callback: (Result<WallpaperRotationStatusData>) -> Unit,
   ) {
     val status = runCatching {
@@ -167,7 +166,7 @@ override fun getWallpaperRotationStatus(
     callback(Result.success(status))
   }
 
-override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
+  override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
     ioExecutor.execute {
       val success = runCatching {
         rotationEngine.applyNextWallpaper()
@@ -179,120 +178,9 @@ override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
     }
   }
 
-  private fun setWallpaperFromUrl(
-    url: String,
-    goToHome: Boolean,
-    flag: Int,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    ioExecutor.execute {
-      val success = runCatching {
-        val bitmap = Picasso.get().load(url).get()
-        setBitmap(bitmap, flag)
-        if (goToHome) {
-          sendUserToHome()
-        }
-        true
-      }.getOrElse {
-        Log.e(TAG, "setWallpaperFromUrl failed", it)
-        false
-      }
-      postBoolean(callback, success)
-    }
-  }
-
-  private fun setWallpaperFromFile(
-    filePath: String,
-    goToHome: Boolean,
-    flag: Int,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    ioExecutor.execute {
-      val success = runCatching {
-        val bitmap = BitmapFactory.decodeFile(filePath)
-        if (bitmap == null) {
-          false
-        } else {
-          setBitmap(bitmap, flag)
-          if (goToHome) {
-            sendUserToHome()
-          }
-          true
-        }
-      }.getOrElse {
-        Log.e(TAG, "setWallpaperFromFile failed", it)
-        false
-      }
-      postBoolean(callback, success)
-    }
-  }
-
-  private fun setBitmap(bitmap: Bitmap, flag: Int) {
-    val wallpaperManager = WallpaperManager.getInstance(context)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      wallpaperManager.setBitmap(bitmap, null, true, flag)
-    } else {
-      wallpaperManager.setBitmap(bitmap)
-    }
-  }
-
-  private fun sendUserToHome() {
-    mainHandler.postDelayed({
-      val intent = Intent(Intent.ACTION_MAIN).apply {
-        addCategory(Intent.CATEGORY_HOME)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      }
-      context.startActivity(intent)
-    }, GO_HOME_DELAY_MS)
-  }
-
   private fun postBoolean(callback: (Result<Boolean>) -> Unit, value: Boolean) {
     mainHandler.post { callback(Result.success(value)) }
   }
-
-  private fun copyFile(from: File, to: File) {
-    FileInputStream(from).channel.use { input ->
-      FileOutputStream(to).channel.use { output ->
-        var transferred = 0L
-        val size = input.size()
-        while (transferred < size) {
-          transferred += input.transferTo(transferred, size - transferred, output)
-        }
-      }
-    }
-  }
-
-  private fun getImageContentUri(context: Context, absPath: String): Uri? {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "wallpaper_${System.currentTimeMillis()}.jpg")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
-      }
-      val imageUri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-      if (imageUri != null) {
-        context.contentResolver.openOutputStream(imageUri)?.use { out ->
-          FileInputStream(File(absPath)).use { input ->
-            input.copyTo(out)
-          }
-        }
-      }
-      return imageUri
-    }
-
-    val values = ContentValues().apply {
-      put(MediaStore.Images.Media.DATA, absPath)
-    }
-    return context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-  }
-
-  companion object {
-    private const val TAG = "AsyncWallpaper"
-    private const val GO_HOME_DELAY_MS = 1500L
-    private const val LIVE_WALLPAPER_FILE_NAME = "file.mp4"
-    private const val MIN_ROTATION_INTERVAL_MINUTES = 15
-  }
-}
 
   override fun applyWallpaper(
     request: StaticWallpaperRequestData,
@@ -1001,6 +889,7 @@ override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
   companion object {
     private const val TAG = "AsyncWallpaper"
     private const val MAX_VIDEO_SOURCE_BYTES = 256L * 1024L * 1024L
+    private const val MIN_ROTATION_INTERVAL_MINUTES = 15
     private const val MAIN_THREAD_WAIT_MILLIS = 10_000L
 
     private const val ERROR_INVALID_REQUEST = "invalid-request"

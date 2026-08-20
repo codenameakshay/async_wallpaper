@@ -15,6 +15,10 @@ void main() {
       unorderedEquals(<String>[
         'android.permission.INTERNET',
         'android.permission.SET_WALLPAPER',
+        'android.permission.RECEIVE_BOOT_COMPLETED',
+        'android.permission.FOREGROUND_SERVICE',
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.SCHEDULE_EXACT_ALARM',
       ]),
     );
 
@@ -152,6 +156,18 @@ void main() {
         '.library(name: "async-wallpaper", targets: ["async_wallpaper"])',
       ),
     );
+    expect(
+      packageContents,
+      contains(
+        '.package(name: "FlutterFramework", path: "../FlutterFramework")',
+      ),
+    );
+    expect(
+      packageContents,
+      contains(
+        '.product(name: "FlutterFramework", package: "FlutterFramework")',
+      ),
+    );
     expect(packageContents, isNot(contains('unsafeFlags')));
 
     final rootPodspec = File('async_wallpaper.podspec').readAsStringSync();
@@ -194,6 +210,26 @@ void main() {
     expect(pluginSource, contains('public class AsyncWallpaperPlugin'));
     expect(pluginSource, contains('public static func register'));
     expect(pluginSource, isNot(contains('public func ')));
+    for (final rotationMethod in <String>[
+      'func startWallpaperRotation(',
+      'func stopWallpaperRotation(completion: @escaping (Result<Bool, Error>) -> Void)',
+      'func getWallpaperRotationStatus(',
+      'func rotateWallpaperNow(completion: @escaping (Result<Bool, Error>) -> Void)',
+    ]) {
+      expect(pluginSource, contains(rotationMethod));
+    }
+    expect(pluginSource, contains('WallpaperRotationStatusData('));
+    for (final statusField in <String>[
+      'isRunning: false',
+      'nextRunEpochMs: 0',
+      'currentIndex: 0',
+      'cachedCount: 0',
+      'totalCount: 0',
+      'lastError: nil',
+      'effectiveIntervalMinutes: 0',
+    ]) {
+      expect(pluginSource, contains(statusField));
+    }
 
     for (final sourceName in <String>[
       'AsyncWallpaperPlugin.swift',

@@ -11,11 +11,15 @@ let package = Package(
     products: [
         .library(name: "async-wallpaper", targets: ["async_wallpaper"])
     ],
-    dependencies: [],
+    dependencies: [
+        .package(name: "FlutterFramework", path: "../FlutterFramework")
+    ],
     targets: [
         .target(
             name: "async_wallpaper",
-            dependencies: []
+            dependencies: [
+                .product(name: "FlutterFramework", package: "FlutterFramework")
+            ]
         )
     ]
 )

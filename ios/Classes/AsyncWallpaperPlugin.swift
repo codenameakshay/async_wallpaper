@@ -190,6 +190,39 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     }
   }
 
+  func startWallpaperRotation(
+    config: WallpaperRotationConfigData,
+    completion: @escaping (Result<Bool, Error>) -> Void
+  ) {
+    completion(.success(false))
+  }
+
+  func stopWallpaperRotation(completion: @escaping (Result<Bool, Error>) -> Void) {
+    completion(.success(false))
+  }
+
+  func getWallpaperRotationStatus(
+    completion: @escaping (Result<WallpaperRotationStatusData, Error>) -> Void
+  ) {
+    completion(
+      .success(
+        WallpaperRotationStatusData(
+          isRunning: false,
+          nextRunEpochMs: 0,
+          currentIndex: 0,
+          cachedCount: 0,
+          totalCount: 0,
+          lastError: nil,
+          effectiveIntervalMinutes: 0
+        )
+      )
+    )
+  }
+
+  func rotateWallpaperNow(completion: @escaping (Result<Bool, Error>) -> Void) {
+    completion(.success(false))
+  }
+
   private func requestPhotoLibraryPermission(_ completion: @escaping (Bool) -> Void) {
     if #available(iOS 14, *) {
       let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)

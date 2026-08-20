@@ -137,7 +137,6 @@ class WallpaperRotationStatusData {
   int? effectiveIntervalMinutes;
 }
 
-
 @ConfigurePigeon(
   PigeonOptions(
     dartOut: 'lib/pigeon_impl_api.dart',

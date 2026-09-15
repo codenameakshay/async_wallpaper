@@ -178,6 +178,18 @@ The plugin's exported wallpaper services use overrideable resource values. Put m
 </resources>
 ```
 
+## Downloads on Android 9 and older
+
+`downloadWallpaper` saves into the shared Pictures collection. Android 10+ allows that without a permission. On Android 9 (API 28) and older it needs `WRITE_EXTERNAL_STORAGE`, which the plugin deliberately does not declare. Apps that support those versions must declare it and request it at runtime before calling `downloadWallpaper`:
+
+```xml
+<uses-permission
+    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28" />
+```
+
+Without the grant the plugin returns a failure before downloading anything.
+
 ## iOS and package managers
 
 iOS is download-only. `downloadWallpaper(DownloadWallpaperRequest(url: ...))` saves an image URL to Photos after the host app supplies `NSPhotoLibraryAddUsageDescription`; all wallpaper-apply, video, chooser, and OpenGL APIs return `unsupported`.

@@ -1,5 +1,6 @@
 package com.codenameakshay.async_wallpaper
 
+import android.Manifest
 import android.app.Activity
 import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
@@ -7,6 +8,7 @@ import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -640,6 +642,17 @@ class PigeonApiImpl(
     var temporaryFile: File? = null
     var completed = false
     return try {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+        appContext.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+        PackageManager.PERMISSION_GRANTED
+      ) {
+        Log.e(
+          TAG,
+          "downloadWallpaper needs WRITE_EXTERNAL_STORAGE on Android 9 and older; " +
+            "the host app must declare it with maxSdkVersion 28 and request it at runtime.",
+        )
+        return false
+      }
       val source = WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url)
       val openedSource = downloadSourceOpener.openWithMetadata(source)
       val contentType = openedSource.contentType

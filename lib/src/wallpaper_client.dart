@@ -39,110 +39,78 @@ WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
 }
 
 /// Converts a requested target into its Pigeon transport representation.
-WallpaperTargetData wallpaperTargetToData(WallpaperTarget target) {
-  switch (target) {
-    case WallpaperTarget.home:
-      return WallpaperTargetData.home;
-    case WallpaperTarget.lock:
-      return WallpaperTargetData.lock;
-    case WallpaperTarget.both:
-      return WallpaperTargetData.both;
-  }
-}
+WallpaperTargetData wallpaperTargetToData(WallpaperTarget target) =>
+    switch (target) {
+      WallpaperTarget.home => WallpaperTargetData.home,
+      WallpaperTarget.lock => WallpaperTargetData.lock,
+      WallpaperTarget.both => WallpaperTargetData.both,
+    };
 
 /// Converts a Pigeon target into its domain representation.
-WallpaperTarget wallpaperTargetFromData(WallpaperTargetData? data) {
-  switch (data) {
-    case WallpaperTargetData.home:
-      return WallpaperTarget.home;
-    case WallpaperTargetData.lock:
-      return WallpaperTarget.lock;
-    case WallpaperTargetData.both:
-      return WallpaperTarget.both;
-    case null:
-      throw const FormatException(
+WallpaperTarget wallpaperTargetFromData(WallpaperTargetData? data) =>
+    switch (data) {
+      WallpaperTargetData.home => WallpaperTarget.home,
+      WallpaperTargetData.lock => WallpaperTarget.lock,
+      WallpaperTargetData.both => WallpaperTarget.both,
+      null => throw const FormatException(
         'Platform did not return a wallpaper target.',
-      );
-  }
-}
+      ),
+    };
 
 /// Converts a scale mode into its Pigeon transport representation.
-WallpaperScaleModeData wallpaperScaleModeToData(WallpaperScaleMode mode) {
-  switch (mode) {
-    case WallpaperScaleMode.centerCrop:
-      return WallpaperScaleModeData.centerCrop;
-    case WallpaperScaleMode.fitCenter:
-      return WallpaperScaleModeData.fitCenter;
-    case WallpaperScaleMode.center:
-      return WallpaperScaleModeData.center;
-    case WallpaperScaleMode.fill:
-      return WallpaperScaleModeData.fill;
-    case WallpaperScaleMode.stretch:
-      return WallpaperScaleModeData.stretch;
-  }
-}
+WallpaperScaleModeData wallpaperScaleModeToData(WallpaperScaleMode mode) =>
+    switch (mode) {
+      WallpaperScaleMode.centerCrop => WallpaperScaleModeData.centerCrop,
+      WallpaperScaleMode.fitCenter => WallpaperScaleModeData.fitCenter,
+      WallpaperScaleMode.center => WallpaperScaleModeData.center,
+      WallpaperScaleMode.fill => WallpaperScaleModeData.fill,
+      WallpaperScaleMode.stretch => WallpaperScaleModeData.stretch,
+    };
 
 /// Converts an apply strategy into its Pigeon transport representation.
 WallpaperApplyStrategyData wallpaperApplyStrategyToData(
   WallpaperApplyStrategy strategy,
-) {
-  switch (strategy) {
-    case WallpaperApplyStrategy.direct:
-      return WallpaperApplyStrategyData.direct;
-    case WallpaperApplyStrategy.systemCropper:
-      return WallpaperApplyStrategyData.systemCropper;
-    case WallpaperApplyStrategy.systemPicker:
-      return WallpaperApplyStrategyData.systemPicker;
-    case WallpaperApplyStrategy.automatic:
-      return WallpaperApplyStrategyData.automatic;
-  }
-}
+) => switch (strategy) {
+  WallpaperApplyStrategy.direct => WallpaperApplyStrategyData.direct,
+  WallpaperApplyStrategy.systemCropper =>
+    WallpaperApplyStrategyData.systemCropper,
+  WallpaperApplyStrategy.systemPicker =>
+    WallpaperApplyStrategyData.systemPicker,
+  WallpaperApplyStrategy.automatic => WallpaperApplyStrategyData.automatic,
+};
 
 /// Converts a Pigeon apply strategy into its domain representation.
 WallpaperApplyStrategy wallpaperApplyStrategyFromData(
   WallpaperApplyStrategyData? data,
-) {
-  switch (data) {
-    case WallpaperApplyStrategyData.direct:
-      return WallpaperApplyStrategy.direct;
-    case WallpaperApplyStrategyData.systemCropper:
-      return WallpaperApplyStrategy.systemCropper;
-    case WallpaperApplyStrategyData.systemPicker:
-      return WallpaperApplyStrategy.systemPicker;
-    case WallpaperApplyStrategyData.automatic:
-      return WallpaperApplyStrategy.automatic;
-    case null:
-      throw const FormatException(
-        'Platform did not return a wallpaper apply strategy.',
-      );
-  }
-}
+) => switch (data) {
+  WallpaperApplyStrategyData.direct => WallpaperApplyStrategy.direct,
+  WallpaperApplyStrategyData.systemCropper =>
+    WallpaperApplyStrategy.systemCropper,
+  WallpaperApplyStrategyData.systemPicker =>
+    WallpaperApplyStrategy.systemPicker,
+  WallpaperApplyStrategyData.automatic => WallpaperApplyStrategy.automatic,
+  null => throw const FormatException(
+    'Platform did not return a wallpaper apply strategy.',
+  ),
+};
 
 /// Converts a Pigeon operation status into its domain representation.
 WallpaperOperationStatus wallpaperOperationStatusFromData(
   OperationStatusData? data,
-) {
-  switch (data) {
-    case OperationStatusData.applied:
-      return WallpaperOperationStatus.applied;
-    case OperationStatusData.previewOpened:
-      return WallpaperOperationStatus.previewOpened;
-    case OperationStatusData.awaitingUserConfirmation:
-      return WallpaperOperationStatus.awaitingUserConfirmation;
-    case OperationStatusData.cancelled:
-      return WallpaperOperationStatus.cancelled;
-    case OperationStatusData.failed:
-      return WallpaperOperationStatus.failed;
-    case OperationStatusData.unsupported:
-      return WallpaperOperationStatus.unsupported;
-    case OperationStatusData.foregroundRequired:
-      return WallpaperOperationStatus.foregroundRequired;
-    case null:
-      throw const FormatException(
-        'Platform did not return a wallpaper operation status.',
-      );
-  }
-}
+) => switch (data) {
+  OperationStatusData.applied => WallpaperOperationStatus.applied,
+  OperationStatusData.previewOpened => WallpaperOperationStatus.previewOpened,
+  OperationStatusData.awaitingUserConfirmation =>
+    WallpaperOperationStatus.awaitingUserConfirmation,
+  OperationStatusData.cancelled => WallpaperOperationStatus.cancelled,
+  OperationStatusData.failed => WallpaperOperationStatus.failed,
+  OperationStatusData.unsupported => WallpaperOperationStatus.unsupported,
+  OperationStatusData.foregroundRequired =>
+    WallpaperOperationStatus.foregroundRequired,
+  null => throw const FormatException(
+    'Platform did not return a wallpaper operation status.',
+  ),
+};
 
 /// Converts a rotation source type into its Pigeon transport representation.
 RotationSourceTypeData rotationSourceTypeToData(WallpaperSourceType type) =>
@@ -350,22 +318,16 @@ class PigeonWallpaperClient implements WallpaperClient {
   }
 }
 
-WallpaperTargetStatus _targetStatusFromData(TargetStatusData? data) {
-  switch (data) {
-    case TargetStatusData.applied:
-      return WallpaperTargetStatus.applied;
-    case TargetStatusData.failed:
-      return WallpaperTargetStatus.failed;
-    case TargetStatusData.unsupported:
-      return WallpaperTargetStatus.unsupported;
-    case TargetStatusData.notAttempted:
-      return WallpaperTargetStatus.notAttempted;
-    case null:
-      throw const FormatException(
+WallpaperTargetStatus _targetStatusFromData(TargetStatusData? data) =>
+    switch (data) {
+      TargetStatusData.applied => WallpaperTargetStatus.applied,
+      TargetStatusData.failed => WallpaperTargetStatus.failed,
+      TargetStatusData.unsupported => WallpaperTargetStatus.unsupported,
+      TargetStatusData.notAttempted => WallpaperTargetStatus.notAttempted,
+      null => throw const FormatException(
         'Platform did not return a wallpaper target status.',
-      );
-  }
-}
+      ),
+    };
 
 /// Returns whether an applied result covers every target it claims to.
 ///

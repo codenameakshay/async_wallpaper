@@ -12,13 +12,19 @@ export 'src/models.dart';
 class AsyncWallpaper {
   AsyncWallpaper._();
 
+  // Mirror the Android-side limits so both sides change together: see
+  // WallpaperSourceLoader.DEFAULT_MAX_ENCODED_BYTES and
+  // ShaderProgramValidator.MAX_FRAGMENT_SHADER_BYTES /
+  // MAX_TEXTURE_COUNT / MAX_TEXTURE_SOURCE_BYTES.
   static const int _maxSourceBytes = 32 * 1024 * 1024;
   static const int _maxOpenGlTextureBytes = 8 * 1024 * 1024;
   static const int _maxOpenGlTextures = 4;
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
+  static const int _minRotationIntervalMinutes = 15;
+
   static final WallpaperApi _api = WallpaperApi();
-  static final WallpaperClient _defaultClient = LegacyWallpaperClient(
+  static final WallpaperClient _defaultClient = PigeonWallpaperClient(
     api: _api,
   );
   static WallpaperClient _client = _defaultClient;
@@ -38,6 +44,18 @@ class AsyncWallpaper {
   static const WallpaperCapabilities _unsupportedCapabilities =
       WallpaperCapabilities(manufacturer: 'Unsupported on this platform');
 
+  static WallpaperRotationStatus _notRunningRotationStatus({
+    String? lastError,
+  }) => WallpaperRotationStatus(
+    isRunning: false,
+    nextRunEpochMs: 0,
+    currentIndex: 0,
+    cachedCount: 0,
+    totalCount: 0,
+    effectiveIntervalMinutes: 0,
+    lastError: lastError,
+  );
+
   /// The host platform version.
   ///
   /// This retains the legacy channel behavior and can throw a platform error.
@@ -55,10 +73,6 @@ class AsyncWallpaper {
     _client = _defaultClient;
   }
 
-  /// Whether a test client currently overrides the default platform client.
-  @visibleForTesting
-  static bool get debugHasClientOverride => !identical(_client, _defaultClient);
-
   /// Returns Material You availability on Android.
   static Future<MaterialYouSupport> checkMaterialYouSupport() async {
     if (!_isAndroid) {
@@ -70,7 +84,7 @@ class AsyncWallpaper {
     }
 
     try {
-      final MaterialYouSupportData data = await _api.checkMaterialYouSupport();
+      final data = await _api.checkMaterialYouSupport();
       return MaterialYouSupport(
         isSupported: data.isSupported == true,
         androidVersion: data.androidVersion ?? 'Unknown',
@@ -101,7 +115,8 @@ class AsyncWallpaper {
     }
   }
 
-  /// Applies a static wallpaper and reports the truthful per-target outcome.
+  /// Applies a static wallpaper and reports the per-target outcome Android
+  /// confirmed.
   static Future<WallpaperOperationResult> applyWallpaper(
     StaticWallpaperRequest request,
   ) async {
@@ -109,7 +124,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateStaticWallpaperRequest(request);
+    final validationError = _validateSource(request.source, label: 'Wallpaper');
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -133,7 +148,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateVideoWallpaperRequest(request);
+    final validationError = _validateSource(
+      request.source,
+      label: 'Video wallpaper',
+    );
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -153,7 +171,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateVideoWallpaperRequest(request);
+    final validationError = _validateSource(
+      request.source,
+      label: 'Video wallpaper',
+    );
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -173,7 +194,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateOpenGlWallpaperRequest(request);
+    final validationError = _validateOpenGlWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -190,20 +211,17 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    if (request.source.trim().isEmpty) {
-      return _legacyInvalidInput('Wallpaper source cannot be empty.');
-    }
 
-    final StaticWallpaperRequest structuredRequest =
-        _legacyStaticWallpaperRequest(request);
-    final String? validationError = _validateStaticWallpaperRequest(
-      structuredRequest,
+    final structuredRequest = _legacyStaticWallpaperRequest(request);
+    final validationError = _validateSource(
+      structuredRequest.source,
+      label: 'Wallpaper',
     );
     if (validationError != null) {
       return _legacyInvalidInput(validationError);
     }
 
-    final WallpaperOperationResult operation = await _runOperation(
+    final operation = await _runOperation(
       target: request.target,
       operation: 'setting wallpaper',
       call: () => _client.applyWallpaper(structuredRequest),
@@ -221,38 +239,18 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    if (request.url.trim().isEmpty) {
-      return _legacyInvalidInput('Material You wallpaper URL cannot be empty.');
-    }
     if (!_isHttpsUrl(request.url)) {
       return _legacyInvalidInput(
         'Material You wallpaper URL must be a valid HTTPS URL.',
       );
     }
 
-    try {
-      final bool success = await _api.setMaterialYouWallpaper(
-        request.url,
-        request.goToHome,
-        request.enableEffects,
-      );
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to set Material You wallpaper.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while setting Material You wallpaper.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: () => _api.setMaterialYouWallpaper(request.url),
+      failureMessage: 'Failed to set Material You wallpaper.',
+      exceptionMessage:
+          'Unexpected exception while setting Material You wallpaper.',
+    );
   }
 
   /// Opens the video live-wallpaper UI for a legacy file-path request.
@@ -262,7 +260,7 @@ class AsyncWallpaper {
   /// [setVideoWallpaper] and [openLiveWallpaperPreview] to keep those states
   /// distinct.
   @Deprecated(
-    'Use setVideoWallpaper and openLiveWallpaperPreview for truthful results.',
+    'Use setVideoWallpaper and openLiveWallpaperPreview for per-target results.',
   )
   static Future<WallpaperResult> setLiveWallpaper(
     LiveWallpaperRequest request,
@@ -270,22 +268,20 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    if (request.filePath.trim().isEmpty) {
-      return _legacyInvalidInput('Live wallpaper file path cannot be empty.');
-    }
 
-    final VideoWallpaperRequest structuredRequest = VideoWallpaperRequest(
+    final structuredRequest = VideoWallpaperRequest(
       source: WallpaperSource.filePath(request.filePath),
       goToHome: request.goToHome,
     );
-    final String? validationError = _validateVideoWallpaperRequest(
-      structuredRequest,
+    final validationError = _validateSource(
+      structuredRequest.source,
+      label: 'Video wallpaper',
     );
     if (validationError != null) {
       return _legacyInvalidInput(validationError);
     }
 
-    final WallpaperOperationResult operation = await _runOperation(
+    final operation = await _runOperation(
       target: structuredRequest.target,
       operation: 'opening live wallpaper preview',
       call: () => _client.openLiveWallpaperPreview(structuredRequest),
@@ -302,25 +298,11 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    try {
-      final bool success = await _api.openWallpaperChooser();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to open wallpaper chooser.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while opening wallpaper chooser.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: _api.openWallpaperChooser,
+      failureMessage: 'Failed to open wallpaper chooser.',
+      exceptionMessage: 'Unexpected exception while opening wallpaper chooser.',
+    );
   }
 
   /// Downloads a wallpaper to the device's supported media library.
@@ -330,38 +312,24 @@ class AsyncWallpaper {
     if (!_isAndroid && !_isIOS) {
       return _unsupportedResult;
     }
-    if (request.url.trim().isEmpty) {
-      return _legacyInvalidInput('Wallpaper URL cannot be empty.');
-    }
     if (!_isHttpsUrl(request.url)) {
       return _legacyInvalidInput('Wallpaper URL must be a valid HTTPS URL.');
     }
 
-    try {
-      final bool success = await _api.downloadWallpaper(request.url);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to download wallpaper.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while downloading wallpaper.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: () => _api.downloadWallpaper(request.url),
+      failureMessage: 'Failed to download wallpaper.',
+      exceptionMessage: 'Unexpected exception while downloading wallpaper.',
+    );
   }
 
   /// Starts wallpaper rotation with the provided playlist and trigger settings.
   static Future<WallpaperResult> startWallpaperRotation(
     WallpaperRotationRequest request,
   ) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     if (request.sources.isEmpty) {
       return const WallpaperResult.failure(
         WallpaperError(
@@ -370,8 +338,8 @@ class AsyncWallpaper {
         ),
       );
     }
-    final bool hasInvalidSource = request.sources.any(
-      (WallpaperRotationSource source) => source.source.trim().isEmpty,
+    final hasInvalidSource = request.sources.any(
+      (source) => source.source.trim().isEmpty,
     );
     if (hasInvalidSource) {
       return const WallpaperResult.failure(
@@ -381,11 +349,12 @@ class AsyncWallpaper {
         ),
       );
     }
-    if (request.intervalMinutes < 15) {
+    if (request.intervalMinutes < _minRotationIntervalMinutes) {
       return const WallpaperResult.failure(
         WallpaperError(
           code: WallpaperErrorCode.invalidInput,
-          message: 'Rotation interval must be at least 15 minutes.',
+          message:
+              'Rotation interval must be at least $_minRotationIntervalMinutes minutes.',
         ),
       );
     }
@@ -398,110 +367,90 @@ class AsyncWallpaper {
       );
     }
 
-    try {
-      final WallpaperRotationConfigData config = WallpaperRotationConfigData(
-        sources: request.sources
-            .map(
-              (WallpaperRotationSource source) => RotationSourceData(
-                source: source.source,
-                sourceType: source.sourceType.index,
-              ),
-            )
-            .toList(),
-        target: request.target.index,
-        intervalMinutes: request.intervalMinutes,
-        enableIntervalTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.interval,
-        ),
-        enableChargingTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.charging,
-        ),
-        enableTimeOfDayTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.timeOfDay,
-        ),
-        activeHoursStart: request.activeHoursStart,
-        activeHoursEnd: request.activeHoursEnd,
-        orderType: request.order.index,
-      );
-      final bool success = await _api.startWallpaperRotation(config);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to start wallpaper rotation.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while starting wallpaper rotation.',
-          details: error,
-        ),
-      );
-    }
+    final config = WallpaperRotationConfigData(
+      sources: request.sources
+          .map(
+            (source) => RotationSourceData(
+              source: source.source,
+              sourceType: rotationSourceTypeToData(source.sourceType),
+            ),
+          )
+          .toList(),
+      target: wallpaperTargetToData(request.target),
+      intervalMinutes: request.intervalMinutes,
+      enableIntervalTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.interval,
+      ),
+      enableChargingTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.charging,
+      ),
+      enableTimeOfDayTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.timeOfDay,
+      ),
+      activeHoursStart: request.activeHoursStart,
+      activeHoursEnd: request.activeHoursEnd,
+      orderType: rotationOrderToData(request.order),
+    );
+    return _runLegacyBooleanOperation(
+      call: () => _api.startWallpaperRotation(config),
+      failureMessage: 'Failed to start wallpaper rotation.',
+      exceptionMessage:
+          'Unexpected exception while starting wallpaper rotation.',
+    );
   }
 
   /// Stops wallpaper rotation and cancels configured background triggers.
   static Future<WallpaperResult> stopWallpaperRotation() async {
-    try {
-      final bool success = await _api.stopWallpaperRotation();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to stop wallpaper rotation.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while stopping wallpaper rotation.',
-          details: error,
-        ),
-      );
+    if (!_isAndroid) {
+      return _unsupportedResult;
     }
+    return _runLegacyBooleanOperation(
+      call: _api.stopWallpaperRotation,
+      failureMessage: 'Failed to stop wallpaper rotation.',
+      exceptionMessage:
+          'Unexpected exception while stopping wallpaper rotation.',
+    );
   }
 
   /// Returns the current wallpaper rotation status.
+  ///
+  /// Off Android this returns a not-running snapshot. If the platform call
+  /// throws, it returns the same snapshot with
+  /// [WallpaperRotationStatus.lastError] set instead of surfacing the
+  /// exception.
   static Future<WallpaperRotationStatus> getWallpaperRotationStatus() async {
-    final WallpaperRotationStatusData data = await _api
-        .getWallpaperRotationStatus();
-    return WallpaperRotationStatus(
-      isRunning: data.isRunning == true,
-      nextRunEpochMs: data.nextRunEpochMs ?? 0,
-      currentIndex: data.currentIndex ?? 0,
-      cachedCount: data.cachedCount ?? 0,
-      totalCount: data.totalCount ?? 0,
-      effectiveIntervalMinutes: data.effectiveIntervalMinutes ?? 0,
-      lastError: data.lastError,
-    );
+    if (!_isAndroid) {
+      return _notRunningRotationStatus();
+    }
+
+    try {
+      final data = await _api.getWallpaperRotationStatus();
+      return WallpaperRotationStatus(
+        isRunning: data.isRunning == true,
+        nextRunEpochMs: data.nextRunEpochMs ?? 0,
+        currentIndex: data.currentIndex ?? 0,
+        cachedCount: data.cachedCount ?? 0,
+        totalCount: data.totalCount ?? 0,
+        effectiveIntervalMinutes: data.effectiveIntervalMinutes ?? 0,
+        lastError: data.lastError,
+      );
+    } catch (_) {
+      return _notRunningRotationStatus(
+        lastError: 'Failed to get wallpaper rotation status.',
+      );
+    }
   }
 
   /// Immediately rotates to the next wallpaper in the current playlist.
   static Future<WallpaperResult> rotateWallpaperNow() async {
-    try {
-      final bool success = await _api.rotateWallpaperNow();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to rotate wallpaper now.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while rotating wallpaper now.',
-          details: error,
-        ),
-      );
+    if (!_isAndroid) {
+      return _unsupportedResult;
     }
+    return _runLegacyBooleanOperation(
+      call: _api.rotateWallpaperNow,
+      failureMessage: 'Failed to rotate wallpaper now.',
+      exceptionMessage: 'Unexpected exception while rotating wallpaper now.',
+    );
   }
 
   static Future<WallpaperOperationResult> _runOperation({
@@ -522,7 +471,33 @@ class AsyncWallpaper {
     }
   }
 
-  /// Maps structured [WallpaperOperationResult] to legacy [WallpaperResult]: `invalid-input`/`foregroundRequired`/`unsupported` become [WallpaperErrorCode.invalidInput]/[WallpaperErrorCode.unsupported]; only `applied`/`previewOpened`/`awaitingUserConfirmation` are treated as success for the legacy boolean contract.
+  /// Runs a legacy boolean host call, mapping its outcome to [WallpaperResult].
+  static Future<WallpaperResult> _runLegacyBooleanOperation({
+    required Future<bool> Function() call,
+    required String failureMessage,
+    required String exceptionMessage,
+  }) async {
+    try {
+      final success = await call();
+      return success
+          ? const WallpaperResult.success()
+          : WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: failureMessage,
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: exceptionMessage,
+          details: error,
+        ),
+      );
+    }
+  }
+
   static WallpaperOperationResult _unsupportedOperation(
     WallpaperTarget target,
   ) {
@@ -555,7 +530,7 @@ class AsyncWallpaper {
   static StaticWallpaperRequest _legacyStaticWallpaperRequest(
     WallpaperRequest request,
   ) {
-    final WallpaperSource source = switch (request.sourceType) {
+    final source = switch (request.sourceType) {
       WallpaperSourceType.url => WallpaperSource.url(request.source),
       WallpaperSourceType.file => WallpaperSource.filePath(request.source),
     };
@@ -564,16 +539,6 @@ class AsyncWallpaper {
       target: request.target,
       goToHome: request.goToHome,
     );
-  }
-
-  static String? _validateStaticWallpaperRequest(
-    StaticWallpaperRequest request,
-  ) {
-    return _validateSource(request.source, label: 'Wallpaper');
-  }
-
-  static String? _validateVideoWallpaperRequest(VideoWallpaperRequest request) {
-    return _validateSource(request.source, label: 'Video wallpaper');
   }
 
   static String? _validateOpenGlWallpaperRequest(
@@ -592,8 +557,8 @@ class AsyncWallpaper {
       return 'At most $_maxOpenGlTextures textures may be supplied.';
     }
 
-    for (var index = 0; index < request.textures.length; index += 1) {
-      final String? validationError = _validateSource(
+    for (var index = 0; index < request.textures.length; index++) {
+      final validationError = _validateSource(
         request.textures[index],
         label: 'Texture $index',
         maxBytes: _maxOpenGlTextureBytes,
@@ -610,16 +575,11 @@ class AsyncWallpaper {
     required String label,
     int maxBytes = _maxSourceBytes,
   }) {
-    final String? url = source.url;
-    final String? filePath = source.filePath;
-    final String? contentUri = source.contentUri;
+    final url = source.url;
+    final filePath = source.filePath;
+    final contentUri = source.contentUri;
     final bytes = source.bytes;
-    final int valueCount = <Object?>[
-      url,
-      filePath,
-      contentUri,
-      bytes,
-    ].where((Object? value) => value != null).length;
+    final valueCount = [url, filePath, contentUri, bytes].nonNulls.length;
     if (valueCount != 1) {
       return '$label source must contain exactly one value.';
     }
@@ -647,10 +607,11 @@ class AsyncWallpaper {
   }
 
   static bool _isHttpsUrl(String value) {
-    if (value.trim().isEmpty || value.trim() != value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
-    final Uri? uri = Uri.tryParse(value);
+    final uri = Uri.tryParse(value);
     return uri != null &&
         uri.isAbsolute &&
         uri.scheme.toLowerCase() == 'https' &&
@@ -659,10 +620,11 @@ class AsyncWallpaper {
   }
 
   static bool _isContentUri(String value) {
-    if (value.trim().isEmpty || value.trim() != value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
-    final Uri? uri = Uri.tryParse(value);
+    final uri = Uri.tryParse(value);
     return uri != null &&
         uri.scheme.toLowerCase() == 'content' &&
         uri.host.isNotEmpty;
@@ -686,10 +648,14 @@ class AsyncWallpaper {
     );
   }
 
+  /// Maps a native error code to a legacy [WallpaperErrorCode]: `unsupported`
+  /// and `not-implemented` become [WallpaperErrorCode.unsupported]; any
+  /// `invalid-*` code becomes [WallpaperErrorCode.invalidInput]; anything
+  /// else defaults to [WallpaperErrorCode.platformFailure].
   static WallpaperErrorCode _legacyErrorCodeFor(
     WallpaperOperationResult operation,
   ) {
-    final String? errorCode = operation.errorCode?.toLowerCase();
+    final errorCode = operation.errorCode?.toLowerCase();
     if (operation.status == WallpaperOperationStatus.unsupported ||
         errorCode == 'unsupported' ||
         errorCode == 'not-implemented') {
@@ -698,22 +664,26 @@ class AsyncWallpaper {
     if (errorCode == 'unknown') {
       return WallpaperErrorCode.unknown;
     }
-    if (errorCode == 'invalid-input' ||
-        errorCode == 'invalid-source' ||
-        errorCode == 'invalid-request' ||
-        errorCode?.startsWith('invalid-') == true) {
+    if (errorCode?.startsWith('invalid-') == true) {
       return WallpaperErrorCode.invalidInput;
     }
     return WallpaperErrorCode.platformFailure;
   }
 
+  /// Only `applied` (with every requested target applied), `previewOpened`,
+  /// and `awaitingUserConfirmation` (for UI-opening operations) count as
+  /// success under the legacy boolean contract.
   static bool _isLegacySuccess(
     WallpaperOperationResult operation, {
     required bool uiOpeningOperation,
   }) {
     switch (operation.status) {
       case WallpaperOperationStatus.applied:
-        return _hasAllAppliedTargets(operation);
+        return hasAppliedEveryRequestedTarget(
+          operation.requestedTarget,
+          operation.home,
+          operation.lock,
+        );
       case WallpaperOperationStatus.previewOpened:
       case WallpaperOperationStatus.awaitingUserConfirmation:
         return uiOpeningOperation;
@@ -722,18 +692,6 @@ class AsyncWallpaper {
       case WallpaperOperationStatus.unsupported:
       case WallpaperOperationStatus.foregroundRequired:
         return false;
-    }
-  }
-
-  static bool _hasAllAppliedTargets(WallpaperOperationResult operation) {
-    switch (operation.requestedTarget) {
-      case WallpaperTarget.home:
-        return operation.home?.status == WallpaperTargetStatus.applied;
-      case WallpaperTarget.lock:
-        return operation.lock?.status == WallpaperTargetStatus.applied;
-      case WallpaperTarget.both:
-        return operation.home?.status == WallpaperTargetStatus.applied &&
-            operation.lock?.status == WallpaperTargetStatus.applied;
     }
   }
 }

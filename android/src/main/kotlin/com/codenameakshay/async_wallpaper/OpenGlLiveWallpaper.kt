@@ -13,6 +13,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
+import androidx.core.net.toUri
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -46,6 +47,75 @@ sealed interface GlTextureSource {
   }
 }
 
+internal fun GlTextureSource.validationInput(): ShaderProgramValidator.TextureInput {
+  return when (this) {
+    is GlTextureSource.Bytes -> ShaderProgramValidator.TextureInput(sourceSizeBytes = byteCount.toLong())
+    is GlTextureSource.FilePath -> ShaderProgramValidator.TextureInput(
+      sourceSizeBytes = File(path).takeIf { it.isFile }?.length(),
+    )
+    is GlTextureSource.ContentUri -> ShaderProgramValidator.TextureInput()
+  }
+}
+
+/** Signals that a [GlTextureSource] exceeded [ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES]. */
+internal class TextureSourceTooLargeException(message: String) : IOException(message)
+
+/**
+ * Reads [this] into memory, enforcing [ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES]. Throws
+ * [TextureSourceTooLargeException] when the source is too large, or a plain [IOException] for any
+ * other read failure; callers map both to their own exception type and keep the message.
+ */
+@Throws(IOException::class, TextureSourceTooLargeException::class)
+internal fun GlTextureSource.readBoundedBytes(context: Context): ByteArray {
+  return when (this) {
+    is GlTextureSource.Bytes -> copyBytes().also { bytes ->
+      if (bytes.size.toLong() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
+        throw TextureSourceTooLargeException("Texture source exceeds the configured byte limit.")
+      }
+    }
+    is GlTextureSource.FilePath -> {
+      val file = File(path)
+      if (!file.isFile || !file.canRead()) {
+        throw IOException("Texture file is unavailable.")
+      }
+      if (file.length() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
+        throw TextureSourceTooLargeException("Texture file exceeds the configured byte limit.")
+      }
+      FileInputStream(file).use(::readBoundedTextureBytes)
+    }
+    is GlTextureSource.ContentUri -> {
+      val parsedUri = uri.toUri()
+      if (!parsedUri.scheme.equals("content", ignoreCase = true) || parsedUri.authority.isNullOrBlank()) {
+        throw IOException("Texture URI must be a readable content URI.")
+      }
+      val input = context.contentResolver.openInputStream(parsedUri)
+        ?: throw IOException("Texture content URI could not be opened.")
+      input.use(::readBoundedTextureBytes)
+    }
+  }
+}
+
+@Throws(IOException::class, TextureSourceTooLargeException::class)
+private fun readBoundedTextureBytes(input: InputStream): ByteArray {
+  val output = ByteArrayOutputStream()
+  val buffer = ByteArray(TEXTURE_READ_BUFFER_SIZE)
+  var total = 0L
+  while (true) {
+    val read = input.read(buffer)
+    if (read < 0) {
+      break
+    }
+    total += read.toLong()
+    if (total > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
+      throw TextureSourceTooLargeException("Texture source exceeds the configured byte limit.")
+    }
+    output.write(buffer, 0, read)
+  }
+  return output.toByteArray()
+}
+
+private const val TEXTURE_READ_BUFFER_SIZE = 8 * 1024
+
 /**
  * Immutable runtime input for the GLES2 wallpaper renderer.
  *
@@ -59,13 +129,7 @@ class OpenGlWallpaperConfiguration(
   textures: List<GlTextureSource> = emptyList(),
   val frameRate: Int = DEFAULT_FRAME_RATE,
 ) {
-  val textures: List<GlTextureSource> = textures.map { source ->
-    when (source) {
-      is GlTextureSource.Bytes -> GlTextureSource.Bytes(source.copyBytes())
-      is GlTextureSource.FilePath -> source
-      is GlTextureSource.ContentUri -> source
-    }
-  }
+  val textures: List<GlTextureSource> = textures.toList()
 
   companion object {
     const val DEFAULT_FRAME_RATE = 30
@@ -471,7 +535,6 @@ private object OpenGlWallpaperConfigurationStore {
   private const val KEY_TEXTURE_PATH_PREFIX = "texture_path_"
   private const val TEXTURE_DIRECTORY = "async_wallpaper_opengl"
   private const val TEXTURE_FILE_SUFFIX = ".texture"
-  private const val BUFFER_SIZE = 8 * 1024
 
   fun load(context: Context): OpenGlWallpaperConfiguration {
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -603,51 +666,11 @@ private object OpenGlWallpaperConfigurationStore {
 
   @Throws(IOException::class, TextureStorageException::class)
   private fun readSource(context: Context, source: GlTextureSource): ByteArray {
-    return when (source) {
-      is GlTextureSource.Bytes -> source.copyBytes().also { bytes ->
-        if (bytes.size.toLong() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-          throw TextureStorageException("Texture source exceeds the configured byte limit.")
-        }
-      }
-      is GlTextureSource.FilePath -> {
-        val file = File(source.path)
-        if (!file.isFile || !file.canRead()) {
-          throw TextureStorageException("Texture file is unavailable.")
-        }
-        if (file.length() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-          throw TextureStorageException("Texture file exceeds the configured byte limit.")
-        }
-        FileInputStream(file).use(::readBounded)
-      }
-      is GlTextureSource.ContentUri -> {
-        val uri = android.net.Uri.parse(source.uri)
-        if (!uri.scheme.equals("content", ignoreCase = true) || uri.authority.isNullOrBlank()) {
-          throw TextureStorageException("Texture URI must be a readable content URI.")
-        }
-        val input = context.contentResolver.openInputStream(uri)
-          ?: throw TextureStorageException("Texture content URI could not be opened.")
-        input.use(::readBounded)
-      }
+    return try {
+      source.readBoundedBytes(context)
+    } catch (error: IOException) {
+      throw TextureStorageException(error.message ?: "Unable to read a texture source.")
     }
-  }
-
-  @Throws(IOException::class, TextureStorageException::class)
-  private fun readBounded(input: InputStream): ByteArray {
-    val output = ByteArrayOutputStream()
-    val buffer = ByteArray(BUFFER_SIZE)
-    var total = 0L
-    while (true) {
-      val read = input.read(buffer)
-      if (read < 0) {
-        break
-      }
-      total += read.toLong()
-      if (total > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-        throw TextureStorageException("Texture source exceeds the configured byte limit.")
-      }
-      output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
   }
 
   private const val DEFAULT_FRAGMENT_SHADER = """
@@ -716,14 +739,4 @@ private fun isWithinOpenGlRoot(rootDirectory: File, candidate: File): Boolean {
     current = current.parentFile
   }
   return false
-}
-
-private fun GlTextureSource.validationInput(): ShaderProgramValidator.TextureInput {
-  return when (this) {
-    is GlTextureSource.Bytes -> ShaderProgramValidator.TextureInput(sourceSizeBytes = byteCount.toLong())
-    is GlTextureSource.FilePath -> ShaderProgramValidator.TextureInput(
-      sourceSizeBytes = File(path).takeIf { it.isFile }?.length(),
-    )
-    is GlTextureSource.ContentUri -> ShaderProgramValidator.TextureInput()
-  }
 }

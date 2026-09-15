@@ -1,6 +1,5 @@
 package com.codenameakshay.async_wallpaper
 
-import java.io.Closeable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -17,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class OperationQueue(
   private val executor: ExecutorService = Executors.newSingleThreadExecutor(QueueThreadFactory()),
-) : Closeable {
+) {
   private val lock = Any()
   private var acceptingWork = true
 
@@ -56,8 +55,6 @@ class OperationQueue(
       executor.shutdown()
     }
   }
-
-  override fun close() = shutdown()
 
   private class OnceCompletion<T>(
     private val callback: (Result<T>) -> Unit,

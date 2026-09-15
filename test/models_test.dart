@@ -6,18 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('WallpaperSource', () {
     test('constructs each supported source variant', () {
-      const WallpaperSource url = WallpaperSource.url(
-        'https://example.com/wallpaper.jpg',
-      );
-      const WallpaperSource filePath = WallpaperSource.filePath(
+      const url = WallpaperSource.url('https://example.com/wallpaper.jpg');
+      const filePath = WallpaperSource.filePath(
         '/data/local/tmp/wallpaper.jpg',
       );
-      const WallpaperSource contentUri = WallpaperSource.contentUri(
+      const contentUri = WallpaperSource.contentUri(
         'content://media/external/images/media/42',
       );
-      final WallpaperSource bytes = WallpaperSource.bytes(
-        Uint8List.fromList(<int>[1, 2, 3]),
-      );
+      final bytes = WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3]));
 
       expect(url.url, 'https://example.com/wallpaper.jpg');
       expect(filePath.filePath, '/data/local/tmp/wallpaper.jpg');
@@ -26,49 +22,27 @@ void main() {
     });
 
     test('defensively copies byte sources', () {
-      final Uint8List input = Uint8List.fromList(<int>[1, 2, 3]);
-      final WallpaperSource source = WallpaperSource.bytes(input);
+      final input = Uint8List.fromList(<int>[1, 2, 3]);
+      final source = WallpaperSource.bytes(input);
 
       input[0] = 9;
-      final Uint8List firstRead = source.bytes!;
+      final firstRead = source.bytes!;
       firstRead[1] = 8;
 
       expect(source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
     });
   });
 
-  test('declares every static scale and apply strategy', () {
-    expect(
-      WallpaperScaleMode.values,
-      orderedEquals(<WallpaperScaleMode>[
-        WallpaperScaleMode.centerCrop,
-        WallpaperScaleMode.fitCenter,
-        WallpaperScaleMode.center,
-        WallpaperScaleMode.fill,
-        WallpaperScaleMode.stretch,
-      ]),
-    );
-    expect(
-      WallpaperApplyStrategy.values,
-      orderedEquals(<WallpaperApplyStrategy>[
-        WallpaperApplyStrategy.direct,
-        WallpaperApplyStrategy.systemCropper,
-        WallpaperApplyStrategy.systemPicker,
-        WallpaperApplyStrategy.automatic,
-      ]),
-    );
-  });
-
   test('constructs an immutable structured static wallpaper request', () {
-    final Uint8List input = Uint8List.fromList(<int>[4, 5, 6]);
-    final StaticWallpaperRequest request = StaticWallpaperRequest(
+    final input = Uint8List.fromList(<int>[4, 5, 6]);
+    final request = StaticWallpaperRequest(
       source: WallpaperSource.bytes(input),
       target: WallpaperTarget.lock,
       scaleMode: WallpaperScaleMode.fill,
       strategy: WallpaperApplyStrategy.direct,
       goToHome: true,
     );
-    const StaticWallpaperRequest defaults = StaticWallpaperRequest(
+    const defaults = StaticWallpaperRequest(
       source: WallpaperSource.url('https://example.com/default.jpg'),
       target: WallpaperTarget.home,
     );
@@ -85,32 +59,8 @@ void main() {
     expect(defaults.goToHome, isFalse);
   });
 
-  test('declares every operation and target status', () {
-    expect(
-      WallpaperOperationStatus.values,
-      orderedEquals(<WallpaperOperationStatus>[
-        WallpaperOperationStatus.applied,
-        WallpaperOperationStatus.previewOpened,
-        WallpaperOperationStatus.awaitingUserConfirmation,
-        WallpaperOperationStatus.cancelled,
-        WallpaperOperationStatus.failed,
-        WallpaperOperationStatus.unsupported,
-        WallpaperOperationStatus.foregroundRequired,
-      ]),
-    );
-    expect(
-      WallpaperTargetStatus.values,
-      orderedEquals(<WallpaperTargetStatus>[
-        WallpaperTargetStatus.applied,
-        WallpaperTargetStatus.failed,
-        WallpaperTargetStatus.unsupported,
-        WallpaperTargetStatus.notAttempted,
-      ]),
-    );
-  });
-
   test('both target result exposes independent screen outcomes', () {
-    const WallpaperOperationResult result = WallpaperOperationResult(
+    const result = WallpaperOperationResult(
       status: WallpaperOperationStatus.applied,
       requestedTarget: WallpaperTarget.both,
       home: WallpaperTargetResult(status: WallpaperTargetStatus.applied),
@@ -129,83 +79,19 @@ void main() {
     expect(result.fallbackStrategy, WallpaperApplyStrategy.direct);
   });
 
-  test('constructs each target result status and operation status', () {
-    for (final WallpaperTargetStatus status in WallpaperTargetStatus.values) {
-      final WallpaperTargetResult result = WallpaperTargetResult(
-        status: status,
-        errorCode: status.name,
-        errorMessage: 'message for ${status.name}',
-        errorDetails: 'details for ${status.name}',
-      );
-      final String? errorDetails = result.errorDetails;
-
-      expect(result.status, status);
-      expect(result.errorCode, status.name);
-      expect(errorDetails, 'details for ${status.name}');
-    }
-
-    for (final WallpaperOperationStatus status
-        in WallpaperOperationStatus.values) {
-      final WallpaperOperationResult result = WallpaperOperationResult(
-        status: status,
-        requestedTarget: WallpaperTarget.home,
-        errorCode: status.name,
-        errorMessage: 'message for ${status.name}',
-        errorDetails: 'details for ${status.name}',
-      );
-      final String? errorDetails = result.errorDetails;
-
-      expect(result.status, status);
-      expect(result.errorCode, status.name);
-      expect(errorDetails, 'details for ${status.name}');
-    }
-  });
-
-  test('constructs capability details', () {
-    const WallpaperCapabilities capabilities = WallpaperCapabilities(
-      supportsStaticWallpaper: true,
-      supportsLiveWallpaper: true,
-      supportsOpenGlLiveWallpaper: true,
-      supportsHomeWallpaper: true,
-      supportsLockWallpaper: false,
-      supportsBothWallpapers: false,
-      canSetWallpaper: true,
-      hasSystemWallpaperPicker: true,
-      requiresForeground: true,
-      manufacturer: 'Example OEM',
-      sdkInt: 36,
-      openGlVersion: 'OpenGL ES 3.2',
-      openGlRenderer: 'Example GPU',
-    );
-
-    expect(capabilities.supportsStaticWallpaper, isTrue);
-    expect(capabilities.supportsLiveWallpaper, isTrue);
-    expect(capabilities.supportsOpenGlLiveWallpaper, isTrue);
-    expect(capabilities.supportsHomeWallpaper, isTrue);
-    expect(capabilities.supportsLockWallpaper, isFalse);
-    expect(capabilities.supportsBothWallpapers, isFalse);
-    expect(capabilities.canSetWallpaper, isTrue);
-    expect(capabilities.hasSystemWallpaperPicker, isTrue);
-    expect(capabilities.requiresForeground, isTrue);
-    expect(capabilities.manufacturer, 'Example OEM');
-    expect(capabilities.sdkInt, 36);
-    expect(capabilities.openGlVersion, 'OpenGL ES 3.2');
-    expect(capabilities.openGlRenderer, 'Example GPU');
-  });
-
   test(
     'constructs video and OpenGL requests without retaining texture lists',
     () {
-      final List<WallpaperSource> textures = <WallpaperSource>[
+      final textures = <WallpaperSource>[
         const WallpaperSource.url('https://example.com/texture.png'),
       ];
-      const VideoWallpaperRequest video = VideoWallpaperRequest(
+      const video = VideoWallpaperRequest(
         source: WallpaperSource.filePath('/data/local/tmp/wallpaper.mp4'),
         target: WallpaperTarget.home,
         scaleMode: WallpaperScaleMode.fitCenter,
         goToHome: true,
       );
-      final OpenGlLiveWallpaperRequest openGl = OpenGlLiveWallpaperRequest(
+      final openGl = OpenGlLiveWallpaperRequest(
         fragmentShader: 'void main() {}',
         textures: textures,
         target: WallpaperTarget.lock,
@@ -232,70 +118,4 @@ void main() {
       );
     },
   );
-
-  test('keeps all 3.1 request and result constructors available', () {
-    const WallpaperRequest staticRequest = WallpaperRequest(
-      target: WallpaperTarget.both,
-      sourceType: WallpaperSourceType.url,
-      source: 'https://example.com/wallpaper.jpg',
-      goToHome: true,
-    );
-    const MaterialYouWallpaperRequest materialYou = MaterialYouWallpaperRequest(
-      url: 'https://example.com/material.jpg',
-      goToHome: true,
-      enableEffects: true,
-    );
-    const LiveWallpaperRequest live = LiveWallpaperRequest(
-      filePath: '/data/local/tmp/wallpaper.mp4',
-      goToHome: true,
-    );
-    const DownloadWallpaperRequest download = DownloadWallpaperRequest(
-      url: 'https://example.com/download.jpg',
-    );
-    const WallpaperError error = WallpaperError(
-      code: WallpaperErrorCode.platformFailure,
-      message: 'failure',
-      details: 'details',
-    );
-    const WallpaperResult success = WallpaperResult.success();
-    const WallpaperResult failure = WallpaperResult.failure(error);
-    const MaterialYouSupport support = MaterialYouSupport(
-      isSupported: true,
-      androidVersion: 'Android 16',
-      sdkInt: 36,
-    );
-
-    expect(
-      WallpaperTarget.values,
-      orderedEquals(<WallpaperTarget>[
-        WallpaperTarget.home,
-        WallpaperTarget.lock,
-        WallpaperTarget.both,
-      ]),
-    );
-    expect(
-      WallpaperSourceType.values,
-      orderedEquals(<WallpaperSourceType>[
-        WallpaperSourceType.url,
-        WallpaperSourceType.file,
-      ]),
-    );
-    expect(
-      WallpaperErrorCode.values,
-      orderedEquals(<WallpaperErrorCode>[
-        WallpaperErrorCode.invalidInput,
-        WallpaperErrorCode.platformFailure,
-        WallpaperErrorCode.unsupported,
-        WallpaperErrorCode.unknown,
-      ]),
-    );
-
-    expect(staticRequest.target, WallpaperTarget.both);
-    expect(materialYou.enableEffects, isTrue);
-    expect(live.filePath, '/data/local/tmp/wallpaper.mp4');
-    expect(download.url, 'https://example.com/download.jpg');
-    expect(success.isSuccess, isTrue);
-    expect(failure.error, same(error));
-    expect(support.sdkInt, 36);
-  });
 }

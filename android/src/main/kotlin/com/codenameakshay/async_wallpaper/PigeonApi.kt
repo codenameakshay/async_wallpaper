@@ -163,6 +163,30 @@ enum class TargetStatusData(val raw: Int) {
   }
 }
 
+/** The location and representation of a rotation playlist entry. */
+enum class RotationSourceTypeData(val raw: Int) {
+  URL(0),
+  FILE(1);
+
+  companion object {
+    fun ofRaw(raw: Int): RotationSourceTypeData? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
+/** The order in which rotation playlist entries are applied. */
+enum class RotationOrderData(val raw: Int) {
+  SEQUENTIAL(0),
+  SHUFFLE(1);
+
+  companion object {
+    fun ofRaw(raw: Int): RotationOrderData? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /**
  * A static, content-provider, or in-memory wallpaper source.
  *
@@ -249,7 +273,7 @@ data class TargetResultData (
 }
 
 /**
- * A truthful, structured result from the host platform.
+ * Structured result, including per-target outcomes, reported by the host platform.
  *
  * Generated class from Pigeon that represents data sent in messages.
  */
@@ -381,8 +405,7 @@ data class StaticWallpaperRequestData (
   val source: WallpaperSourceData? = null,
   val target: WallpaperTargetData? = null,
   val scaleMode: WallpaperScaleModeData? = null,
-  val strategy: WallpaperApplyStrategyData? = null,
-  val goToHome: Boolean? = null
+  val strategy: WallpaperApplyStrategyData? = null
 )
  {
   companion object {
@@ -391,8 +414,7 @@ data class StaticWallpaperRequestData (
       val target = pigeonVar_list[1] as WallpaperTargetData?
       val scaleMode = pigeonVar_list[2] as WallpaperScaleModeData?
       val strategy = pigeonVar_list[3] as WallpaperApplyStrategyData?
-      val goToHome = pigeonVar_list[4] as Boolean?
-      return StaticWallpaperRequestData(source, target, scaleMode, strategy, goToHome)
+      return StaticWallpaperRequestData(source, target, scaleMode, strategy)
     }
   }
   fun toList(): List<Any?> {
@@ -401,7 +423,6 @@ data class StaticWallpaperRequestData (
       target,
       scaleMode,
       strategy,
-      goToHome,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -424,8 +445,7 @@ data class StaticWallpaperRequestData (
 data class VideoWallpaperRequestData (
   val source: WallpaperSourceData? = null,
   val target: WallpaperTargetData? = null,
-  val scaleMode: WallpaperScaleModeData? = null,
-  val goToHome: Boolean? = null
+  val scaleMode: WallpaperScaleModeData? = null
 )
  {
   companion object {
@@ -433,8 +453,7 @@ data class VideoWallpaperRequestData (
       val source = pigeonVar_list[0] as WallpaperSourceData?
       val target = pigeonVar_list[1] as WallpaperTargetData?
       val scaleMode = pigeonVar_list[2] as WallpaperScaleModeData?
-      val goToHome = pigeonVar_list[3] as Boolean?
-      return VideoWallpaperRequestData(source, target, scaleMode, goToHome)
+      return VideoWallpaperRequestData(source, target, scaleMode)
     }
   }
   fun toList(): List<Any?> {
@@ -442,7 +461,6 @@ data class VideoWallpaperRequestData (
       source,
       target,
       scaleMode,
-      goToHome,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -466,8 +484,7 @@ data class OpenGlWallpaperRequestData (
   val fragmentShader: String? = null,
   val textures: List<WallpaperSourceData?>? = null,
   val target: WallpaperTargetData? = null,
-  val frameRate: Long? = null,
-  val goToHome: Boolean? = null
+  val frameRate: Long? = null
 )
  {
   companion object {
@@ -476,8 +493,7 @@ data class OpenGlWallpaperRequestData (
       val textures = pigeonVar_list[1] as List<WallpaperSourceData?>?
       val target = pigeonVar_list[2] as WallpaperTargetData?
       val frameRate = pigeonVar_list[3] as Long?
-      val goToHome = pigeonVar_list[4] as Boolean?
-      return OpenGlWallpaperRequestData(fragmentShader, textures, target, frameRate, goToHome)
+      return OpenGlWallpaperRequestData(fragmentShader, textures, target, frameRate)
     }
   }
   fun toList(): List<Any?> {
@@ -486,7 +502,6 @@ data class OpenGlWallpaperRequestData (
       textures,
       target,
       frameRate,
-      goToHome,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -538,13 +553,13 @@ data class MaterialYouSupportData (
 /** Generated class from Pigeon that represents data sent in messages. */
 data class RotationSourceData (
   val source: String? = null,
-  val sourceType: Long? = null
+  val sourceType: RotationSourceTypeData? = null
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): RotationSourceData {
       val source = pigeonVar_list[0] as String?
-      val sourceType = pigeonVar_list[1] as Long?
+      val sourceType = pigeonVar_list[1] as RotationSourceTypeData?
       return RotationSourceData(source, sourceType)
     }
   }
@@ -569,27 +584,27 @@ data class RotationSourceData (
 /** Generated class from Pigeon that represents data sent in messages. */
 data class WallpaperRotationConfigData (
   val sources: List<RotationSourceData?>? = null,
-  val target: Long? = null,
+  val target: WallpaperTargetData? = null,
   val intervalMinutes: Long? = null,
   val enableIntervalTrigger: Boolean? = null,
   val enableChargingTrigger: Boolean? = null,
   val enableTimeOfDayTrigger: Boolean? = null,
   val activeHoursStart: Long? = null,
   val activeHoursEnd: Long? = null,
-  val orderType: Long? = null
+  val orderType: RotationOrderData? = null
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): WallpaperRotationConfigData {
       val sources = pigeonVar_list[0] as List<RotationSourceData?>?
-      val target = pigeonVar_list[1] as Long?
+      val target = pigeonVar_list[1] as WallpaperTargetData?
       val intervalMinutes = pigeonVar_list[2] as Long?
       val enableIntervalTrigger = pigeonVar_list[3] as Boolean?
       val enableChargingTrigger = pigeonVar_list[4] as Boolean?
       val enableTimeOfDayTrigger = pigeonVar_list[5] as Boolean?
       val activeHoursStart = pigeonVar_list[6] as Long?
       val activeHoursEnd = pigeonVar_list[7] as Long?
-      val orderType = pigeonVar_list[8] as Long?
+      val orderType = pigeonVar_list[8] as RotationOrderData?
       return WallpaperRotationConfigData(sources, target, intervalMinutes, enableIntervalTrigger, enableChargingTrigger, enableTimeOfDayTrigger, activeHoursStart, activeHoursEnd, orderType)
     }
   }
@@ -697,56 +712,66 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
         }
       }
       135.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperSourceData.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          RotationSourceTypeData.ofRaw(it.toInt())
         }
       }
       136.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          TargetResultData.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          RotationOrderData.ofRaw(it.toInt())
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OperationResultData.fromList(it)
+          WallpaperSourceData.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperCapabilitiesData.fromList(it)
+          TargetResultData.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          StaticWallpaperRequestData.fromList(it)
+          OperationResultData.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          VideoWallpaperRequestData.fromList(it)
+          WallpaperCapabilitiesData.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OpenGlWallpaperRequestData.fromList(it)
+          StaticWallpaperRequestData.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MaterialYouSupportData.fromList(it)
+          VideoWallpaperRequestData.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          RotationSourceData.fromList(it)
+          OpenGlWallpaperRequestData.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperRotationConfigData.fromList(it)
+          MaterialYouSupportData.fromList(it)
         }
       }
       145.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          RotationSourceData.fromList(it)
+        }
+      }
+      146.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WallpaperRotationConfigData.fromList(it)
+        }
+      }
+      147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           WallpaperRotationStatusData.fromList(it)
         }
@@ -780,48 +805,56 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
         stream.write(134)
         writeValue(stream, value.raw)
       }
-      is WallpaperSourceData -> {
+      is RotationSourceTypeData -> {
         stream.write(135)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is TargetResultData -> {
+      is RotationOrderData -> {
         stream.write(136)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is OperationResultData -> {
+      is WallpaperSourceData -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is WallpaperCapabilitiesData -> {
+      is TargetResultData -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is StaticWallpaperRequestData -> {
+      is OperationResultData -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is VideoWallpaperRequestData -> {
+      is WallpaperCapabilitiesData -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is OpenGlWallpaperRequestData -> {
+      is StaticWallpaperRequestData -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is MaterialYouSupportData -> {
+      is VideoWallpaperRequestData -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is RotationSourceData -> {
+      is OpenGlWallpaperRequestData -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationConfigData -> {
+      is MaterialYouSupportData -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationStatusData -> {
+      is RotationSourceData -> {
         stream.write(145)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationConfigData -> {
+        stream.write(146)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationStatusData -> {
+        stream.write(147)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -844,17 +877,7 @@ interface WallpaperApi {
   fun openLiveWallpaperPreview(request: VideoWallpaperRequestData, callback: (Result<OperationResultData>) -> Unit)
   /** Applies a shader-based OpenGL live wallpaper. */
   fun applyOpenGlWallpaper(request: OpenGlWallpaperRequestData, callback: (Result<OperationResultData>) -> Unit)
-  /** Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5. */
-  fun setHomeWallpaperFromUrl(url: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setLockWallpaperFromUrl(url: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setBothWallpaperFromUrl(url: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setWallpaper(url: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setHomeWallpaperFromFile(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setLockWallpaperFromFile(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setBothWallpaperFromFile(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setWallpaperFromFile(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setMaterialYouWallpaper(url: String, goToHome: Boolean, enableEffects: Boolean, callback: (Result<Boolean>) -> Unit)
-  fun setLiveWallpaper(filePath: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit)
+  fun setMaterialYouWallpaper(url: String, callback: (Result<Boolean>) -> Unit)
   fun openWallpaperChooser(callback: (Result<Boolean>) -> Unit)
   fun downloadWallpaper(url: String, callback: (Result<Boolean>) -> Unit)
   fun startWallpaperRotation(config: WallpaperRotationConfigData, callback: (Result<Boolean>) -> Unit)
@@ -1006,203 +1029,12 @@ interface WallpaperApi {
         }
       }
       run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromUrl$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val urlArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setHomeWallpaperFromUrl(urlArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromUrl$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val urlArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setLockWallpaperFromUrl(urlArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromUrl$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val urlArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setBothWallpaperFromUrl(urlArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaper$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val urlArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setWallpaper(urlArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromFile$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val filePathArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setHomeWallpaperFromFile(filePathArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromFile$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val filePathArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setLockWallpaperFromFile(filePathArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromFile$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val filePathArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setBothWallpaperFromFile(filePathArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaperFromFile$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val filePathArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setWallpaperFromFile(filePathArg, goToHomeArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setMaterialYouWallpaper$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val urlArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            val enableEffectsArg = args[2] as Boolean
-            api.setMaterialYouWallpaper(urlArg, goToHomeArg, enableEffectsArg) { result: Result<Boolean> ->
-              val error = result.exceptionOrNull()
-              if (error != null) {
-                reply.reply(wrapError(error))
-              } else {
-                val data = result.getOrNull()
-                reply.reply(wrapResult(data))
-              }
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLiveWallpaper$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val filePathArg = args[0] as String
-            val goToHomeArg = args[1] as Boolean
-            api.setLiveWallpaper(filePathArg, goToHomeArg) { result: Result<Boolean> ->
+            api.setMaterialYouWallpaper(urlArg) { result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

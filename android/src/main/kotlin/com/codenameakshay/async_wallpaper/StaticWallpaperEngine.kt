@@ -8,10 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
-import android.os.Build
 import kotlin.math.floor
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * Applies a structured static-wallpaper request without requiring a foreground Activity for the
@@ -30,9 +27,6 @@ class StaticWallpaperEngine(
   /** Applies [request] directly, returning structured failures instead of throwing. */
   fun applyDirect(request: StaticWallpaperRequestData): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     return when (validated.strategy) {
       WallpaperApplyStrategyData.SYSTEM_CROPPER,
       WallpaperApplyStrategyData.SYSTEM_PICKER,
@@ -56,9 +50,6 @@ class StaticWallpaperEngine(
     activity: Activity?,
   ): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     if (validated.strategy != WallpaperApplyStrategyData.SYSTEM_CROPPER) {
       return OperationResultPolicy.failed(
         validated.target,
@@ -66,7 +57,7 @@ class StaticWallpaperEngine(
         message = "The system cropper can only be used with the systemCropper strategy.",
       )
     }
-    val liveActivity = activity.takeIf(::isUsableActivity)
+    val liveActivity = activity.takeIf { it.isUsable() }
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val uri = validated.source.contentUri
       ?.takeIf { validated.source.kind == WallpaperSourceKindData.CONTENT_URI }
@@ -119,9 +110,6 @@ class StaticWallpaperEngine(
     activity: Activity?,
   ): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     if (validated.strategy != WallpaperApplyStrategyData.SYSTEM_PICKER) {
       return OperationResultPolicy.failed(
         validated.target,
@@ -129,7 +117,7 @@ class StaticWallpaperEngine(
         message = "The system picker can only be used with the systemPicker strategy.",
       )
     }
-    val liveActivity = activity.takeIf(::isUsableActivity)
+    val liveActivity = activity.takeIf { it.isUsable() }
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val intent = Intent(Intent.ACTION_SET_WALLPAPER)
     return try {
@@ -179,9 +167,6 @@ class StaticWallpaperEngine(
   }
 
   private fun applyBitmap(request: ValidatedStaticWallpaperRequest): OperationResultData {
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, request.target)?.let {
-      return it
-    }
     val capability = AndroidCapabilities.staticWallpaperSupport(appContext)
     if (!capability.wallpaperSupported) {
       return OperationResultPolicy.unsupported(
@@ -201,7 +186,7 @@ class StaticWallpaperEngine(
     var sourceBitmap: Bitmap? = null
     var transformedBitmap: Bitmap? = null
     return try {
-      sourceBitmap = sourceLoader.load(request.source).bitmap
+      sourceBitmap = sourceLoader.load(request.source)
       val dimensions = boundedWallpaperDimensions(wallpaperManagerProvider())
       transformedBitmap = BitmapTransformer.transform(
         bitmap = sourceBitmap,
@@ -308,16 +293,12 @@ class StaticWallpaperEngine(
   }
 
   private fun setBitmap(bitmap: Bitmap, flag: Int) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      wallpaperManagerProvider().setBitmap(
-        bitmap,
-        Rect(0, 0, bitmap.width, bitmap.height),
-        true,
-        flag,
-      )
-    } else {
-      wallpaperManagerProvider().setBitmap(bitmap)
-    }
+    wallpaperManagerProvider().setBitmap(
+      bitmap,
+      Rect(0, 0, bitmap.width, bitmap.height),
+      true,
+      flag,
+    )
   }
 
   private fun boundedWallpaperDimensions(manager: WallpaperManager): WallpaperDimensions {
@@ -326,19 +307,12 @@ class StaticWallpaperEngine(
     val desiredHeight = manager.desiredMinimumHeight.takeIf { it > 0 } ?: metrics.heightPixels
     val safeWidth = desiredWidth.coerceAtLeast(1)
     val safeHeight = desiredHeight.coerceAtLeast(1)
-    val pixelCount = safeWidth.toLong() * safeHeight.toLong()
-    if (pixelCount <= MAX_TRANSFORM_PIXELS &&
-      safeWidth <= MAX_TRANSFORM_DIMENSION &&
-      safeHeight <= MAX_TRANSFORM_DIMENSION
-    ) {
-      return WallpaperDimensions(safeWidth, safeHeight)
-    }
-    val pixelScale = sqrt(MAX_TRANSFORM_PIXELS.toDouble() / pixelCount.toDouble())
-    val dimensionScale = min(
-      MAX_TRANSFORM_DIMENSION.toDouble() / safeWidth.toDouble(),
-      MAX_TRANSFORM_DIMENSION.toDouble() / safeHeight.toDouble(),
+    val scale = BitmapTransformMath.scaleToFit(
+      safeWidth,
+      safeHeight,
+      MAX_TRANSFORM_DIMENSION,
+      MAX_TRANSFORM_PIXELS,
     )
-    val scale = min(1.0, min(pixelScale, dimensionScale))
     return WallpaperDimensions(
       width = floor(safeWidth * scale).toInt().coerceAtLeast(1),
       height = floor(safeHeight * scale).toInt().coerceAtLeast(1),
@@ -359,21 +333,6 @@ class StaticWallpaperEngine(
       is IllegalArgumentException -> ERROR_INVALID_REQUEST
       else -> ERROR_WALLPAPER_APPLY_FAILED
     }
-  }
-
-  private fun WallpaperSourceData.hasValueForKind(): Boolean {
-    return when (kind) {
-      WallpaperSourceKindData.URL -> !url.isNullOrBlank()
-      WallpaperSourceKindData.FILE_PATH -> !filePath.isNullOrBlank()
-      WallpaperSourceKindData.CONTENT_URI -> !contentUri.isNullOrBlank()
-      WallpaperSourceKindData.BYTES -> bytes?.isNotEmpty() == true
-      null -> false
-    }
-  }
-
-  private fun isUsableActivity(activity: Activity?): Boolean {
-    return activity != null && !activity.isFinishing &&
-      (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !activity.isDestroyed)
   }
 
   private fun Bitmap?.recycleOwned(except: Bitmap? = null) {
@@ -413,8 +372,9 @@ class StaticWallpaperEngine(
 }
 
 /**
- * Centralized result construction keeps every Android endpoint honest about partial outcomes.
- * It is platform-independent so the contract is covered by regular JVM unit tests.
+ * Centralized result construction so partial and unsupported outcomes are reported per target
+ * instead of collapsed into one boolean. It is platform-independent so the contract is covered by
+ * regular JVM unit tests.
  */
 object OperationResultPolicy {
   const val ERROR_FOREGROUND_REQUIRED = "foreground-required"

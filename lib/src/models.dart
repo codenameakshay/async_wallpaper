@@ -59,7 +59,7 @@ class WallpaperSource {
 
   /// A defensive copy of the byte value when this is a byte source.
   Uint8List? get bytes {
-    final Uint8List? value = _bytes;
+    final value = _bytes;
     return value == null ? null : Uint8List.fromList(value);
   }
 }
@@ -116,7 +116,7 @@ class StaticWallpaperRequest {
   final WallpaperScaleMode scaleMode;
   final WallpaperApplyStrategy strategy;
 
-  /// Retained only for source compatibility since 3.2.0; the engine intentionally ignores it and never performs automatic navigation.
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
 }
 
@@ -132,6 +132,8 @@ class MaterialYouWallpaperRequest {
 
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
+
+  /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool enableEffects;
 }
 
@@ -206,7 +208,7 @@ class WallpaperTargetResult {
   final String? errorDetails;
 }
 
-/// Truthful result details for a wallpaper operation.
+/// Result details for a wallpaper operation, including per-target outcomes.
 class WallpaperOperationResult {
   const WallpaperOperationResult({
     required this.status,

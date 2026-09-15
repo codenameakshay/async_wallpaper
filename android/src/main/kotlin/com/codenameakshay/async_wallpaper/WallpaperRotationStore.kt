@@ -1,6 +1,7 @@
 package com.codenameakshay.async_wallpaper
 
 import android.content.Context
+import androidx.core.content.edit
 import org.json.JSONArray
 
 internal data class StoredWallpaperRotationConfig(
@@ -20,21 +21,21 @@ internal class WallpaperRotationStore(context: Context) {
   private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   fun saveConfig(config: StoredWallpaperRotationConfig) {
-    prefs.edit()
-      .putBoolean(KEY_IS_RUNNING, true)
-      .putString(KEY_LOCAL_SOURCES, JSONArray(config.localSources).toString())
-      .putInt(KEY_TARGET, config.target)
-      .putInt(KEY_INTERVAL_MINUTES, config.intervalMinutes)
-      .putBoolean(KEY_ENABLE_INTERVAL_TRIGGER, config.enableIntervalTrigger)
-      .putBoolean(KEY_ENABLE_CHARGING_TRIGGER, config.enableChargingTrigger)
-      .putBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, config.enableTimeOfDayTrigger)
-      .putInt(KEY_ACTIVE_HOURS_START, config.activeHoursStart)
-      .putInt(KEY_ACTIVE_HOURS_END, config.activeHoursEnd)
-      .putInt(KEY_ORDER_TYPE, config.orderType)
-      .putInt(KEY_CURRENT_INDEX, 0)
-      .putString(KEY_SHUFFLE_ORDER, null)
-      .putString(KEY_LAST_ERROR, null)
-      .apply()
+    prefs.edit {
+      putBoolean(KEY_IS_RUNNING, true)
+      putString(KEY_LOCAL_SOURCES, JSONArray(config.localSources).toString())
+      putInt(KEY_TARGET, config.target)
+      putInt(KEY_INTERVAL_MINUTES, config.intervalMinutes)
+      putBoolean(KEY_ENABLE_INTERVAL_TRIGGER, config.enableIntervalTrigger)
+      putBoolean(KEY_ENABLE_CHARGING_TRIGGER, config.enableChargingTrigger)
+      putBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, config.enableTimeOfDayTrigger)
+      putInt(KEY_ACTIVE_HOURS_START, config.activeHoursStart)
+      putInt(KEY_ACTIVE_HOURS_END, config.activeHoursEnd)
+      putInt(KEY_ORDER_TYPE, config.orderType)
+      putInt(KEY_CURRENT_INDEX, 0)
+      putString(KEY_SHUFFLE_ORDER, null)
+      putString(KEY_LAST_ERROR, null)
+    }
   }
 
   fun getConfig(): StoredWallpaperRotationConfig? {
@@ -62,17 +63,17 @@ internal class WallpaperRotationStore(context: Context) {
   fun isRunning(): Boolean = prefs.getBoolean(KEY_IS_RUNNING, false)
 
   fun stopRotation() {
-    prefs.edit()
-      .putBoolean(KEY_IS_RUNNING, false)
-      .putLong(KEY_NEXT_RUN_EPOCH_MS, 0L)
-      .putString(KEY_LAST_ERROR, null)
-      .apply()
+    prefs.edit {
+      putBoolean(KEY_IS_RUNNING, false)
+      putLong(KEY_NEXT_RUN_EPOCH_MS, 0L)
+      putString(KEY_LAST_ERROR, null)
+    }
   }
 
   fun getCurrentIndex(): Int = prefs.getInt(KEY_CURRENT_INDEX, 0)
 
   fun setCurrentIndex(index: Int) {
-    prefs.edit().putInt(KEY_CURRENT_INDEX, index).apply()
+    prefs.edit { putInt(KEY_CURRENT_INDEX, index) }
   }
 
   fun getShuffleOrder(): List<Int> {
@@ -81,23 +82,23 @@ internal class WallpaperRotationStore(context: Context) {
   }
 
   fun setShuffleOrder(order: List<Int>) {
-    prefs.edit().putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString()).apply()
+    prefs.edit { putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString()) }
   }
 
   fun setLastAppliedEpochMs(epochMs: Long) {
-    prefs.edit().putLong(KEY_LAST_APPLIED_EPOCH_MS, epochMs).apply()
+    prefs.edit { putLong(KEY_LAST_APPLIED_EPOCH_MS, epochMs) }
   }
 
   fun getLastAppliedEpochMs(): Long = prefs.getLong(KEY_LAST_APPLIED_EPOCH_MS, 0L)
 
   fun setNextRunEpochMs(epochMs: Long) {
-    prefs.edit().putLong(KEY_NEXT_RUN_EPOCH_MS, epochMs).apply()
+    prefs.edit { putLong(KEY_NEXT_RUN_EPOCH_MS, epochMs) }
   }
 
   fun getNextRunEpochMs(): Long = prefs.getLong(KEY_NEXT_RUN_EPOCH_MS, 0L)
 
   fun setLastError(error: String?) {
-    prefs.edit().putString(KEY_LAST_ERROR, error).apply()
+    prefs.edit { putString(KEY_LAST_ERROR, error) }
   }
 
   fun getStatusData(): WallpaperRotationStatusData {
@@ -116,8 +117,6 @@ internal class WallpaperRotationStore(context: Context) {
   fun isChargingTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_CHARGING_TRIGGER, false)
 
   fun isTimeOfDayTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, false)
-
-  fun isIntervalTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_INTERVAL_TRIGGER, true)
 
   fun getActiveHoursStart(): Int = prefs.getInt(KEY_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)
 

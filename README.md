@@ -5,7 +5,7 @@ Flutter wallpaper plugin with support for:
 - static wallpaper from URL, file path, content URI, or bytes
 - home, lock, or both targets
 - live wallpaper from video or OpenGL shader
-- capability check and truthful operation results
+- capability check and operation results that distinguish applied from preview-opened
 - download to Photos (iOS and Android)
 
 ## Demo

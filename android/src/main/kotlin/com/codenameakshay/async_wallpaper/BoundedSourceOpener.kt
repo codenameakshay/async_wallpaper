@@ -1,14 +1,13 @@
 package com.codenameakshay.async_wallpaper
 
 import android.content.Context
-import android.net.Uri
+import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 
@@ -66,7 +65,7 @@ class BoundedSourceOpener(
   }
 
   private fun openContentUri(value: String): InputStream {
-    val uri = Uri.parse(value)
+    val uri = value.toUri()
     if (!uri.scheme.equals(CONTENT_SCHEME, ignoreCase = true) || uri.authority.isNullOrBlank()) {
       throw invalidSource("Sources of this kind must use a content URI.")
     }
@@ -194,19 +193,6 @@ class BoundedSourceOpener(
       bytesRead += count
       if (bytesRead > limit) {
         throw BoundedSourceException(ERROR_SOURCE_TOO_LARGE, "The source exceeds the configured byte limit.")
-      }
-    }
-  }
-
-  private class DisconnectingInputStream(
-    input: InputStream,
-    private val connection: HttpURLConnection,
-  ) : FilterInputStream(input) {
-    override fun close() {
-      try {
-        super.close()
-      } finally {
-        connection.disconnect()
       }
     }
   }

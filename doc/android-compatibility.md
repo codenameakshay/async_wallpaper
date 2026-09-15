@@ -71,7 +71,7 @@ Image decoding is bounds-first, sampled, and size-limited. EXIF orientation is n
 
 ### Direct, cropper, picker, and automatic strategies
 
-| Strategy | User interaction | Source restrictions | Truthful result |
+| Strategy | User interaction | Source restrictions | Reported result |
 | --- | --- | --- | --- |
 | `direct` | None | Any supported static source | `applied`, `failed`, or `unsupported` |
 | `systemCropper` | Android crop UI | Readable `content://` image URI | `previewOpened`, never `applied` merely because UI opened |

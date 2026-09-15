@@ -5,14 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
-import android.net.Uri
+import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
@@ -57,15 +56,6 @@ class WallpaperSourceLoader(
     }
   }
 
-  /** A decoded bitmap with the raw source dimensions retained for diagnostics. */
-  data class LoadedBitmap(
-    val bitmap: Bitmap,
-    val sourceWidth: Int,
-    val sourceHeight: Int,
-    val sampleSize: Int,
-    val exifOrientation: Int,
-  )
-
   private val appContext = context.applicationContext
 
   /**
@@ -73,7 +63,7 @@ class WallpaperSourceLoader(
    * The caller owns the returned bitmap and must recycle it when it is no longer needed.
    */
   @Throws(WallpaperSourceException::class)
-  fun load(source: WallpaperSourceData): LoadedBitmap {
+  fun load(source: WallpaperSourceData): Bitmap {
     val inputSource = inputSourceFor(source)
     val bounds = decodeBounds(inputSource)
     val sampleSize = calculateInSampleSize(
@@ -95,13 +85,7 @@ class WallpaperSourceLoader(
       )
     }
 
-    return LoadedBitmap(
-      bitmap = normalized,
-      sourceWidth = bounds.width,
-      sourceHeight = bounds.height,
-      sampleSize = sampleSize,
-      exifOrientation = exifOrientation,
-    )
+    return normalized
   }
 
   private fun inputSourceFor(source: WallpaperSourceData): InputSource {
@@ -139,7 +123,7 @@ class WallpaperSourceLoader(
   }
 
   private fun contentUriInputSource(value: String): InputSource {
-    val uri = Uri.parse(value)
+    val uri = value.toUri()
     if (!uri.scheme.equals(CONTENT_SCHEME, ignoreCase = true) || uri.authority.isNullOrBlank()) {
       throw invalidSource("Wallpaper content sources must use a content URI.")
     }
@@ -507,20 +491,6 @@ class WallpaperSourceLoader(
           code = ERROR_IMAGE_TOO_LARGE,
           message = "The encoded image exceeds the configured size limit.",
         )
-      }
-    }
-  }
-
-  /** Closes both the response stream and its HTTP connection. */
-  private class DisconnectingInputStream(
-    input: InputStream,
-    private val connection: HttpURLConnection,
-  ) : FilterInputStream(input) {
-    override fun close() {
-      try {
-        super.close()
-      } finally {
-        connection.disconnect()
       }
     }
   }

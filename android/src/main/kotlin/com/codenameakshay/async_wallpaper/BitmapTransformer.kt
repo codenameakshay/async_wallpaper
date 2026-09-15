@@ -5,8 +5,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import androidx.core.graphics.createBitmap
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /** An integer rectangle expressed as left, top, right, and bottom edges. */
 data class RectSpec(
@@ -135,22 +137,6 @@ object BitmapTransformMath {
     }
   }
 
-  /** Returns null instead of throwing when either source or target dimensions are invalid. */
-  fun calculateOrNull(
-    mode: WallpaperScaleModeData,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    targetWidth: Int,
-    targetHeight: Int,
-    focalX: Float = DEFAULT_FOCAL_POINT,
-    focalY: Float = DEFAULT_FOCAL_POINT,
-  ): BitmapTransformSpec? {
-    if (!hasValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
-      return null
-    }
-    return calculate(mode, sourceWidth, sourceHeight, targetWidth, targetHeight, focalX, focalY)
-  }
-
   /**
    * Returns the source rectangle whose aspect ratio matches the target. This is intentionally
    * exposed as a small pure operation for callers that need crop hints without drawing a bitmap.
@@ -186,6 +172,20 @@ object BitmapTransformMath {
     } else {
       value.coerceIn(0f, 1f)
     }
+  }
+
+  /**
+   * Returns the largest scale in (0, 1] that keeps [width] x [height] within both [maxDimension]
+   * per side and [maxPixels] total, or `1.0` when the input is already within both bounds.
+   */
+  fun scaleToFit(width: Int, height: Int, maxDimension: Int, maxPixels: Long): Double {
+    val pixelCount = width.toLong() * height.toLong()
+    val pixelScale = sqrt(maxPixels.toDouble() / pixelCount.toDouble())
+    val dimensionScale = min(
+      maxDimension.toDouble() / width.toDouble(),
+      maxDimension.toDouble() / height.toDouble(),
+    )
+    return min(1.0, min(pixelScale, dimensionScale))
   }
 
   private fun fitCenterDestination(
@@ -285,23 +285,6 @@ object BitmapTransformMath {
   private const val DEFAULT_FOCAL_POINT = 0.5f
 }
 
-/** Convenience top-level alias for crop-hint callers and JVM-only geometry tests. */
-fun calculateCenterCrop(
-  sourceWidth: Int,
-  sourceHeight: Int,
-  targetWidth: Int,
-  targetHeight: Int,
-  focalX: Float = 0.5f,
-  focalY: Float = 0.5f,
-): RectSpec = BitmapTransformMath.calculateCenterCrop(
-  sourceWidth,
-  sourceHeight,
-  targetWidth,
-  targetHeight,
-  focalX,
-  focalY,
-)
-
 /** Applies [BitmapTransformMath] geometry using Android's bitmap and canvas APIs. */
 object BitmapTransformer {
   /** Calculates and applies a scale mode in one call. */
@@ -343,7 +326,7 @@ object BitmapTransformer {
       "Destination rectangle must have positive dimensions."
     }
 
-    val output = Bitmap.createBitmap(
+    val output = createBitmap(
       geometry.outputWidth,
       geometry.outputHeight,
       Bitmap.Config.ARGB_8888,

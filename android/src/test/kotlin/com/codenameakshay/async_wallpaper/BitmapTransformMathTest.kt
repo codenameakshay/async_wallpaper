@@ -1,7 +1,7 @@
 package com.codenameakshay.async_wallpaper
 
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -10,7 +10,7 @@ class BitmapTransformMathTest {
   fun `center crop crops a landscape source around its center`() {
     assertEquals(
       RectSpec(500, 0, 1500, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, 0.5f, 0.5f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, 0.5f, 0.5f),
     )
   }
 
@@ -18,11 +18,11 @@ class BitmapTransformMathTest {
   fun `center crop clamps focal points at both source edges`() {
     assertEquals(
       RectSpec(0, 0, 1000, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, -5f, -2f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, -5f, -2f),
     )
     assertEquals(
       RectSpec(1000, 0, 2000, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, 7f, 3f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, 7f, 3f),
     )
   }
 
@@ -30,7 +30,7 @@ class BitmapTransformMathTest {
   fun `center crop handles portrait sources with vertical focal positions`() {
     assertEquals(
       RectSpec(0, 1000, 1000, 2000),
-      calculateCenterCrop(1000, 2000, 1000, 1000, 0.5f, 0.75f),
+      BitmapTransformMath.calculateCenterCrop(1000, 2000, 1000, 1000, 0.5f, 0.75f),
     )
   }
 
@@ -126,16 +126,7 @@ class BitmapTransformMathTest {
   }
 
   @Test
-  fun `invalid dimensions return null or fail explicitly`() {
-    assertNull(
-      BitmapTransformMath.calculateOrNull(
-        WallpaperScaleModeData.CENTER_CROP,
-        sourceWidth = 0,
-        sourceHeight = 100,
-        targetWidth = 100,
-        targetHeight = 100,
-      ),
-    )
+  fun `invalid dimensions fail explicitly`() {
     assertThrows(IllegalArgumentException::class.java) {
       BitmapTransformMath.calculate(
         WallpaperScaleModeData.CENTER_CROP,
@@ -145,6 +136,33 @@ class BitmapTransformMathTest {
         targetHeight = 100,
       )
     }
+  }
+
+  @Test
+  fun `scale to fit keeps images already within both bounds unscaled`() {
+    assertEquals(
+      1.0,
+      BitmapTransformMath.scaleToFit(width = 100, height = 100, maxDimension = 200, maxPixels = 1_000_000),
+      0.0,
+    )
+  }
+
+  @Test
+  fun `scale to fit is limited by the longer side when only a dimension is exceeded`() {
+    assertEquals(
+      0.512,
+      BitmapTransformMath.scaleToFit(width = 8000, height = 8000, maxDimension = 4096, maxPixels = Long.MAX_VALUE),
+      1e-9,
+    )
+  }
+
+  @Test
+  fun `scale to fit is limited by pixel count when only the total is exceeded`() {
+    assertEquals(
+      sqrt(0.5),
+      BitmapTransformMath.scaleToFit(width = 100, height = 100, maxDimension = 1_000_000, maxPixels = 5_000),
+      1e-9,
+    )
   }
 
   @Test

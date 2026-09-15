@@ -116,7 +116,6 @@ void main() {
     expect(find.byKey(const Key('scale-selector')), findsOneWidget);
     expect(find.byKey(const Key('strategy-selector')), findsOneWidget);
     expect(find.byKey(const Key('url-source-input')), findsOneWidget);
-    expect(find.text('Open home after a successful flow'), findsNothing);
 
     await tester.tap(find.byKey(const Key('source-selector')));
     await tester.pumpAndSettle();
@@ -143,7 +142,7 @@ void main() {
   testWidgets('shows capabilities and separate home and lock outcomes', (
     WidgetTester tester,
   ) async {
-    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+    final api = _FakeWallpaperDemoApi()
       ..staticResult = const WallpaperOperationResult(
         status: WallpaperOperationStatus.applied,
         requestedTarget: WallpaperTarget.both,
@@ -191,7 +190,7 @@ void main() {
   testWidgets('serializes actions while an operation is in flight', (
     WidgetTester tester,
   ) async {
-    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+    final api = _FakeWallpaperDemoApi()
       ..staticCompleter = Completer<WallpaperOperationResult>();
     await _pumpExample(tester, api);
 
@@ -229,7 +228,7 @@ void main() {
   testWidgets('does not update state after the example is disposed', (
     WidgetTester tester,
   ) async {
-    final _FakeWallpaperDemoApi api = _FakeWallpaperDemoApi()
+    final api = _FakeWallpaperDemoApi()
       ..staticCompleter = Completer<WallpaperOperationResult>();
     await _pumpExample(tester, api);
     await _tapVisible(tester, find.byKey(const Key('apply-static-button')));

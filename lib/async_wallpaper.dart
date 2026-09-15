@@ -61,10 +61,6 @@ class AsyncWallpaper {
     _client = _defaultClient;
   }
 
-  /// Whether a test client currently overrides the default platform client.
-  @visibleForTesting
-  static bool get debugHasClientOverride => !identical(_client, _defaultClient);
-
   /// Returns Material You availability on Android.
   static Future<MaterialYouSupport> checkMaterialYouSupport() async {
     if (!_isAndroid) {

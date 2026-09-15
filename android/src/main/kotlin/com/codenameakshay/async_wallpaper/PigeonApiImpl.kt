@@ -101,21 +101,7 @@ class PigeonApiImpl(
         val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
         val started = rotationEngine.startRotation(config)
         if (started) {
-          if (config.enableIntervalTrigger == true) {
-            WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
-            rotationStore.setNextRunEpochMs(
-              System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
-            )
-          } else {
-            WallpaperRotationScheduler.cancelPeriodic(appContext)
-            rotationStore.setNextRunEpochMs(0L)
-          }
-          val needsMonitor = config.enableChargingTrigger == true || config.enableTimeOfDayTrigger == true
-          if (needsMonitor) {
-            WallpaperRotationMonitorService.start(appContext)
-          } else {
-            WallpaperRotationMonitorService.stop(appContext)
-          }
+          reconcileRotationTriggers(config, intervalMinutes)
         }
         started
       }.getOrElse {
@@ -130,7 +116,8 @@ class PigeonApiImpl(
     ioExecutor.execute {
       val success = runCatching {
         WallpaperRotationScheduler.cancelPeriodic(appContext)
-        WallpaperRotationMonitorService.stop(appContext)
+        WallpaperRotationScheduler.cancelCharging(appContext)
+        WallpaperRotationScheduler.cancelTimeOfDay(appContext)
         rotationStore.stopRotation()
         rotationEngine.clearRotationCache()
         true
@@ -139,6 +126,40 @@ class PigeonApiImpl(
         false
       }
       postCallback(callback, Result.success(success))
+    }
+  }
+
+  /**
+   * Reconciles every background trigger with the configuration that was just saved. Each trigger
+   * is scheduled or cancelled independently so changing one setting never leaves a stale schedule
+   * for another.
+   */
+  private fun reconcileRotationTriggers(
+    config: WallpaperRotationConfigData,
+    intervalMinutes: Int,
+  ) {
+    if (config.enableIntervalTrigger == true) {
+      WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
+      rotationStore.setNextRunEpochMs(
+        System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
+      )
+    } else {
+      WallpaperRotationScheduler.cancelPeriodic(appContext)
+      rotationStore.setNextRunEpochMs(0L)
+    }
+
+    if (config.enableChargingTrigger == true) {
+      WallpaperRotationScheduler.scheduleCharging(appContext, intervalMinutes)
+    } else {
+      WallpaperRotationScheduler.cancelCharging(appContext)
+    }
+
+    val startHour = config.activeHoursStart?.toInt()
+      ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_START
+    if (config.enableTimeOfDayTrigger == true) {
+      WallpaperRotationScheduler.scheduleTimeOfDay(appContext, startHour)
+    } else {
+      WallpaperRotationScheduler.cancelTimeOfDay(appContext)
     }
   }
 

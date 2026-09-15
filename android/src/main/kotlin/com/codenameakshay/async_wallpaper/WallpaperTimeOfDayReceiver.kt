@@ -16,13 +16,19 @@ internal class WallpaperTimeOfDayReceiver : BroadcastReceiver() {
       return
     }
 
-    val now = Calendar.getInstance()
-    val currentHour = now.get(Calendar.HOUR_OF_DAY)
     val startHour = store.getActiveHoursStart()
     val endHour = store.getActiveHoursEnd()
 
-    if (currentHour < startHour || currentHour >= endHour) {
-      Log.d(TAG, "Skip time-of-day rotation: outside active hours ($currentHour not in $startHour-$endHour)")
+    // The alarm is one-shot, so re-arm it before doing any work. That keeps the next window queued
+    // even when this delivery is skipped or the rotation itself fails.
+    WallpaperRotationScheduler.scheduleTimeOfDay(context, startHour)
+
+    val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    if (!WallpaperRotationScheduleMath.isWithinActiveHours(currentHour, startHour, endHour)) {
+      Log.d(
+        TAG,
+        "Skip time-of-day rotation: outside active hours ($currentHour not in $startHour-$endHour)",
+      )
       return
     }
 

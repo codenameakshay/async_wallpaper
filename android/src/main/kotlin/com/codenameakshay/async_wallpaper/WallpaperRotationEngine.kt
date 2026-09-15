@@ -75,7 +75,6 @@ internal class WallpaperRotationEngine(
           if (config.orderType == WallpaperRotationStore.ORDER_TYPE_SHUFFLE && nextPosition == 0) {
             store.setShuffleOrder(generateShuffleOrder(sourceCount))
           }
-          store.setLastAppliedEpochMs(System.currentTimeMillis())
           store.setLastError(null)
           return@withLock true
         }

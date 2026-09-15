@@ -18,8 +18,11 @@ internal class WallpaperBootReceiver : BroadcastReceiver() {
         System.currentTimeMillis() + config.intervalMinutes.toLong() * 60_000L
       store.setNextRunEpochMs(nextRunEpochMs)
     }
-    if (config.enableChargingTrigger || config.enableTimeOfDayTrigger) {
-      WallpaperRotationMonitorService.start(context)
+    if (config.enableChargingTrigger) {
+      WallpaperRotationScheduler.scheduleCharging(context, config.intervalMinutes)
+    }
+    if (config.enableTimeOfDayTrigger) {
+      WallpaperRotationScheduler.scheduleTimeOfDay(context, config.activeHoursStart)
     }
   }
 }

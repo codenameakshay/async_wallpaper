@@ -16,9 +16,6 @@ void main() {
         'android.permission.INTERNET',
         'android.permission.SET_WALLPAPER',
         'android.permission.RECEIVE_BOOT_COMPLETED',
-        'android.permission.FOREGROUND_SERVICE',
-        'android.permission.POST_NOTIFICATIONS',
-        'android.permission.SCHEDULE_EXACT_ALARM',
       ]),
     );
 

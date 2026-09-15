@@ -142,12 +142,31 @@ The Android manifest contains only:
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.SET_WALLPAPER" />
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 <uses-feature
     android:name="android.software.live_wallpaper"
     android:required="false" />
 ```
 
-The optional live-wallpaper feature avoids Play/device filtering for apps that use only static wallpapers. There is no OpenGL hardware feature declaration and no broad storage/media permission.
+`RECEIVE_BOOT_COMPLETED` is declared because wallpaper rotation can resume its own schedules after a
+reboot. The optional live-wallpaper feature avoids Play/device filtering for apps that use only
+static wallpapers. There is no OpenGL hardware feature declaration, no foreground-service
+permission, no notification permission, no exact-alarm special access, and no broad storage/media
+permission.
+
+### Rotation triggers use platform scheduling, not a foreground service
+
+Rotation never starts a foreground service. Interval and charging triggers use `WorkManager`, and
+the time-of-day trigger uses one inexact alarm that is re-armed after each delivery. Consequences
+for consumers:
+
+- Charging rotation now runs at most once per configured interval while the device is charging,
+  instead of exactly once on the plug-in event.
+- The time-of-day trigger fires near `activeHoursStart` rather than at an exact minute, so no
+  exact-alarm permission is needed. `activeHoursStart == activeHoursEnd` means a full-day window,
+  and a window may wrap past midnight (for example `22` to `6`).
+- `WorkManager` and the alarm both survive process death; the interval and charging schedules are
+  re-registered on boot from the persisted rotation configuration.
 
 The plugin's exported wallpaper services use overrideable resource values. Put matching names in the consuming app's `android/app/src/main/res/values/` resources to brand Android's system preview:
 

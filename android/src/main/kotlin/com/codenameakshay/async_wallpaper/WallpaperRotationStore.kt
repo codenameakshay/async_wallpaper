@@ -85,12 +85,6 @@ internal class WallpaperRotationStore(context: Context) {
     prefs.edit { putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString()) }
   }
 
-  fun setLastAppliedEpochMs(epochMs: Long) {
-    prefs.edit { putLong(KEY_LAST_APPLIED_EPOCH_MS, epochMs) }
-  }
-
-  fun getLastAppliedEpochMs(): Long = prefs.getLong(KEY_LAST_APPLIED_EPOCH_MS, 0L)
-
   fun setNextRunEpochMs(epochMs: Long) {
     prefs.edit { putLong(KEY_NEXT_RUN_EPOCH_MS, epochMs) }
   }
@@ -113,8 +107,6 @@ internal class WallpaperRotationStore(context: Context) {
       effectiveIntervalMinutes = config?.intervalMinutes?.toLong() ?: 0L,
     )
   }
-
-  fun isChargingTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_CHARGING_TRIGGER, false)
 
   fun isTimeOfDayTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, false)
 
@@ -159,7 +151,6 @@ internal class WallpaperRotationStore(context: Context) {
     private const val KEY_ORDER_TYPE = "order_type"
     private const val KEY_CURRENT_INDEX = "current_index"
     private const val KEY_SHUFFLE_ORDER = "shuffle_order"
-    private const val KEY_LAST_APPLIED_EPOCH_MS = "last_applied_epoch_ms"
     private const val KEY_NEXT_RUN_EPOCH_MS = "next_run_epoch_ms"
     private const val KEY_LAST_ERROR = "last_error"
   }

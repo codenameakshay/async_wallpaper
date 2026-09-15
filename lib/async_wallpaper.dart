@@ -21,6 +21,8 @@ class AsyncWallpaper {
   static const int _maxOpenGlTextures = 4;
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
+  static const int _minRotationIntervalMinutes = 15;
+
   static final WallpaperApi _api = WallpaperApi();
   static final WallpaperClient _defaultClient = PigeonWallpaperClient(
     api: _api,
@@ -382,11 +384,12 @@ class AsyncWallpaper {
         ),
       );
     }
-    if (request.intervalMinutes < 15) {
+    if (request.intervalMinutes < _minRotationIntervalMinutes) {
       return const WallpaperResult.failure(
         WallpaperError(
           code: WallpaperErrorCode.invalidInput,
-          message: 'Rotation interval must be at least 15 minutes.',
+          message:
+              'Rotation interval must be at least $_minRotationIntervalMinutes minutes.',
         ),
       );
     }
@@ -699,10 +702,7 @@ class AsyncWallpaper {
     if (errorCode == 'unknown') {
       return WallpaperErrorCode.unknown;
     }
-    if (errorCode == 'invalid-input' ||
-        errorCode == 'invalid-source' ||
-        errorCode == 'invalid-request' ||
-        errorCode?.startsWith('invalid-') == true) {
+    if (errorCode?.startsWith('invalid-') == true) {
       return WallpaperErrorCode.invalidInput;
     }
     return WallpaperErrorCode.platformFailure;

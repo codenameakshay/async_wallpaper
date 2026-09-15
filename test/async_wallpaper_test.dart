@@ -287,6 +287,112 @@ void main() {
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
+
+    test('rejects rotation active hours outside 0 through 23', () async {
+      for (final hours in <(int, int)>[(24, 6), (-1, 6), (6, 24), (6, -1)]) {
+        final result = await AsyncWallpaper.startWallpaperRotation(
+          WallpaperRotationRequest(
+            sources: const <WallpaperRotationSource>[
+              WallpaperRotationSource(
+                sourceType: WallpaperSourceType.url,
+                source: 'https://example.com/a.jpg',
+              ),
+            ],
+            target: WallpaperTarget.home,
+            intervalMinutes: 60,
+            activeHoursStart: hours.$1,
+            activeHoursEnd: hours.$2,
+          ),
+        );
+
+        expect(result.error?.code, WallpaperErrorCode.invalidInput);
+        expect(result.error?.message, contains('0 and 23'));
+      }
+    });
+
+    test('rejects rotation playlists over 100 sources', () async {
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        WallpaperRotationRequest(
+          sources: List<WallpaperRotationSource>.filled(
+            101,
+            const WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
+            ),
+          ),
+          target: WallpaperTarget.home,
+          intervalMinutes: 60,
+        ),
+      );
+
+      expect(result.error?.code, WallpaperErrorCode.invalidInput);
+      expect(result.error?.message, contains('100'));
+    });
+
+    test('accepts overnight rotation active hours', () async {
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[
+            WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
+            ),
+          ],
+          target: WallpaperTarget.home,
+          intervalMinutes: 60,
+          activeHoursStart: 22,
+          activeHoursEnd: 6,
+        ),
+      );
+
+      expect(result.error?.code, isNot(WallpaperErrorCode.invalidInput));
+    });
+  });
+
+  group('video validation', () {
+    test('accepts video bytes at the documented 256 MiB limit', () async {
+      final client = _RecordingWallpaperClient();
+      AsyncWallpaper.debugSetClient(client);
+      final result = await AsyncWallpaper.setVideoWallpaper(
+        VideoWallpaperRequest(
+          source: WallpaperSource.bytes(Uint8List(256 * 1024 * 1024)),
+        ),
+      );
+
+      expect(result.status, WallpaperOperationStatus.awaitingUserConfirmation);
+      expect(client.prepareCalls, 1);
+    });
+
+    test(
+      'rejects unsupported video scale modes before platform calls',
+      () async {
+        final client = _RecordingWallpaperClient();
+        AsyncWallpaper.debugSetClient(client);
+
+        for (final scaleMode in <WallpaperScaleMode>[
+          WallpaperScaleMode.center,
+          WallpaperScaleMode.fill,
+          WallpaperScaleMode.stretch,
+        ]) {
+          final request = VideoWallpaperRequest(
+            source: const WallpaperSource.contentUri('content://media/video/7'),
+            scaleMode: scaleMode,
+          );
+          final prepared = await AsyncWallpaper.setVideoWallpaper(request);
+          final preview = await AsyncWallpaper.openLiveWallpaperPreview(
+            request,
+          );
+
+          for (final result in <WallpaperOperationResult>[prepared, preview]) {
+            expect(result.status, WallpaperOperationStatus.failed);
+            expect(result.errorCode, 'invalid-input');
+          }
+        }
+
+        expect(client.prepareCalls, 0);
+        expect(client.previewCalls, 0);
+      },
+    );
   });
 
   test(

@@ -730,7 +730,6 @@ class PigeonApiImpl(
   companion object {
     private const val TAG = "AsyncWallpaper"
     private const val MAX_VIDEO_SOURCE_BYTES = 256L * 1024L * 1024L
-    private const val MIN_ROTATION_INTERVAL_MINUTES = 15
     private const val MAIN_THREAD_WAIT_MILLIS = 10_000L
 
     private const val ERROR_INVALID_REQUEST = "invalid-request"

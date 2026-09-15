@@ -8,7 +8,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
-import android.os.Build
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -60,7 +59,7 @@ class StaticWallpaperEngine(
         message = "The system cropper can only be used with the systemCropper strategy.",
       )
     }
-    val liveActivity = activity.takeIf(::isUsableActivity)
+    val liveActivity = activity.takeIf { it.isUsable() }
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val uri = validated.source.contentUri
       ?.takeIf { validated.source.kind == WallpaperSourceKindData.CONTENT_URI }
@@ -120,7 +119,7 @@ class StaticWallpaperEngine(
         message = "The system picker can only be used with the systemPicker strategy.",
       )
     }
-    val liveActivity = activity.takeIf(::isUsableActivity)
+    val liveActivity = activity.takeIf { it.isUsable() }
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val intent = Intent(Intent.ACTION_SET_WALLPAPER)
     return try {
@@ -343,21 +342,6 @@ class StaticWallpaperEngine(
       is IllegalArgumentException -> ERROR_INVALID_REQUEST
       else -> ERROR_WALLPAPER_APPLY_FAILED
     }
-  }
-
-  private fun WallpaperSourceData.hasValueForKind(): Boolean {
-    return when (kind) {
-      WallpaperSourceKindData.URL -> !url.isNullOrBlank()
-      WallpaperSourceKindData.FILE_PATH -> !filePath.isNullOrBlank()
-      WallpaperSourceKindData.CONTENT_URI -> !contentUri.isNullOrBlank()
-      WallpaperSourceKindData.BYTES -> bytes?.isNotEmpty() == true
-      null -> false
-    }
-  }
-
-  private fun isUsableActivity(activity: Activity?): Boolean {
-    return activity != null && !activity.isFinishing &&
-      (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !activity.isDestroyed)
   }
 
   private fun Bitmap?.recycleOwned(except: Bitmap? = null) {

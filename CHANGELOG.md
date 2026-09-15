@@ -9,6 +9,7 @@
 - `getWallpaperRotationStatus()` no longer throws when the platform call fails; it returns a not-running status with `lastError` set instead.
 - OpenGL live wallpaper: an unexpected I/O error while reading a texture source during configuration is now reported as `texture-source-unavailable` instead of `configuration-store-failed`, matching what the renderer reports for the same failure.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
+- Example (Android 12+): the example keeps one `FlutterEngine` for the process. A new wallpaper changes the dynamic colors, Android relaunches the Activity, and the default `FlutterActivity` destroyed its engine, so the example restarted and never showed the `applyWallpaper` result. The Android compatibility guide now explains this relaunch and how a host app can keep its result.
 
 ## 3.2.0
 

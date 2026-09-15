@@ -55,6 +55,25 @@ switch (result.status) {
 
 `WallpaperTargetResult.status` is one of `applied`, `failed`, `unsupported`, or `notAttempted`. A successful whole-operation status is never a reason to invent a missing target result; null means the platform did not report an individual result.
 
+### Activity relaunch after a wallpaper change
+
+On Android 12+ a new wallpaper can change the system's dynamic colors. Android then relaunches every visible Activity with an asset-path configuration change, which an app cannot opt out of in its manifest. A default `FlutterActivity` destroys its `FlutterEngine` with the old Activity, so the Dart state restarts and the `applyWallpaper` result never arrives, even though the wallpaper was applied.
+
+Keep one engine for the process so the result survives the relaunch. The example app does this:
+
+```kotlin
+class MainActivity : FlutterActivity() {
+  override fun provideFlutterEngine(context: Context): FlutterEngine =
+    engine ?: FlutterEngine(context.applicationContext).also { engine = it }
+
+  private companion object {
+    var engine: FlutterEngine? = null
+  }
+}
+```
+
+If your app cannot keep its engine, record the request before you call the plugin and read the wallpaper state again after a restart.
+
 ### Scaling
 
 All five `WallpaperScaleMode` values are implemented for static images:

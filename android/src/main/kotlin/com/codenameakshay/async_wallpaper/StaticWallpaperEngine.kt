@@ -372,8 +372,9 @@ class StaticWallpaperEngine(
 }
 
 /**
- * Centralized result construction keeps every Android endpoint honest about partial outcomes.
- * It is platform-independent so the contract is covered by regular JVM unit tests.
+ * Centralized result construction so partial and unsupported outcomes are reported per target
+ * instead of collapsed into one boolean. It is platform-independent so the contract is covered by
+ * regular JVM unit tests.
  */
 object OperationResultPolicy {
   const val ERROR_FOREGROUND_REQUIRED = "foreground-required"

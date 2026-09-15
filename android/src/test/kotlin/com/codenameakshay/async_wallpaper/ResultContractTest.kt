@@ -7,6 +7,19 @@ import org.junit.Test
 
 class ResultContractTest {
   @Test
+  fun `cropper reports an unreadable or non-image content URI as a source error`() {
+    assertEquals(
+      WallpaperSourceLoader.ERROR_SOURCE_UNAVAILABLE,
+      StaticWallpaperEngine.cropperSourceError(null)?.first,
+    )
+    assertEquals(
+      WallpaperSourceLoader.ERROR_INVALID_CONTENT_TYPE,
+      StaticWallpaperEngine.cropperSourceError("video/mp4")?.first,
+    )
+    assertEquals(null, StaticWallpaperEngine.cropperSourceError("image/jpeg"))
+  }
+
+  @Test
   fun `partial both fallback retains the successful target but never reports applied`() {
     val result = OperationResultPolicy.fromTargetResults(
       requestedTarget = WallpaperTargetData.BOTH,

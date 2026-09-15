@@ -6,6 +6,8 @@ import org.json.JSONArray
 
 internal data class StoredWallpaperRotationConfig(
   val localSources: List<String>,
+  /** Sources the caller asked for; [localSources] holds only the ones that could be cached. */
+  val requestedSourceCount: Int,
   val target: Int,
   val intervalMinutes: Int,
   val enableIntervalTrigger: Boolean,
@@ -24,6 +26,7 @@ internal class WallpaperRotationStore(context: Context) {
     prefs.edit {
       putBoolean(KEY_IS_RUNNING, true)
       putString(KEY_LOCAL_SOURCES, JSONArray(config.localSources).toString())
+      putInt(KEY_REQUESTED_SOURCE_COUNT, config.requestedSourceCount)
       putInt(KEY_TARGET, config.target)
       putInt(KEY_INTERVAL_MINUTES, config.intervalMinutes)
       putBoolean(KEY_ENABLE_INTERVAL_TRIGGER, config.enableIntervalTrigger)
@@ -49,6 +52,7 @@ internal class WallpaperRotationStore(context: Context) {
     }
     return StoredWallpaperRotationConfig(
       localSources = localSources,
+      requestedSourceCount = prefs.getInt(KEY_REQUESTED_SOURCE_COUNT, localSources.size),
       target = prefs.getInt(KEY_TARGET, 2),
       intervalMinutes = prefs.getInt(KEY_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES),
       enableIntervalTrigger = prefs.getBoolean(KEY_ENABLE_INTERVAL_TRIGGER, true),
@@ -114,7 +118,7 @@ internal class WallpaperRotationStore(context: Context) {
       nextRunEpochMs = getNextRunEpochMs(),
       currentIndex = getCurrentIndex().toLong(),
       cachedCount = config?.localSources?.size?.toLong() ?: 0L,
-      totalCount = config?.localSources?.size?.toLong() ?: 0L,
+      totalCount = config?.requestedSourceCount?.toLong() ?: 0L,
       lastError = prefs.getString(KEY_LAST_ERROR, null),
       effectiveIntervalMinutes = config?.intervalMinutes?.toLong() ?: 0L,
     )
@@ -153,6 +157,7 @@ internal class WallpaperRotationStore(context: Context) {
     private const val PREFS_NAME = "async_wallpaper_rotation"
     private const val KEY_IS_RUNNING = "is_running"
     private const val KEY_LOCAL_SOURCES = "local_sources"
+    private const val KEY_REQUESTED_SOURCE_COUNT = "requested_source_count"
     private const val KEY_TARGET = "target"
     private const val KEY_INTERVAL_MINUTES = "interval_minutes"
     private const val KEY_ENABLE_INTERVAL_TRIGGER = "enable_interval_trigger"

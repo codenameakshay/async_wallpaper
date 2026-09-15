@@ -24,6 +24,34 @@ internal enum class RotationStartResult {
   FAILED_AFTER_SAVE,
 }
 
+/**
+ * Fills a sibling staging directory and swaps it in only when [fill] produced at least one file, so
+ * a rejected playlist never deletes the cache a running rotation still reads. Returns the absolute
+ * paths inside [target], or an empty list when nothing was produced or the swap failed; in both
+ * cases [target] keeps its previous contents.
+ */
+internal fun replaceDirectoryContents(target: File, fill: (File) -> List<String>): List<String> {
+  val parent = target.absoluteFile.parentFile
+  val staging = File(parent, "${target.name}.staging").apply { deleteRecursively(); mkdirs() }
+  val names = fill(staging)
+  if (names.isEmpty()) {
+    staging.deleteRecursively()
+    return emptyList()
+  }
+  val previous = File(parent, "${target.name}.previous").apply { deleteRecursively() }
+  if (target.exists() && !target.renameTo(previous)) {
+    staging.deleteRecursively()
+    return emptyList()
+  }
+  if (!staging.renameTo(target)) {
+    previous.renameTo(target)
+    staging.deleteRecursively()
+    return emptyList()
+  }
+  previous.deleteRecursively()
+  return names.map { File(target, it).absolutePath }
+}
+
 internal class WallpaperRotationEngine(
   context: Context,
   private val store: WallpaperRotationStore,
@@ -45,7 +73,8 @@ internal class WallpaperRotationEngine(
       return@withLock RotationStartResult.REJECTED
     }
 
-    val preparedFiles = prepareLocalFiles(config.sources.orEmpty())
+    val sources = config.sources.orEmpty()
+    val preparedFiles = prepareLocalFiles(sources)
     if (preparedFiles.isEmpty()) {
       store.setLastError("No valid wallpapers available for rotation.")
       return@withLock RotationStartResult.REJECTED
@@ -53,6 +82,7 @@ internal class WallpaperRotationEngine(
 
     val storedConfig = StoredWallpaperRotationConfig(
       localSources = preparedFiles,
+      requestedSourceCount = sources.size,
       target = targetToStored(config.target),
       intervalMinutes = intervalMinutes,
       enableIntervalTrigger = config.enableIntervalTrigger == true,
@@ -148,13 +178,11 @@ internal class WallpaperRotationEngine(
     return list
   }
 
-  private fun prepareLocalFiles(sources: List<RotationSourceData?>): List<String> {
-    val cacheDir = getRotationCacheDirectory()
-    if (cacheDir.exists()) {
-      cacheDir.deleteRecursively()
-    }
-    cacheDir.mkdirs()
+  private fun prepareLocalFiles(sources: List<RotationSourceData?>): List<String> =
+    replaceDirectoryContents(getRotationCacheDirectory()) { stagingDir -> cacheSources(sources, stagingDir) }
 
+  /** Caches every loadable source into [cacheDir] and returns the cached file names. */
+  private fun cacheSources(sources: List<RotationSourceData?>, cacheDir: File): List<String> {
     val prepared = mutableListOf<String>()
     sources.forEachIndexed { index, sourceData ->
       val source = sourceData?.source?.trim().orEmpty()
@@ -174,7 +202,7 @@ internal class WallpaperRotationEngine(
         null -> false
       }
       if (success) {
-        prepared.add(targetFile.absolutePath)
+        prepared.add(targetFile.name)
       }
     }
     return prepared

@@ -8,6 +8,7 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
@@ -28,15 +29,10 @@ internal object WallpaperRotationScheduler {
   private const val TIME_OF_DAY_REQUEST_CODE = 42043
 
   fun schedulePeriodic(context: Context, intervalMinutes: Int) {
-    val workManager = WorkManager.getInstance(context)
-    val request = PeriodicWorkRequestBuilder<WallpaperRotationWorker>(
-      intervalMinutes.toLong(),
-      TimeUnit.MINUTES,
-    ).build()
-    workManager.enqueueUniquePeriodicWork(
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
       PERIODIC_WORK_NAME,
       ExistingPeriodicWorkPolicy.UPDATE,
-      request,
+      rotationRequest(intervalMinutes, requiresCharging = false),
     )
   }
 
@@ -49,17 +45,22 @@ internal object WallpaperRotationScheduler {
    * `ACTION_POWER_CONNECTED` receiver, which required a persistent foreground service.
    */
   fun scheduleCharging(context: Context, intervalMinutes: Int) {
-    val request = PeriodicWorkRequestBuilder<WallpaperRotationWorker>(
-      intervalMinutes.toLong(),
-      TimeUnit.MINUTES,
-    ).setConstraints(
-      Constraints.Builder().setRequiresCharging(true).build(),
-    ).build()
     WorkManager.getInstance(context).enqueueUniquePeriodicWork(
       CHARGING_WORK_NAME,
       ExistingPeriodicWorkPolicy.UPDATE,
-      request,
+      rotationRequest(intervalMinutes, requiresCharging = true),
     )
+  }
+
+  /**
+   * Starting a rotation already applies the first wallpaper, so the first scheduled run waits one
+   * interval. Without the delay WorkManager runs a new periodic request at once and skips ahead.
+   */
+  internal fun rotationRequest(intervalMinutes: Int, requiresCharging: Boolean): PeriodicWorkRequest {
+    return PeriodicWorkRequestBuilder<WallpaperRotationWorker>(intervalMinutes.toLong(), TimeUnit.MINUTES)
+      .setInitialDelay(intervalMinutes.toLong(), TimeUnit.MINUTES)
+      .setConstraints(Constraints.Builder().setRequiresCharging(requiresCharging).build())
+      .build()
   }
 
   fun cancelCharging(context: Context) {

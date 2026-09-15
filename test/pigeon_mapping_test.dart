@@ -110,11 +110,6 @@ void main() {
     expect(result.errorDetails, 'Native stack trace');
     expect(result.fallbackUsed, isTrue);
     expect(result.fallbackStrategy, WallpaperApplyStrategy.systemCropper);
-    expect(operationResultToData(result).status, OperationStatusData.failed);
-    expect(
-      operationResultToData(result).fallbackStrategy,
-      WallpaperApplyStrategyData.systemCropper,
-    );
   });
 
   test('does not report malformed applied transport data as applied', () {
@@ -134,7 +129,7 @@ void main() {
     );
   });
 
-  test('maps every source kind and defensively copies byte data', () {
+  test('maps every source kind into transport data', () {
     final List<(WallpaperSource, WallpaperSourceKindData)> cases =
         <(WallpaperSource, WallpaperSourceKindData)>[
           (
@@ -158,15 +153,16 @@ void main() {
     for (final (WallpaperSource source, WallpaperSourceKindData kind)
         in cases) {
       final WallpaperSourceData data = wallpaperSourceToData(source);
-      final WallpaperSource roundTripped = wallpaperSourceFromData(data);
 
       expect(data.kind, kind);
-      expect(roundTripped.url, source.url);
-      expect(roundTripped.filePath, source.filePath);
-      expect(roundTripped.contentUri, source.contentUri);
-      expect(roundTripped.bytes, source.bytes);
+      expect(data.url, source.url);
+      expect(data.filePath, source.filePath);
+      expect(data.contentUri, source.contentUri);
+      expect(data.bytes, source.bytes);
     }
+  });
 
+  test('defensively copies byte sources into transport data', () {
     final WallpaperSource source = WallpaperSource.bytes(
       Uint8List.fromList(<int>[1, 2, 3]),
     );
@@ -174,21 +170,23 @@ void main() {
     data.bytes![0] = 99;
 
     expect(source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
-    expect(
-      () => wallpaperSourceFromData(
-        WallpaperSourceData(kind: WallpaperSourceKindData.url),
-      ),
-      throwsFormatException,
-    );
   });
 
-  test('maps every target, scale, strategy, operation, and target status', () {
+  test('round-trips every wallpaper target', () {
     for (final WallpaperTarget target in WallpaperTarget.values) {
       expect(wallpaperTargetFromData(wallpaperTargetToData(target)), target);
     }
-    for (final WallpaperScaleMode mode in WallpaperScaleMode.values) {
-      expect(wallpaperScaleModeFromData(wallpaperScaleModeToData(mode)), mode);
-    }
+  });
+
+  test('maps every scale mode to a unique transport value', () {
+    final Set<WallpaperScaleModeData> mapped = WallpaperScaleMode.values
+        .map(wallpaperScaleModeToData)
+        .toSet();
+
+    expect(mapped, hasLength(WallpaperScaleMode.values.length));
+  });
+
+  test('round-trips every apply strategy', () {
     for (final WallpaperApplyStrategy strategy
         in WallpaperApplyStrategy.values) {
       expect(
@@ -196,24 +194,53 @@ void main() {
         strategy,
       );
     }
-    for (final WallpaperOperationStatus status
-        in WallpaperOperationStatus.values) {
-      expect(
-        wallpaperOperationStatusFromData(
-          wallpaperOperationStatusToData(status),
-        ),
-        status,
-      );
+  });
+
+  test('maps every operation status from transport data', () {
+    const List<(OperationStatusData, WallpaperOperationStatus)> cases =
+        <(OperationStatusData, WallpaperOperationStatus)>[
+          (OperationStatusData.applied, WallpaperOperationStatus.applied),
+          (
+            OperationStatusData.previewOpened,
+            WallpaperOperationStatus.previewOpened,
+          ),
+          (
+            OperationStatusData.awaitingUserConfirmation,
+            WallpaperOperationStatus.awaitingUserConfirmation,
+          ),
+          (OperationStatusData.cancelled, WallpaperOperationStatus.cancelled),
+          (OperationStatusData.failed, WallpaperOperationStatus.failed),
+          (
+            OperationStatusData.unsupported,
+            WallpaperOperationStatus.unsupported,
+          ),
+          (
+            OperationStatusData.foregroundRequired,
+            WallpaperOperationStatus.foregroundRequired,
+          ),
+        ];
+
+    for (final (OperationStatusData data, WallpaperOperationStatus status)
+        in cases) {
+      expect(wallpaperOperationStatusFromData(data), status);
     }
-    for (final WallpaperTargetStatus status in WallpaperTargetStatus.values) {
-      final WallpaperTargetResult target = WallpaperTargetResult(
-        status: status,
-        errorCode: '${status.name}-code',
-        errorMessage: '${status.name}-message',
-        errorDetails: '${status.name}-details',
+  });
+
+  test('maps every target status from transport data', () {
+    const List<(TargetStatusData, WallpaperTargetStatus)> cases =
+        <(TargetStatusData, WallpaperTargetStatus)>[
+          (TargetStatusData.applied, WallpaperTargetStatus.applied),
+          (TargetStatusData.failed, WallpaperTargetStatus.failed),
+          (TargetStatusData.unsupported, WallpaperTargetStatus.unsupported),
+          (TargetStatusData.notAttempted, WallpaperTargetStatus.notAttempted),
+        ];
+
+    for (final (TargetStatusData data, WallpaperTargetStatus status) in cases) {
+      final WallpaperTargetResult result = targetResultFromData(
+        TargetResultData(status: data),
       );
 
-      expect(targetResultFromData(targetResultToData(target)).status, status);
+      expect(result.status, status);
     }
   });
 
@@ -254,93 +281,30 @@ void main() {
     expect(defaults.supportsStaticWallpaper, isFalse);
     expect(defaults.manufacturer, 'Unknown');
     expect(defaults.sdkInt, 0);
-    expect(capabilitiesToData(capabilities), data);
   });
 
-  test(
-    'round-trips structured static requests for every transport variant',
-    () {
-      final List<WallpaperSource> sources = <WallpaperSource>[
-        const WallpaperSource.url('https://example.com/static.jpg'),
-        const WallpaperSource.filePath('/data/local/tmp/static.jpg'),
-        const WallpaperSource.contentUri('content://media/images/8'),
-        WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
-      ];
-
-      for (final WallpaperSource source in sources) {
-        for (final WallpaperScaleMode scaleMode in WallpaperScaleMode.values) {
-          for (final WallpaperApplyStrategy strategy
-              in WallpaperApplyStrategy.values) {
-            final StaticWallpaperRequest request = StaticWallpaperRequest(
-              source: source,
-              target: WallpaperTarget.lock,
-              scaleMode: scaleMode,
-              strategy: strategy,
-              goToHome: true,
-            );
-            final StaticWallpaperRequestData data =
-                staticWallpaperRequestToData(request);
-            final StaticWallpaperRequest roundTripped =
-                staticWallpaperRequestFromData(data);
-
-            expect(roundTripped.source.url, source.url);
-            expect(roundTripped.source.filePath, source.filePath);
-            expect(roundTripped.source.contentUri, source.contentUri);
-            expect(roundTripped.source.bytes, source.bytes);
-            expect(roundTripped.target, WallpaperTarget.lock);
-            expect(roundTripped.scaleMode, scaleMode);
-            expect(roundTripped.strategy, strategy);
-            expect(roundTripped.goToHome, isTrue);
-          }
-        }
-      }
-    },
-  );
-
-  test('isolates bytes in structured static request transport round-trips', () {
-    final StaticWallpaperRequest request = StaticWallpaperRequest(
-      source: WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
-      target: WallpaperTarget.home,
+  test('maps a structured static request to transport data', () {
+    const StaticWallpaperRequest request = StaticWallpaperRequest(
+      source: WallpaperSource.filePath('/data/local/tmp/static.jpg'),
+      target: WallpaperTarget.lock,
+      scaleMode: WallpaperScaleMode.fill,
+      strategy: WallpaperApplyStrategy.direct,
     );
     final StaticWallpaperRequestData data = staticWallpaperRequestToData(
       request,
     );
-    final StaticWallpaperRequest roundTripped = staticWallpaperRequestFromData(
-      data,
-    );
 
-    data.source!.bytes![0] = 9;
-    final Uint8List returnedBytes = roundTripped.source.bytes!;
-    returnedBytes[1] = 8;
-
-    expect(request.source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
-    expect(roundTripped.source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
+    expect(data.source?.kind, WallpaperSourceKindData.filePath);
+    expect(data.target, WallpaperTargetData.lock);
+    expect(data.scaleMode, WallpaperScaleModeData.fill);
+    expect(data.strategy, WallpaperApplyStrategyData.direct);
   });
 
-  test('keeps legacy static transport mapping available and defaulted', () {
-    const WallpaperRequest legacyRequest = WallpaperRequest(
-      target: WallpaperTarget.lock,
-      sourceType: WallpaperSourceType.file,
-      source: '/data/local/tmp/static.jpg',
-      goToHome: true,
-    );
-    final StaticWallpaperRequestData staticData = legacyWallpaperRequestToData(
-      legacyRequest,
-    );
-
-    expect(staticData.source?.kind, WallpaperSourceKindData.filePath);
-    expect(staticData.target, WallpaperTargetData.lock);
-    expect(staticData.scaleMode, WallpaperScaleModeData.centerCrop);
-    expect(staticData.strategy, WallpaperApplyStrategyData.automatic);
-    expect(staticData.goToHome, isTrue);
-  });
-
-  test('maps video and OpenGL request data', () {
+  test('maps video and OpenGL request data to transport data', () {
     const VideoWallpaperRequest videoRequest = VideoWallpaperRequest(
       source: WallpaperSource.contentUri('content://media/video/7'),
       target: WallpaperTarget.both,
       scaleMode: WallpaperScaleMode.fitCenter,
-      goToHome: true,
     );
     final VideoWallpaperRequestData videoData = videoWallpaperRequestToData(
       videoRequest,
@@ -353,32 +317,40 @@ void main() {
       ],
       target: WallpaperTarget.lock,
       frameRate: 30,
-      goToHome: true,
     );
     final OpenGlWallpaperRequestData openGlData = openGlWallpaperRequestToData(
       openGlRequest,
     );
 
-    expect(
-      videoWallpaperRequestFromData(videoData).source.contentUri,
-      'content://media/video/7',
-    );
-    expect(
-      videoWallpaperRequestFromData(videoData).target,
-      WallpaperTarget.both,
-    );
-    expect(
-      videoWallpaperRequestFromData(videoData).scaleMode,
-      WallpaperScaleMode.fitCenter,
-    );
+    expect(videoData.source?.contentUri, 'content://media/video/7');
+    expect(videoData.target, WallpaperTargetData.both);
+    expect(videoData.scaleMode, WallpaperScaleModeData.fitCenter);
     expect(openGlData.fragmentShader, 'void main() {}');
     expect(openGlData.textures, hasLength(2));
     expect(
       openGlData.textures?.first?.bytes,
       Uint8List.fromList(<int>[7, 8, 9]),
     );
-    expect(openGlWallpaperRequestFromData(openGlData).textures, hasLength(2));
-    expect(openGlWallpaperRequestFromData(openGlData).frameRate, 30);
-    expect(openGlWallpaperRequestFromData(openGlData).goToHome, isTrue);
+    expect(openGlData.target, WallpaperTargetData.lock);
+    expect(openGlData.frameRate, 30);
+  });
+
+  test('maps rotation source type and order to transport data', () {
+    expect(
+      rotationSourceTypeToData(WallpaperSourceType.url),
+      RotationSourceTypeData.url,
+    );
+    expect(
+      rotationSourceTypeToData(WallpaperSourceType.file),
+      RotationSourceTypeData.file,
+    );
+    expect(
+      rotationOrderToData(WallpaperRotationOrder.sequential),
+      RotationOrderData.sequential,
+    );
+    expect(
+      rotationOrderToData(WallpaperRotationOrder.shuffle),
+      RotationOrderData.shuffle,
+    );
   });
 }

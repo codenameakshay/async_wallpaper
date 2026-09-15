@@ -233,25 +233,12 @@ class AsyncWallpaper {
       );
     }
 
-    try {
-      final bool success = await _api.setMaterialYouWallpaper(request.url);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to set Material You wallpaper.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while setting Material You wallpaper.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: () => _api.setMaterialYouWallpaper(request.url),
+      failureMessage: 'Failed to set Material You wallpaper.',
+      exceptionMessage:
+          'Unexpected exception while setting Material You wallpaper.',
+    );
   }
 
   /// Opens the video live-wallpaper UI for a legacy file-path request.
@@ -301,25 +288,11 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    try {
-      final bool success = await _api.openWallpaperChooser();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to open wallpaper chooser.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while opening wallpaper chooser.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: _api.openWallpaperChooser,
+      failureMessage: 'Failed to open wallpaper chooser.',
+      exceptionMessage: 'Unexpected exception while opening wallpaper chooser.',
+    );
   }
 
   /// Downloads a wallpaper to the device's supported media library.
@@ -336,25 +309,11 @@ class AsyncWallpaper {
       return _legacyInvalidInput('Wallpaper URL must be a valid HTTPS URL.');
     }
 
-    try {
-      final bool success = await _api.downloadWallpaper(request.url);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to download wallpaper.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while downloading wallpaper.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: () => _api.downloadWallpaper(request.url),
+      failureMessage: 'Failed to download wallpaper.',
+      exceptionMessage: 'Unexpected exception while downloading wallpaper.',
+    );
   }
 
   /// Starts wallpaper rotation with the provided playlist and trigger settings.
@@ -398,72 +357,46 @@ class AsyncWallpaper {
       );
     }
 
-    try {
-      final WallpaperRotationConfigData config = WallpaperRotationConfigData(
-        sources: request.sources
-            .map(
-              (WallpaperRotationSource source) => RotationSourceData(
-                source: source.source,
-                sourceType: rotationSourceTypeToData(source.sourceType),
-              ),
-            )
-            .toList(),
-        target: wallpaperTargetToData(request.target),
-        intervalMinutes: request.intervalMinutes,
-        enableIntervalTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.interval,
-        ),
-        enableChargingTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.charging,
-        ),
-        enableTimeOfDayTrigger: request.triggers.contains(
-          WallpaperRotationTrigger.timeOfDay,
-        ),
-        activeHoursStart: request.activeHoursStart,
-        activeHoursEnd: request.activeHoursEnd,
-        orderType: rotationOrderToData(request.order),
-      );
-      final bool success = await _api.startWallpaperRotation(config);
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to start wallpaper rotation.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while starting wallpaper rotation.',
-          details: error,
-        ),
-      );
-    }
+    final WallpaperRotationConfigData config = WallpaperRotationConfigData(
+      sources: request.sources
+          .map(
+            (WallpaperRotationSource source) => RotationSourceData(
+              source: source.source,
+              sourceType: rotationSourceTypeToData(source.sourceType),
+            ),
+          )
+          .toList(),
+      target: wallpaperTargetToData(request.target),
+      intervalMinutes: request.intervalMinutes,
+      enableIntervalTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.interval,
+      ),
+      enableChargingTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.charging,
+      ),
+      enableTimeOfDayTrigger: request.triggers.contains(
+        WallpaperRotationTrigger.timeOfDay,
+      ),
+      activeHoursStart: request.activeHoursStart,
+      activeHoursEnd: request.activeHoursEnd,
+      orderType: rotationOrderToData(request.order),
+    );
+    return _runLegacyBooleanOperation(
+      call: () => _api.startWallpaperRotation(config),
+      failureMessage: 'Failed to start wallpaper rotation.',
+      exceptionMessage:
+          'Unexpected exception while starting wallpaper rotation.',
+    );
   }
 
   /// Stops wallpaper rotation and cancels configured background triggers.
   static Future<WallpaperResult> stopWallpaperRotation() async {
-    try {
-      final bool success = await _api.stopWallpaperRotation();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to stop wallpaper rotation.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while stopping wallpaper rotation.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: _api.stopWallpaperRotation,
+      failureMessage: 'Failed to stop wallpaper rotation.',
+      exceptionMessage:
+          'Unexpected exception while stopping wallpaper rotation.',
+    );
   }
 
   /// Returns the current wallpaper rotation status.
@@ -483,25 +416,11 @@ class AsyncWallpaper {
 
   /// Immediately rotates to the next wallpaper in the current playlist.
   static Future<WallpaperResult> rotateWallpaperNow() async {
-    try {
-      final bool success = await _api.rotateWallpaperNow();
-      return success
-          ? const WallpaperResult.success()
-          : const WallpaperResult.failure(
-              WallpaperError(
-                code: WallpaperErrorCode.platformFailure,
-                message: 'Failed to rotate wallpaper now.',
-              ),
-            );
-    } catch (error) {
-      return WallpaperResult.failure(
-        WallpaperError(
-          code: WallpaperErrorCode.unknown,
-          message: 'Unexpected exception while rotating wallpaper now.',
-          details: error,
-        ),
-      );
-    }
+    return _runLegacyBooleanOperation(
+      call: _api.rotateWallpaperNow,
+      failureMessage: 'Failed to rotate wallpaper now.',
+      exceptionMessage: 'Unexpected exception while rotating wallpaper now.',
+    );
   }
 
   static Future<WallpaperOperationResult> _runOperation({
@@ -518,6 +437,33 @@ class AsyncWallpaper {
         errorCode: 'unknown',
         errorMessage: 'Unexpected exception while $operation.',
         errorDetails: error.toString(),
+      );
+    }
+  }
+
+  /// Runs a legacy boolean host call, mapping its outcome to [WallpaperResult].
+  static Future<WallpaperResult> _runLegacyBooleanOperation({
+    required Future<bool> Function() call,
+    required String failureMessage,
+    required String exceptionMessage,
+  }) async {
+    try {
+      final bool success = await call();
+      return success
+          ? const WallpaperResult.success()
+          : WallpaperResult.failure(
+              WallpaperError(
+                code: WallpaperErrorCode.platformFailure,
+                message: failureMessage,
+              ),
+            );
+    } catch (error) {
+      return WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.unknown,
+          message: exceptionMessage,
+          details: error,
+        ),
       );
     }
   }

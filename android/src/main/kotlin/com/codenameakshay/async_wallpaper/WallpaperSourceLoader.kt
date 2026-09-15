@@ -12,7 +12,6 @@ import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
@@ -492,20 +491,6 @@ class WallpaperSourceLoader(
           code = ERROR_IMAGE_TOO_LARGE,
           message = "The encoded image exceeds the configured size limit.",
         )
-      }
-    }
-  }
-
-  /** Closes both the response stream and its HTTP connection. */
-  private class DisconnectingInputStream(
-    input: InputStream,
-    private val connection: HttpURLConnection,
-  ) : FilterInputStream(input) {
-    override fun close() {
-      try {
-        super.close()
-      } finally {
-        connection.disconnect()
       }
     }
   }

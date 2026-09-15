@@ -8,7 +8,6 @@ import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 
@@ -194,19 +193,6 @@ class BoundedSourceOpener(
       bytesRead += count
       if (bytesRead > limit) {
         throw BoundedSourceException(ERROR_SOURCE_TOO_LARGE, "The source exceeds the configured byte limit.")
-      }
-    }
-  }
-
-  private class DisconnectingInputStream(
-    input: InputStream,
-    private val connection: HttpURLConnection,
-  ) : FilterInputStream(input) {
-    override fun close() {
-      try {
-        super.close()
-      } finally {
-        connection.disconnect()
       }
     }
   }

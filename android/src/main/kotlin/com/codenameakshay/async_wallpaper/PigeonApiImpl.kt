@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.net.toUri
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
@@ -497,7 +498,7 @@ class PigeonApiImpl(
       WallpaperSourceKindData.CONTENT_URI -> {
         val uri = source.contentUri?.trim()?.takeIf { it.isNotEmpty() }
           ?: throw BoundedSourceException(BoundedSourceOpener.ERROR_INVALID_SOURCE, "A texture content URI is required.")
-        val parsed = Uri.parse(uri)
+        val parsed = uri.toUri()
         if (!parsed.scheme.equals("content", ignoreCase = true) || parsed.authority.isNullOrBlank()) {
           throw BoundedSourceException(
             BoundedSourceOpener.ERROR_INVALID_SOURCE,

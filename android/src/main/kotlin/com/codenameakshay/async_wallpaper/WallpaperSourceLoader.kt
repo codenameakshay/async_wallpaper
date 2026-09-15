@@ -57,15 +57,6 @@ class WallpaperSourceLoader(
     }
   }
 
-  /** A decoded bitmap with the raw source dimensions retained for diagnostics. */
-  data class LoadedBitmap(
-    val bitmap: Bitmap,
-    val sourceWidth: Int,
-    val sourceHeight: Int,
-    val sampleSize: Int,
-    val exifOrientation: Int,
-  )
-
   private val appContext = context.applicationContext
 
   /**
@@ -73,7 +64,7 @@ class WallpaperSourceLoader(
    * The caller owns the returned bitmap and must recycle it when it is no longer needed.
    */
   @Throws(WallpaperSourceException::class)
-  fun load(source: WallpaperSourceData): LoadedBitmap {
+  fun load(source: WallpaperSourceData): Bitmap {
     val inputSource = inputSourceFor(source)
     val bounds = decodeBounds(inputSource)
     val sampleSize = calculateInSampleSize(
@@ -95,13 +86,7 @@ class WallpaperSourceLoader(
       )
     }
 
-    return LoadedBitmap(
-      bitmap = normalized,
-      sourceWidth = bounds.width,
-      sourceHeight = bounds.height,
-      sampleSize = sampleSize,
-      exifOrientation = exifOrientation,
-    )
+    return normalized
   }
 
   private fun inputSourceFor(source: WallpaperSourceData): InputSource {

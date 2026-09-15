@@ -188,7 +188,7 @@ class StaticWallpaperEngine(
     var sourceBitmap: Bitmap? = null
     var transformedBitmap: Bitmap? = null
     return try {
-      sourceBitmap = sourceLoader.load(request.source).bitmap
+      sourceBitmap = sourceLoader.load(request.source)
       val dimensions = boundedWallpaperDimensions(wallpaperManagerProvider())
       transformedBitmap = BitmapTransformer.transform(
         bitmap = sourceBitmap,

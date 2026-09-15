@@ -3,7 +3,6 @@ package com.codenameakshay.async_wallpaper
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
@@ -12,11 +11,7 @@ import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.view.Surface
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
-import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -476,62 +471,16 @@ class GlRenderer(
 
   @Throws(IOException::class, TextureLoadException::class)
   private fun readTextureBytes(source: GlTextureSource): ByteArray {
-    return when (source) {
-      is GlTextureSource.Bytes -> {
-        val bytes = source.copyBytes()
-        if (bytes.size.toLong() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-          throw TextureLoadException(
-            ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_TOO_LARGE.wireCode,
-            "Texture source exceeds the configured byte limit.",
-          )
-        }
-        bytes
-      }
-      is GlTextureSource.FilePath -> {
-        val file = File(source.path)
-        if (!file.isFile || !file.canRead()) {
-          throw TextureLoadException(ERROR_TEXTURE_SOURCE_UNAVAILABLE, "Texture file is unavailable.")
-        }
-        if (file.length() > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-          throw TextureLoadException(
-            ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_TOO_LARGE.wireCode,
-            "Texture file exceeds the configured byte limit.",
-          )
-        }
-        FileInputStream(file).use(::readBounded)
-      }
-      is GlTextureSource.ContentUri -> {
-        val uri = Uri.parse(source.uri)
-        if (!uri.scheme.equals("content", ignoreCase = true) || uri.authority.isNullOrBlank()) {
-          throw TextureLoadException(ERROR_TEXTURE_SOURCE_UNAVAILABLE, "Texture URI must be a readable content URI.")
-        }
-        val input = appContext.contentResolver.openInputStream(uri)
-          ?: throw TextureLoadException(ERROR_TEXTURE_SOURCE_UNAVAILABLE, "Texture content URI could not be opened.")
-        input.use(::readBounded)
-      }
+    return try {
+      source.readBoundedBytes(appContext)
+    } catch (error: TextureSourceTooLargeException) {
+      throw TextureLoadException(
+        ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_TOO_LARGE.wireCode,
+        error.message ?: "Texture source exceeds the configured byte limit.",
+      )
+    } catch (error: IOException) {
+      throw TextureLoadException(ERROR_TEXTURE_SOURCE_UNAVAILABLE, error.message ?: "Unable to open a wallpaper texture.")
     }
-  }
-
-  @Throws(IOException::class, TextureLoadException::class)
-  private fun readBounded(input: InputStream): ByteArray {
-    val output = ByteArrayOutputStream()
-    val buffer = ByteArray(BUFFER_SIZE)
-    var total = 0L
-    while (true) {
-      val read = input.read(buffer)
-      if (read < 0) {
-        break
-      }
-      total += read.toLong()
-      if (total > ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES) {
-        throw TextureLoadException(
-          ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_TOO_LARGE.wireCode,
-          "Texture source exceeds the configured byte limit.",
-        )
-      }
-      output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
   }
 
   private fun calculateSampleSize(width: Int, height: Int): Int {
@@ -710,7 +659,6 @@ class GlRenderer(
     private const val POSITION_ATTRIBUTE = "a_position"
     private const val POSITION_COMPONENTS = 2
     private const val VERTEX_COUNT = 4
-    private const val BUFFER_SIZE = 8 * 1024
     private const val MAX_SAMPLE_SIZE = 1 shl 30
     private const val MAX_GL_LOG_CHARS = 1024
 

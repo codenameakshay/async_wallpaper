@@ -1,78 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 
-const List<int> _demoPngBytes = <int>[
-  137,
-  80,
-  78,
-  71,
-  13,
-  10,
-  26,
-  10,
-  0,
-  0,
-  0,
-  13,
-  73,
-  72,
-  68,
-  82,
-  0,
-  0,
-  0,
-  1,
-  0,
-  0,
-  0,
-  1,
-  8,
-  6,
-  0,
-  0,
-  0,
-  31,
-  21,
-  196,
-  137,
-  0,
-  0,
-  0,
-  10,
-  73,
-  68,
-  65,
-  84,
-  120,
-  156,
-  99,
-  96,
-  0,
-  0,
-  0,
-  2,
-  0,
-  1,
-  229,
-  39,
-  212,
-  162,
-  0,
-  0,
-  0,
-  0,
-  73,
-  69,
-  78,
-  68,
-  174,
-  66,
-  96,
-  130,
-];
+/// A 1×1 blue PNG used by the embedded-bytes and sample-file sources.
+final Uint8List demoPngBytes = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mOwD9wKAAIYAUbd/mmIAAAAAElFTkSuQmCC',
+);
 
 /// A deliberately small GLSL ES 1.00 shader that needs no textures or input.
 ///
@@ -110,6 +47,30 @@ abstract interface class WallpaperDemoApi {
   Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
     OpenGlLiveWallpaperRequest request,
   );
+
+  Future<String> platformVersion();
+
+  Future<MaterialYouSupport> checkMaterialYouSupport();
+
+  Future<WallpaperResult> setWallpaper(WallpaperRequest request);
+
+  Future<WallpaperResult> setMaterialYouWallpaper(
+    MaterialYouWallpaperRequest request,
+  );
+
+  Future<WallpaperResult> openWallpaperChooser();
+
+  Future<WallpaperResult> downloadWallpaper(DownloadWallpaperRequest request);
+
+  Future<WallpaperResult> startWallpaperRotation(
+    WallpaperRotationRequest request,
+  );
+
+  Future<WallpaperResult> stopWallpaperRotation();
+
+  Future<WallpaperRotationStatus> getWallpaperRotationStatus();
+
+  Future<WallpaperResult> rotateWallpaperNow();
 }
 
 class AsyncWallpaperDemoApi implements WallpaperDemoApi {
@@ -138,6 +99,47 @@ class AsyncWallpaperDemoApi implements WallpaperDemoApi {
   Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
     OpenGlLiveWallpaperRequest request,
   ) => AsyncWallpaper.setOpenGlLiveWallpaper(request);
+
+  @override
+  Future<String> platformVersion() => AsyncWallpaper.platformVersion;
+
+  @override
+  Future<MaterialYouSupport> checkMaterialYouSupport() =>
+      AsyncWallpaper.checkMaterialYouSupport();
+
+  @override
+  Future<WallpaperResult> setWallpaper(WallpaperRequest request) =>
+      AsyncWallpaper.setWallpaper(request);
+
+  @override
+  Future<WallpaperResult> setMaterialYouWallpaper(
+    MaterialYouWallpaperRequest request,
+  ) => AsyncWallpaper.setMaterialYouWallpaper(request);
+
+  @override
+  Future<WallpaperResult> openWallpaperChooser() =>
+      AsyncWallpaper.openWallpaperChooser();
+
+  @override
+  Future<WallpaperResult> downloadWallpaper(DownloadWallpaperRequest request) =>
+      AsyncWallpaper.downloadWallpaper(request);
+
+  @override
+  Future<WallpaperResult> startWallpaperRotation(
+    WallpaperRotationRequest request,
+  ) => AsyncWallpaper.startWallpaperRotation(request);
+
+  @override
+  Future<WallpaperResult> stopWallpaperRotation() =>
+      AsyncWallpaper.stopWallpaperRotation();
+
+  @override
+  Future<WallpaperRotationStatus> getWallpaperRotationStatus() =>
+      AsyncWallpaper.getWallpaperRotationStatus();
+
+  @override
+  Future<WallpaperResult> rotateWallpaperNow() =>
+      AsyncWallpaper.rotateWallpaperNow();
 }
 
 void main() {
@@ -180,9 +182,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _urlController = TextEditingController(
     text: 'https://images.unsplash.com/photo-1635593701810-3156162e184f',
   );
-  final TextEditingController _fileController = TextEditingController(
-    text: '/storage/emulated/0/Download/wallpaper.jpg',
-  );
+  final TextEditingController _fileController = TextEditingController();
   final TextEditingController _contentUriController = TextEditingController(
     text: 'content://media/external/images/media/1',
   );
@@ -198,8 +198,31 @@ class _HomePageState extends State<HomePage> {
   WallpaperOperationResult? _videoPreparationResult;
   WallpaperOperationResult? _videoPreviewResult;
   WallpaperOperationResult? _openGlResult;
+  String? _moreOutcome;
 
   bool get _isBusy => _activeAction != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _writeSampleFile();
+  }
+
+  /// Gives the file-path source a readable default instead of a path that
+  /// needs storage permission.
+  Future<void> _writeSampleFile() async {
+    try {
+      final file = File(
+        '${Directory.systemTemp.path}/async_wallpaper_demo.png',
+      );
+      await file.writeAsBytes(demoPngBytes, flush: true);
+      if (mounted && _fileController.text.isEmpty) {
+        _fileController.text = file.path;
+      }
+    } on FileSystemException {
+      // The field stays empty and the user can enter a path.
+    }
+  }
 
   @override
   void dispose() {
@@ -226,7 +249,7 @@ class _HomePageState extends State<HomePage> {
       }
       setState(() {
         _capabilities = capabilities;
-        _status = 'Capabilities loaded for ${capabilities.manufacturer}.';
+        _status = 'Capabilities loaded.';
       });
     } catch (error) {
       if (!mounted) {
@@ -247,6 +270,43 @@ class _HomePageState extends State<HomePage> {
     required String startingStatus,
     required Future<WallpaperOperationResult> Function() operation,
     required void Function(WallpaperOperationResult result) storeResult,
+  }) {
+    return _run<WallpaperOperationResult>(
+      action: action,
+      startingStatus: startingStatus,
+      operation: operation,
+      describe: _resultSummary,
+      storeResult: storeResult,
+    );
+  }
+
+  /// Runs an action from the "More APIs" card and keeps its outcome there.
+  Future<void> _runMore<T>(
+    String action,
+    Future<T> Function() operation,
+    String Function(T result) describe,
+  ) async {
+    if (_isBusy) {
+      return;
+    }
+    await _run<T>(
+      action: action,
+      startingStatus: '$action…',
+      operation: operation,
+      describe: describe,
+      storeResult: (T result) {},
+    );
+    if (mounted) {
+      setState(() => _moreOutcome = _status);
+    }
+  }
+
+  Future<void> _run<T>({
+    required String action,
+    required String startingStatus,
+    required Future<T> Function() operation,
+    required String Function(T result) describe,
+    required void Function(T result) storeResult,
   }) async {
     if (_isBusy) {
       return;
@@ -264,7 +324,7 @@ class _HomePageState extends State<HomePage> {
       }
       setState(() {
         storeResult(result);
-        _status = '$action: ${_resultSummary(result)}';
+        _status = '$action: ${describe(result)}';
       });
     } catch (error) {
       if (!mounted) {
@@ -356,9 +416,7 @@ class _HomePageState extends State<HomePage> {
       _DemoSourceKind.contentUri => WallpaperSource.contentUri(
         _requiredInput(_contentUriController.text, 'Content URI'),
       ),
-      _DemoSourceKind.bytes => WallpaperSource.bytes(
-        Uint8List.fromList(_demoPngBytes),
-      ),
+      _DemoSourceKind.bytes => WallpaperSource.bytes(demoPngBytes),
     };
   }
 
@@ -377,13 +435,86 @@ class _HomePageState extends State<HomePage> {
         'fallback ${result.fallbackStrategy?.name ?? 'strategy'} used',
       );
     }
-    if (result.errorCode != null) {
+    if (result.errorCode != null && result.errorCode != result.status.name) {
       details.add(result.errorCode!);
     }
     if (result.errorMessage != null) {
       details.add(result.errorMessage!);
     }
     return details.join(' — ');
+  }
+
+  String _summaryOrNotRun(WallpaperOperationResult? result) =>
+      result == null ? 'not run' : _resultSummary(result);
+
+  static String _legacySummary(WallpaperResult result) {
+    final error = result.error;
+    if (result.isSuccess || error == null) {
+      return 'success';
+    }
+    return 'failed — ${error.code.name} — ${error.message}';
+  }
+
+  static String _materialYouSummary(MaterialYouSupport support) {
+    return support.isSupported
+        ? 'supported on SDK ${support.sdkInt}'
+        : 'unavailable';
+  }
+
+  String _rotationSummary(WallpaperRotationStatus status) {
+    final details = <String>[status.isRunning ? 'running' : 'not running'];
+    if (status.isRunning) {
+      final nextRun = DateTime.fromMillisecondsSinceEpoch(
+        status.nextRunEpochMs,
+      );
+      details.add(
+        'index ${status.currentIndex} of ${status.totalCount}, '
+        '${status.cachedCount} cached, '
+        'every ${status.effectiveIntervalMinutes} min, '
+        'next at ${TimeOfDay.fromDateTime(nextRun).format(context)}',
+      );
+    }
+    if (status.lastError != null) {
+      details.add(status.lastError!);
+    }
+    return details.join(' — ');
+  }
+
+  WallpaperRequest _legacyRequest() {
+    return switch (_sourceKind) {
+      _DemoSourceKind.url => WallpaperRequest(
+        target: _target,
+        sourceType: WallpaperSourceType.url,
+        source: _requiredInput(_urlController.text, 'URL'),
+      ),
+      _DemoSourceKind.filePath => WallpaperRequest(
+        target: _target,
+        sourceType: WallpaperSourceType.file,
+        source: _requiredInput(_fileController.text, 'File path'),
+      ),
+      _ => throw ArgumentError(
+        'Legacy set wallpaper accepts only a URL or file path source.',
+      ),
+    };
+  }
+
+  WallpaperRotationRequest _rotationRequest() {
+    final filePath = _fileController.text.trim();
+    return WallpaperRotationRequest(
+      sources: <WallpaperRotationSource>[
+        WallpaperRotationSource(
+          sourceType: WallpaperSourceType.url,
+          source: _requiredInput(_urlController.text, 'URL'),
+        ),
+        if (filePath.isNotEmpty)
+          WallpaperRotationSource(
+            sourceType: WallpaperSourceType.file,
+            source: filePath,
+          ),
+      ],
+      target: _target,
+      intervalMinutes: 15,
+    );
   }
 
   String _targetOutcome(
@@ -394,7 +525,8 @@ class _HomePageState extends State<HomePage> {
       return '$targetLabel: not reported';
     }
     final details = <String>[targetResult.status.name];
-    if (targetResult.errorCode != null) {
+    if (targetResult.errorCode != null &&
+        targetResult.errorCode != targetResult.status.name) {
       details.add(targetResult.errorCode!);
     }
     if (targetResult.errorMessage != null) {
@@ -420,6 +552,8 @@ class _HomePageState extends State<HomePage> {
             _videoCard(context),
             const SizedBox(height: 16),
             _openGlCard(context),
+            const SizedBox(height: 16),
+            _moreApisCard(context),
           ],
         ),
       ),
@@ -521,6 +655,7 @@ class _HomePageState extends State<HomePage> {
               onChanged: (WallpaperApplyStrategy value) =>
                   setState(() => _strategy = value),
             ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               key: const Key('apply-static-button'),
               onPressed: _isBusy ? null : _applyStaticWallpaper,
@@ -707,12 +842,9 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Video preparation: '
-              '${_videoPreparationResult?.status.name ?? 'not run'}',
+              'Video preparation: ${_summaryOrNotRun(_videoPreparationResult)}',
             ),
-            Text(
-              'Video preview: ${_videoPreviewResult?.status.name ?? 'not run'}',
-            ),
+            Text('Video preview: ${_summaryOrNotRun(_videoPreviewResult)}'),
           ],
         ),
       ),
@@ -754,6 +886,171 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _moreApisCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('More APIs', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text(
+              'Download, Material You, and rotation use the URL above. Legacy '
+              'set wallpaper uses the selected URL or file path. iOS supports '
+              'only download.',
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _moreButton(
+                  'download-button',
+                  'Download to gallery',
+                  Icons.download_outlined,
+                  () => _runMore(
+                    'Download wallpaper',
+                    () => widget.api.downloadWallpaper(
+                      DownloadWallpaperRequest(
+                        url: _requiredInput(_urlController.text, 'URL'),
+                      ),
+                    ),
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'chooser-button',
+                  'Open wallpaper chooser',
+                  Icons.photo_library_outlined,
+                  () => _runMore(
+                    'Open wallpaper chooser',
+                    widget.api.openWallpaperChooser,
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'legacy-set-button',
+                  'Legacy set wallpaper',
+                  Icons.history,
+                  () => _runMore(
+                    'Legacy set wallpaper',
+                    () => widget.api.setWallpaper(_legacyRequest()),
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'material-you-check-button',
+                  'Check Material You',
+                  Icons.palette_outlined,
+                  () => _runMore(
+                    'Material You',
+                    widget.api.checkMaterialYouSupport,
+                    _materialYouSummary,
+                  ),
+                ),
+                _moreButton(
+                  'material-you-set-button',
+                  'Set Material You wallpaper',
+                  Icons.format_paint_outlined,
+                  () => _runMore(
+                    'Set Material You wallpaper',
+                    () => widget.api.setMaterialYouWallpaper(
+                      MaterialYouWallpaperRequest(
+                        url: _requiredInput(_urlController.text, 'URL'),
+                      ),
+                    ),
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'platform-version-button',
+                  'Platform version',
+                  Icons.info_outline,
+                  () => _runMore(
+                    'Platform version',
+                    widget.api.platformVersion,
+                    (String version) => version,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Rotation', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            const Text('Rotates the URL and the file path every 15 minutes.'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _moreButton(
+                  'rotation-start-button',
+                  'Start rotation',
+                  Icons.play_arrow_outlined,
+                  () => _runMore(
+                    'Start rotation',
+                    () => widget.api.startWallpaperRotation(_rotationRequest()),
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'rotation-now-button',
+                  'Rotate now',
+                  Icons.skip_next_outlined,
+                  () => _runMore(
+                    'Rotate now',
+                    widget.api.rotateWallpaperNow,
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'rotation-status-button',
+                  'Rotation status',
+                  Icons.schedule,
+                  () => _runMore(
+                    'Rotation status',
+                    widget.api.getWallpaperRotationStatus,
+                    _rotationSummary,
+                  ),
+                ),
+                _moreButton(
+                  'rotation-stop-button',
+                  'Stop rotation',
+                  Icons.stop_outlined,
+                  () => _runMore(
+                    'Stop rotation',
+                    widget.api.stopWallpaperRotation,
+                    _legacySummary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Last result: ${_moreOutcome ?? 'not run'}',
+              key: const Key('more-outcome-text'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _moreButton(
+    String key,
+    String label,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
+    return OutlinedButton.icon(
+      key: Key(key),
+      onPressed: _isBusy ? null : onPressed,
+      icon: Icon(icon),
+      label: Text(label),
+    );
+  }
+
   Widget _resultPanel(
     BuildContext context, {
     required String title,
@@ -772,9 +1069,7 @@ class _HomePageState extends State<HomePage> {
           children: <Widget>[
             Text(title, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
-            Text(
-              'Status: ${result == null ? 'not run' : _resultSummary(result)}',
-            ),
+            Text('Status: ${_summaryOrNotRun(result)}'),
             ...children,
           ],
         ),

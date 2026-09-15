@@ -38,40 +38,6 @@ WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
   throw StateError('WallpaperSource does not contain a supported source kind.');
 }
 
-/// Converts Pigeon source data into a validated, immutable domain source.
-WallpaperSource wallpaperSourceFromData(WallpaperSourceData data) {
-  final WallpaperSourceKindData kind = _required(
-    data.kind,
-    'wallpaper source kind',
-  );
-  final int payloadCount = <Object?>[
-    data.url,
-    data.filePath,
-    data.contentUri,
-    data.bytes,
-  ].where((Object? value) => value != null).length;
-  if (payloadCount != 1) {
-    throw FormatException(
-      'Wallpaper source data must contain exactly one payload for $kind.',
-    );
-  }
-
-  switch (kind) {
-    case WallpaperSourceKindData.url:
-      return WallpaperSource.url(_required(data.url, 'wallpaper URL'));
-    case WallpaperSourceKindData.filePath:
-      return WallpaperSource.filePath(
-        _required(data.filePath, 'wallpaper file path'),
-      );
-    case WallpaperSourceKindData.contentUri:
-      return WallpaperSource.contentUri(
-        _required(data.contentUri, 'wallpaper content URI'),
-      );
-    case WallpaperSourceKindData.bytes:
-      return WallpaperSource.bytes(_required(data.bytes, 'wallpaper bytes'));
-  }
-}
-
 /// Converts a requested target into its Pigeon transport representation.
 WallpaperTargetData wallpaperTargetToData(WallpaperTarget target) {
   switch (target) {
@@ -116,26 +82,6 @@ WallpaperScaleModeData wallpaperScaleModeToData(WallpaperScaleMode mode) {
   }
 }
 
-/// Converts a Pigeon scale mode into its domain representation.
-WallpaperScaleMode wallpaperScaleModeFromData(WallpaperScaleModeData? data) {
-  switch (data) {
-    case WallpaperScaleModeData.centerCrop:
-      return WallpaperScaleMode.centerCrop;
-    case WallpaperScaleModeData.fitCenter:
-      return WallpaperScaleMode.fitCenter;
-    case WallpaperScaleModeData.center:
-      return WallpaperScaleMode.center;
-    case WallpaperScaleModeData.fill:
-      return WallpaperScaleMode.fill;
-    case WallpaperScaleModeData.stretch:
-      return WallpaperScaleMode.stretch;
-    case null:
-      throw const FormatException(
-        'Platform did not return a wallpaper scale mode.',
-      );
-  }
-}
-
 /// Converts an apply strategy into its Pigeon transport representation.
 WallpaperApplyStrategyData wallpaperApplyStrategyToData(
   WallpaperApplyStrategy strategy,
@@ -169,28 +115,6 @@ WallpaperApplyStrategy wallpaperApplyStrategyFromData(
       throw const FormatException(
         'Platform did not return a wallpaper apply strategy.',
       );
-  }
-}
-
-/// Converts an operation status into its Pigeon transport representation.
-OperationStatusData wallpaperOperationStatusToData(
-  WallpaperOperationStatus status,
-) {
-  switch (status) {
-    case WallpaperOperationStatus.applied:
-      return OperationStatusData.applied;
-    case WallpaperOperationStatus.previewOpened:
-      return OperationStatusData.previewOpened;
-    case WallpaperOperationStatus.awaitingUserConfirmation:
-      return OperationStatusData.awaitingUserConfirmation;
-    case WallpaperOperationStatus.cancelled:
-      return OperationStatusData.cancelled;
-    case WallpaperOperationStatus.failed:
-      return OperationStatusData.failed;
-    case WallpaperOperationStatus.unsupported:
-      return OperationStatusData.unsupported;
-    case WallpaperOperationStatus.foregroundRequired:
-      return OperationStatusData.foregroundRequired;
   }
 }
 
@@ -234,16 +158,6 @@ RotationOrderData rotationOrderToData(WallpaperRotationOrder order) =>
       WallpaperRotationOrder.shuffle => RotationOrderData.shuffle,
     };
 
-/// Converts a per-target domain result into Pigeon transport data.
-TargetResultData targetResultToData(WallpaperTargetResult result) {
-  return TargetResultData(
-    status: _targetStatusToData(result.status),
-    errorCode: result.errorCode,
-    errorMessage: result.errorMessage,
-    errorDetails: result.errorDetails,
-  );
-}
-
 /// Converts and validates a per-target Pigeon result.
 WallpaperTargetResult targetResultFromData(TargetResultData data) {
   return WallpaperTargetResult(
@@ -251,23 +165,6 @@ WallpaperTargetResult targetResultFromData(TargetResultData data) {
     errorCode: data.errorCode,
     errorMessage: data.errorMessage,
     errorDetails: data.errorDetails,
-  );
-}
-
-/// Converts a complete domain operation result into Pigeon transport data.
-OperationResultData operationResultToData(WallpaperOperationResult result) {
-  return OperationResultData(
-    status: wallpaperOperationStatusToData(result.status),
-    requestedTarget: wallpaperTargetToData(result.requestedTarget),
-    home: result.home == null ? null : targetResultToData(result.home!),
-    lock: result.lock == null ? null : targetResultToData(result.lock!),
-    errorCode: result.errorCode,
-    errorMessage: result.errorMessage,
-    errorDetails: result.errorDetails,
-    fallbackUsed: result.fallbackUsed,
-    fallbackStrategy: result.fallbackStrategy == null
-        ? null
-        : wallpaperApplyStrategyToData(result.fallbackStrategy!),
   );
 }
 
@@ -322,27 +219,6 @@ WallpaperOperationResult operationResultFromData(OperationResultData data) {
   }
 }
 
-/// Converts a capability snapshot into Pigeon transport data.
-WallpaperCapabilitiesData capabilitiesToData(
-  WallpaperCapabilities capabilities,
-) {
-  return WallpaperCapabilitiesData(
-    supportsStaticWallpaper: capabilities.supportsStaticWallpaper,
-    supportsLiveWallpaper: capabilities.supportsLiveWallpaper,
-    supportsOpenGlLiveWallpaper: capabilities.supportsOpenGlLiveWallpaper,
-    supportsHomeWallpaper: capabilities.supportsHomeWallpaper,
-    supportsLockWallpaper: capabilities.supportsLockWallpaper,
-    supportsBothWallpapers: capabilities.supportsBothWallpapers,
-    canSetWallpaper: capabilities.canSetWallpaper,
-    hasSystemWallpaperPicker: capabilities.hasSystemWallpaperPicker,
-    requiresForeground: capabilities.requiresForeground,
-    manufacturer: capabilities.manufacturer,
-    sdkInt: capabilities.sdkInt,
-    openGlVersion: capabilities.openGlVersion,
-    openGlRenderer: capabilities.openGlRenderer,
-  );
-}
-
 /// Converts a nullable Pigeon capability snapshot using conservative defaults.
 WallpaperCapabilities capabilitiesFromData(WallpaperCapabilitiesData data) {
   return WallpaperCapabilities(
@@ -374,39 +250,6 @@ StaticWallpaperRequestData staticWallpaperRequestToData(
   );
 }
 
-/// Converts a Pigeon static request into a validated structured request.
-StaticWallpaperRequest staticWallpaperRequestFromData(
-  StaticWallpaperRequestData data,
-) {
-  return StaticWallpaperRequest(
-    source: wallpaperSourceFromData(
-      _required(data.source, 'static wallpaper source'),
-    ),
-    target: wallpaperTargetFromData(data.target),
-    scaleMode: wallpaperScaleModeFromData(data.scaleMode),
-    strategy: wallpaperApplyStrategyFromData(data.strategy),
-  );
-}
-
-/// Converts a source-compatible legacy static request into transport data.
-///
-/// Legacy requests cannot express the structured source, scale, or strategy
-/// fields, so this adapter intentionally uses the original defaults.
-StaticWallpaperRequestData legacyWallpaperRequestToData(
-  WallpaperRequest request,
-) {
-  final WallpaperSource source = switch (request.sourceType) {
-    WallpaperSourceType.url => WallpaperSource.url(request.source),
-    WallpaperSourceType.file => WallpaperSource.filePath(request.source),
-  };
-  return StaticWallpaperRequestData(
-    source: wallpaperSourceToData(source),
-    target: wallpaperTargetToData(request.target),
-    scaleMode: WallpaperScaleModeData.centerCrop,
-    strategy: WallpaperApplyStrategyData.automatic,
-  );
-}
-
 /// Converts a domain video request into Pigeon transport data.
 VideoWallpaperRequestData videoWallpaperRequestToData(
   VideoWallpaperRequest request,
@@ -415,19 +258,6 @@ VideoWallpaperRequestData videoWallpaperRequestToData(
     source: wallpaperSourceToData(request.source),
     target: wallpaperTargetToData(request.target),
     scaleMode: wallpaperScaleModeToData(request.scaleMode),
-  );
-}
-
-/// Converts a Pigeon video request into a validated domain request.
-VideoWallpaperRequest videoWallpaperRequestFromData(
-  VideoWallpaperRequestData data,
-) {
-  return VideoWallpaperRequest(
-    source: wallpaperSourceFromData(
-      _required(data.source, 'video wallpaper source'),
-    ),
-    target: wallpaperTargetFromData(data.target),
-    scaleMode: wallpaperScaleModeFromData(data.scaleMode),
   );
 }
 
@@ -442,26 +272,6 @@ OpenGlWallpaperRequestData openGlWallpaperRequestToData(
         .toList(growable: false),
     target: wallpaperTargetToData(request.target),
     frameRate: request.frameRate,
-  );
-}
-
-/// Converts a Pigeon OpenGL request into a validated domain request.
-OpenGlLiveWallpaperRequest openGlWallpaperRequestFromData(
-  OpenGlWallpaperRequestData data,
-) {
-  final List<WallpaperSource> textures =
-      (data.textures ?? const <WallpaperSourceData?>[])
-          .map(
-            (WallpaperSourceData? texture) => wallpaperSourceFromData(
-              _required(texture, 'OpenGL texture source'),
-            ),
-          )
-          .toList(growable: false);
-  return OpenGlLiveWallpaperRequest(
-    fragmentShader: _required(data.fragmentShader, 'OpenGL fragment shader'),
-    textures: textures,
-    target: wallpaperTargetFromData(data.target),
-    frameRate: _required(data.frameRate, 'OpenGL frame rate'),
   );
 }
 
@@ -539,19 +349,6 @@ class PigeonWallpaperClient implements WallpaperClient {
   }
 }
 
-TargetStatusData _targetStatusToData(WallpaperTargetStatus status) {
-  switch (status) {
-    case WallpaperTargetStatus.applied:
-      return TargetStatusData.applied;
-    case WallpaperTargetStatus.failed:
-      return TargetStatusData.failed;
-    case WallpaperTargetStatus.unsupported:
-      return TargetStatusData.unsupported;
-    case WallpaperTargetStatus.notAttempted:
-      return TargetStatusData.notAttempted;
-  }
-}
-
 WallpaperTargetStatus _targetStatusFromData(TargetStatusData? data) {
   switch (data) {
     case TargetStatusData.applied:
@@ -623,11 +420,4 @@ WallpaperTarget _targetOrHome(WallpaperTargetData? data) {
     case null:
       return WallpaperTarget.home;
   }
-}
-
-T _required<T>(T? value, String name) {
-  if (value == null) {
-    throw FormatException('Platform did not return $name.');
-  }
-  return value;
 }

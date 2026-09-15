@@ -17,7 +17,6 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * Owns one EGL display/context and the resources for an [OpenGlWallpaperConfiguration].
@@ -505,19 +504,12 @@ class GlRenderer(
 
   private fun scaleToTextureLimit(bitmap: Bitmap): Bitmap {
     val maximumDimension = min(ShaderProgramValidator.MAX_TEXTURE_DIMENSION, maxTextureSize)
-    val sourcePixels = bitmap.width.toLong() * bitmap.height.toLong()
-    val dimensionScale = min(
-      1.0,
-      min(
-        maximumDimension.toDouble() / bitmap.width.toDouble(),
-        maximumDimension.toDouble() / bitmap.height.toDouble(),
-      ),
+    val scale = BitmapTransformMath.scaleToFit(
+      bitmap.width,
+      bitmap.height,
+      maximumDimension,
+      ShaderProgramValidator.MAX_TEXTURE_PIXELS,
     )
-    val pixelScale = min(
-      1.0,
-      sqrt(ShaderProgramValidator.MAX_TEXTURE_PIXELS.toDouble() / sourcePixels.toDouble()),
-    )
-    val scale = min(dimensionScale, pixelScale)
     if (scale >= 1.0) {
       return bitmap
     }

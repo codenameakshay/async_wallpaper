@@ -116,6 +116,8 @@ Check `supportsOpenGlLiveWallpaper` first. Use GLSL ES 1.00, `void main()`, 1-60
 await AsyncWallpaper.downloadWallpaper(const DownloadWallpaperRequest(url: 'https://example.com/wallpaper.jpg'));
 ```
 
+On Android 9 (API 28) and older, saving to the gallery needs `WRITE_EXTERNAL_STORAGE`, which the plugin does not declare. If your app supports those versions, add `<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />` and request it at runtime before calling `downloadWallpaper`; otherwise the call fails there.
+
 ### Legacy 3.1 API
 
 `setWallpaper`, `setLiveWallpaper`, `openWallpaperChooser`, and Material You helpers stay available. New code must use the structured API.

@@ -208,7 +208,7 @@ class WallpaperTargetResult {
   final String? errorDetails;
 }
 
-/// Truthful result details for a wallpaper operation.
+/// Result details for a wallpaper operation, including per-target outcomes.
 class WallpaperOperationResult {
   const WallpaperOperationResult({
     required this.status,

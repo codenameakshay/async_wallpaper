@@ -129,13 +129,7 @@ class OpenGlWallpaperConfiguration(
   textures: List<GlTextureSource> = emptyList(),
   val frameRate: Int = DEFAULT_FRAME_RATE,
 ) {
-  val textures: List<GlTextureSource> = textures.map { source ->
-    when (source) {
-      is GlTextureSource.Bytes -> source
-      is GlTextureSource.FilePath -> source
-      is GlTextureSource.ContentUri -> source
-    }
-  }
+  val textures: List<GlTextureSource> = textures.toList()
 
   companion object {
     const val DEFAULT_FRAME_RATE = 30

@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -105,13 +106,27 @@ class PigeonApiImpl(
     ioExecutor.execute {
       val success = runCatching {
         val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
-        val started = rotationEngine.startRotation(config)
-        if (started) {
-          reconcileRotationTriggers(config, intervalMinutes)
-        } else {
-          rollbackFailedRotationStart()
+        when (rotationEngine.startRotation(config)) {
+          RotationStartResult.STARTED -> {
+            try {
+              reconcileRotationTriggers(config, intervalMinutes)
+              true
+            } catch (error: Exception) {
+              // The wallpaper is already applied but the schedules are unknown; report failure and
+              // tear the rotation down rather than leaving a half-armed trigger set.
+              Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
+              rollbackFailedRotationStart()
+              false
+            }
+          }
+          // Only a start that already persisted a new configuration may roll back, so a rejected
+          // request cannot stop a rotation that is still running.
+          RotationStartResult.FAILED_AFTER_SAVE -> {
+            rollbackFailedRotationStart()
+            false
+          }
+          RotationStartResult.REJECTED -> false
         }
-        started
       }.getOrElse {
         Log.e(TAG, "startWallpaperRotation failed", it)
         false
@@ -642,6 +657,20 @@ class PigeonApiImpl(
       } else {
         null
       } ?: return false
+      // A header can report valid dimensions for a truncated file, so decode once with a bounded
+      // sample size to prove the payload is a complete image before publishing it.
+      val decoded = BitmapFactory.decodeFile(
+        downloadedFile.absolutePath,
+        BitmapFactory.Options().apply {
+          inSampleSize = WallpaperSourceLoader.calculateInSampleSize(
+            options.outWidth,
+            options.outHeight,
+            MAX_DOWNLOAD_DECODED_PIXELS,
+          )
+          inPreferredConfig = Bitmap.Config.ARGB_8888
+        },
+      ) ?: return false
+      decoded.recycle()
       val values = ContentValues().apply {
         put(
           MediaStore.Images.Media.DISPLAY_NAME,
@@ -838,6 +867,7 @@ class PigeonApiImpl(
     private const val MAX_VIDEO_SOURCE_BYTES = 256L * 1024L * 1024L
     /** Generous bound for one downloaded wallpaper; validation still happens from a temp file. */
     private const val MAX_DOWNLOAD_SOURCE_BYTES = 64L * 1024L * 1024L
+    private const val MAX_DOWNLOAD_DECODED_PIXELS = 16L * 1024L * 1024L
     private const val MAIN_THREAD_WAIT_MILLIS = 10_000L
 
     private const val ERROR_INVALID_REQUEST = "invalid-request"

@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import java.util.Calendar
-import java.util.concurrent.Executors
 
 internal class WallpaperTimeOfDayReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
@@ -32,19 +31,12 @@ internal class WallpaperTimeOfDayReceiver : BroadcastReceiver() {
       return
     }
 
-    ioExecutor.execute {
-      val didRun = WallpaperRotationRunner.runNext(context)
-      if (!didRun) {
-        Log.w(TAG, "Direct time-of-day rotation failed, queue immediate work")
-        WallpaperRotationScheduler.enqueueImmediate(context)
-      } else {
-        Log.d(TAG, "Time-of-day triggered rotation applied")
-      }
-    }
+    // Hand off through WorkManager. A BroadcastReceiver returns immediately, so applying the
+    // wallpaper here on a private executor risks the process being killed before it finishes.
+    WallpaperRotationScheduler.enqueueImmediate(context)
   }
 
   companion object {
     private const val TAG = "TimeOfDayReceiver"
-    private val ioExecutor = Executors.newSingleThreadExecutor()
   }
 }

@@ -12,6 +12,18 @@ import java.util.Collections
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+/** Why a rotation start did or did not take effect, so callers can roll back only when needed. */
+internal enum class RotationStartResult {
+  /** Rotation is configured and the first wallpaper was applied. */
+  STARTED,
+
+  /** The request was rejected before anything was persisted; any existing rotation is untouched. */
+  REJECTED,
+
+  /** The new configuration was persisted but the first wallpaper could not be applied. */
+  FAILED_AFTER_SAVE,
+}
+
 internal class WallpaperRotationEngine(
   context: Context,
   private val store: WallpaperRotationStore,
@@ -26,17 +38,17 @@ internal class WallpaperRotationEngine(
    * Holds [rotationLock] for the whole swap so the cache directory cannot be deleted while a
    * worker or alarm receiver is reading a file out of it.
    */
-  fun startRotation(config: WallpaperRotationConfigData): Boolean = rotationLock.withLock {
-    val intervalMinutes = config.intervalMinutes?.toInt() ?: return@withLock false
+  fun startRotation(config: WallpaperRotationConfigData): RotationStartResult = rotationLock.withLock {
+    val intervalMinutes = config.intervalMinutes?.toInt() ?: return@withLock RotationStartResult.REJECTED
     if (intervalMinutes < MIN_INTERVAL_MINUTES) {
       store.setLastError("Rotation interval must be at least 15 minutes.")
-      return@withLock false
+      return@withLock RotationStartResult.REJECTED
     }
 
     val preparedFiles = prepareLocalFiles(config.sources.orEmpty())
     if (preparedFiles.isEmpty()) {
       store.setLastError("No valid wallpapers available for rotation.")
-      return@withLock false
+      return@withLock RotationStartResult.REJECTED
     }
 
     val storedConfig = StoredWallpaperRotationConfig(
@@ -57,9 +69,13 @@ internal class WallpaperRotationEngine(
       store.setLastError("Unable to apply initial wallpaper from playlist.")
     }
     // A start that cannot apply its first wallpaper is a failed start, not a success. Reporting
-    // true here previously told callers rotation was running while lastError already held a
+    // success here previously told callers rotation was running while lastError already held a
     // failure, which is the behaviour behind the "success before the wallpaper is set" reports.
-    firstApplySuccess
+    if (firstApplySuccess) {
+      RotationStartResult.STARTED
+    } else {
+      RotationStartResult.FAILED_AFTER_SAVE
+    }
   }
 
   fun applyNextWallpaper(): Boolean {
@@ -99,7 +115,9 @@ internal class WallpaperRotationEngine(
   }
 
   fun clearRotationCache() {
-    getRotationCacheDirectory().deleteRecursively()
+    rotationLock.withLock {
+      getRotationCacheDirectory().deleteRecursively()
+    }
   }
 
   private fun resolveOrder(config: StoredWallpaperRotationConfig, sourceCount: Int): List<Int> {
@@ -111,7 +129,8 @@ internal class WallpaperRotationEngine(
       return savedOrder
     }
     val newOrder = generateShuffleOrder(sourceCount)
-    store.setShuffleOrder(newOrder)
+    // Keep the regenerated order and the cursor consistent in a single write.
+    store.setCurrentIndexAndShuffleOrder(store.getCurrentIndex(), newOrder)
     return newOrder
   }
 

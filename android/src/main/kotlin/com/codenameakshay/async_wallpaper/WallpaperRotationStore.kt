@@ -80,14 +80,13 @@ internal class WallpaperRotationStore(context: Context) {
    * Persists the cursor and (optionally) the next shuffle order in one edit.
    *
    * Writing them separately can leave a cursor paired with the wrong order if the process dies at
-   * a shuffle-cycle boundary, which skips or repeats wallpapers after restart.
+   * a shuffle-cycle boundary, which skips or repeats wallpapers after restart. A null [order]
+   * leaves the stored order untouched; `saveConfig` clears it when a rotation starts.
    */
   fun setCurrentIndexAndShuffleOrder(index: Int, order: List<Int>?) {
     prefs.edit {
       putInt(KEY_CURRENT_INDEX, index)
-      if (order == null) {
-        remove(KEY_SHUFFLE_ORDER)
-      } else {
+      if (order != null) {
         putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString())
       }
     }
@@ -96,10 +95,6 @@ internal class WallpaperRotationStore(context: Context) {
   fun getShuffleOrder(): List<Int> {
     val json = prefs.getString(KEY_SHUFFLE_ORDER, null) ?: return emptyList()
     return jsonArrayToIntList(json)
-  }
-
-  fun setShuffleOrder(order: List<Int>) {
-    prefs.edit { putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString()) }
   }
 
   fun setNextRunEpochMs(epochMs: Long) {

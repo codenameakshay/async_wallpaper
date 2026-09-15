@@ -709,7 +709,11 @@ class AsyncWallpaper {
   }) {
     switch (operation.status) {
       case WallpaperOperationStatus.applied:
-        return _hasAllAppliedTargets(operation);
+        return hasAppliedEveryRequestedTarget(
+          operation.requestedTarget,
+          operation.home,
+          operation.lock,
+        );
       case WallpaperOperationStatus.previewOpened:
       case WallpaperOperationStatus.awaitingUserConfirmation:
         return uiOpeningOperation;
@@ -718,18 +722,6 @@ class AsyncWallpaper {
       case WallpaperOperationStatus.unsupported:
       case WallpaperOperationStatus.foregroundRequired:
         return false;
-    }
-  }
-
-  static bool _hasAllAppliedTargets(WallpaperOperationResult operation) {
-    switch (operation.requestedTarget) {
-      case WallpaperTarget.home:
-        return operation.home?.status == WallpaperTargetStatus.applied;
-      case WallpaperTarget.lock:
-        return operation.lock?.status == WallpaperTargetStatus.applied;
-      case WallpaperTarget.both:
-        return operation.home?.status == WallpaperTargetStatus.applied &&
-            operation.lock?.status == WallpaperTargetStatus.applied;
     }
   }
 }

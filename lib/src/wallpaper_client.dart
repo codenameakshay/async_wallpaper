@@ -187,7 +187,8 @@ WallpaperOperationResult operationResultFromData(OperationResultData data) {
         ? null
         : wallpaperApplyStrategyFromData(data.fallbackStrategy);
 
-    if (!_hasCompleteAppliedTargets(status, target, home, lock)) {
+    if (status == WallpaperOperationStatus.applied &&
+        !hasAppliedEveryRequestedTarget(target, home, lock)) {
       return _malformedOperationResult(
         data,
         target: target,
@@ -366,15 +367,15 @@ WallpaperTargetStatus _targetStatusFromData(TargetStatusData? data) {
   }
 }
 
-bool _hasCompleteAppliedTargets(
-  WallpaperOperationStatus status,
+/// Returns whether an applied result covers every target it claims to.
+///
+/// Shared by [operationResultFromData], which rejects malformed transport
+/// data, and the facade's legacy success mapping.
+bool hasAppliedEveryRequestedTarget(
   WallpaperTarget target,
   WallpaperTargetResult? home,
   WallpaperTargetResult? lock,
 ) {
-  if (status != WallpaperOperationStatus.applied) {
-    return true;
-  }
   switch (target) {
     case WallpaperTarget.home:
       return home?.status == WallpaperTargetStatus.applied;
@@ -409,15 +410,5 @@ WallpaperOperationResult _malformedOperationResult(
   );
 }
 
-WallpaperTarget _targetOrHome(WallpaperTargetData? data) {
-  switch (data) {
-    case WallpaperTargetData.home:
-      return WallpaperTarget.home;
-    case WallpaperTargetData.lock:
-      return WallpaperTarget.lock;
-    case WallpaperTargetData.both:
-      return WallpaperTarget.both;
-    case null:
-      return WallpaperTarget.home;
-  }
-}
+WallpaperTarget _targetOrHome(WallpaperTargetData? data) =>
+    data == null ? WallpaperTarget.home : wallpaperTargetFromData(data);

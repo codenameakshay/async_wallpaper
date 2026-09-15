@@ -322,10 +322,11 @@ class PigeonApiImpl(
       runOnMainBlocking {
         val activity = currentActivity() ?: return@runOnMainBlocking false
         val intent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
-        if (!AndroidCapabilities.resolves(activity.packageManager, intent)) {
+        val resolvedIntent = AndroidCapabilities.resolveExplicit(activity.packageManager, intent)
+        if (resolvedIntent == null) {
           false
         } else {
-          runCatching { activity.startActivity(intent) }.isSuccess
+          runCatching { activity.startActivity(resolvedIntent) }.isSuccess
         }
       }
     }
@@ -431,7 +432,8 @@ class PigeonApiImpl(
       )
     }
     return try {
-      if (!AndroidCapabilities.resolves(activity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(activity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           target,
           ERROR_SYSTEM_UI_UNAVAILABLE,
@@ -439,7 +441,7 @@ class PigeonApiImpl(
         )
       } else {
         beforeLaunch?.invoke()?.let { return it }
-        activity.startActivity(intent)
+        activity.startActivity(resolvedIntent)
         // Android owns target selection in this UI. Do not claim home or lock was applied.
         OperationResultPolicy.previewOpened(target)
       }

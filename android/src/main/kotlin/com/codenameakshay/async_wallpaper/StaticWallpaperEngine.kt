@@ -72,14 +72,15 @@ class StaticWallpaperEngine(
 
     return try {
       val intent = wallpaperManagerProvider().getCropAndSetWallpaperIntent(uri)
-      if (!AndroidCapabilities.resolves(liveActivity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(liveActivity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           validated.target,
           code = ERROR_SYSTEM_UI_UNAVAILABLE,
           message = "This device has no app that can crop and set wallpapers.",
         )
       } else {
-        liveActivity.startActivity(intent)
+        liveActivity.startActivity(resolvedIntent)
         OperationResultPolicy.previewOpened(validated.target)
       }
     } catch (_: ActivityNotFoundException) {
@@ -122,14 +123,15 @@ class StaticWallpaperEngine(
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val intent = Intent(Intent.ACTION_SET_WALLPAPER)
     return try {
-      if (!AndroidCapabilities.resolves(liveActivity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(liveActivity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           validated.target,
           code = ERROR_SYSTEM_UI_UNAVAILABLE,
           message = "This device has no system wallpaper picker.",
         )
       } else {
-        liveActivity.startActivity(intent)
+        liveActivity.startActivity(resolvedIntent)
         OperationResultPolicy.awaitingUserConfirmation(validated.target)
       }
     } catch (_: ActivityNotFoundException) {

@@ -27,6 +27,33 @@ class VideoStateMachineTest {
   }
 
   @Test
+  fun `reapply replaces the player only while a surface can show it`() {
+    val stateMachine = VideoPlaybackStateMachine()
+    assertEquals(VideoPlaybackAction.NONE, stateMachine.onAssetReapplied())
+
+    stateMachine.onSurfaceCreated()
+    stateMachine.onVisibilityChanged(true)
+    stateMachine.onPrepared()
+    assertEquals(VideoPlaybackState.PLAYING, stateMachine.state)
+    assertEquals(VideoPlaybackAction.PREPARE, stateMachine.onAssetReapplied())
+    assertEquals(VideoPlaybackState.PREPARING, stateMachine.state)
+    assertEquals(VideoPlaybackAction.START, stateMachine.onPrepared())
+
+    stateMachine.onPlayerError()
+    assertEquals(VideoPlaybackAction.PREPARE, stateMachine.onAssetReapplied())
+
+    stateMachine.onSurfaceDestroyed()
+    assertEquals(VideoPlaybackAction.NONE, stateMachine.onAssetReapplied())
+    stateMachine.onEngineDestroyed()
+    assertEquals(VideoPlaybackAction.NONE, stateMachine.onAssetReapplied())
+  }
+
+  @Test
+  fun `reapply command matches the platform constant`() {
+    assertEquals("android.wallpaper.reapply", WALLPAPER_COMMAND_REAPPLY)
+  }
+
+  @Test
   fun `hidden preparation waits until wallpaper is visible`() {
     val stateMachine = VideoPlaybackStateMachine()
 

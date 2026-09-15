@@ -5,10 +5,18 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
+import android.os.Bundle
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import java.io.File
+
+/**
+ * `WallpaperManager.COMMAND_REAPPLY` (hidden API). On API 30+ Android does not rebind a live
+ * wallpaper when the user sets the same component again; it sends this command to the running
+ * engine instead, so the engine must reload its content itself.
+ */
+internal const val WALLPAPER_COMMAND_REAPPLY = "android.wallpaper.reapply"
 
 /** The two scaling modes supported directly by Android's MediaPlayer. */
 enum class VideoWallpaperScaleMode {
@@ -59,6 +67,26 @@ class VideoLiveWallpaper : WallpaperService() {
         applyActionLocked(stateMachine.onEngineDestroyed())
       }
       super.onDestroy()
+    }
+
+    /** Reloads the active video when the user confirms this same component again. */
+    override fun onCommand(
+      action: String?,
+      x: Int,
+      y: Int,
+      z: Int,
+      extras: Bundle?,
+      resultRequested: Boolean,
+    ): Bundle? {
+      if (action == WALLPAPER_COMMAND_REAPPLY) {
+        synchronized(lifecycleLock) {
+          if (stateMachine.onAssetReapplied() == VideoPlaybackAction.PREPARE) {
+            releasePlayerLocked()
+            preparePlayerLocked(surfaceHolder)
+          }
+        }
+      }
+      return super.onCommand(action, x, y, z, extras, resultRequested)
     }
 
     private fun preparePlayerLocked(holder: SurfaceHolder) {
@@ -267,6 +295,15 @@ class VideoPlaybackStateMachine {
       state = VideoPlaybackState.PAUSED
       VideoPlaybackAction.NONE
     }
+  }
+
+  /** A new active asset was confirmed; replace the player if a surface can show it now. */
+  fun onAssetReapplied(): VideoPlaybackAction {
+    if (state == VideoPlaybackState.RELEASED || !hasSurface) {
+      return VideoPlaybackAction.NONE
+    }
+    state = VideoPlaybackState.PREPARING
+    return VideoPlaybackAction.PREPARE
   }
 
   fun onPlayerError(): VideoPlaybackAction {

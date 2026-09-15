@@ -115,6 +115,7 @@ Consequently:
 - `previewOpened` means that the preview UI opened, not that the wallpaper was applied.
 - `awaitingUserConfirmation` means Android is waiting for the user's choice.
 - This release reports `previewOpened` when it launches the system UI and does not infer `applied` after the user leaves that UI.
+- When the plugin's live wallpaper is already active and the user sets it again with new content, Android 11+ keeps the running engine and the plugin reloads the content in place. On Android 10 and older the new content appears only after the wallpaper's surface is recreated, for example after a restart.
 - `cancelled`, `unsupported`, and `failed` must remain visible to the user/app; do not replace them with a success toast.
 
 This limitation is documented rather than hidden because Android does not expose a portable API to force a live-wallpaper target across OEM preview implementations.

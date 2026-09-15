@@ -5,6 +5,7 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
@@ -200,6 +201,21 @@ class OpenGlLiveWallpaper : WallpaperService() {
       super.onTouchEvent(event)
     }
 
+    /** Loads the newly saved configuration when the user confirms this same component again. */
+    override fun onCommand(
+      action: String?,
+      x: Int,
+      y: Int,
+      z: Int,
+      extras: Bundle?,
+      resultRequested: Boolean,
+    ): Bundle? {
+      if (action == WALLPAPER_COMMAND_REAPPLY) {
+        renderThread.configurationChanged(OpenGlWallpaperConfigurationStore.load(applicationContext))
+      }
+      return super.onCommand(action, x, y, z, extras, resultRequested)
+    }
+
     override fun onDestroy() {
       renderThread.shutdown()
       super.onDestroy()
@@ -208,21 +224,16 @@ class OpenGlLiveWallpaper : WallpaperService() {
 
   private class WallpaperRenderThread(
     context: Context,
-    private val configuration: OpenGlWallpaperConfiguration,
+    initialConfiguration: OpenGlWallpaperConfiguration,
   ) {
     private val appContext = context.applicationContext
     private val thread = HandlerThread("AsyncWallpaper-OpenGL").apply { start() }
     private val handler = Handler(thread.looper)
-    private val frameIntervalMillis = max(
-      1L,
-      1_000L / configuration.frameRate.coerceIn(
-        ShaderProgramValidator.MIN_FRAME_RATE.toInt(),
-        ShaderProgramValidator.MAX_FRAME_RATE.toInt(),
-      ),
-    )
     private val createdAtNanos = SystemClock.elapsedRealtimeNanos()
 
     // Everything below is accessed only from [handler].
+    private var configuration = initialConfiguration
+    private var frameIntervalMillis = frameIntervalFor(initialConfiguration)
     private var destroyed = false
     private var visible = false
     private var surface: Surface? = null
@@ -322,6 +333,23 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
         touchX = (x / width.toFloat()).coerceIn(0f, 1f)
         touchY = (y / height.toFloat()).coerceIn(0f, 1f)
+        scheduleFrame(immediate = true)
+      }
+    }
+
+    /** Swaps in a newly confirmed configuration; the next frame builds a renderer for it. */
+    fun configurationChanged(newConfiguration: OpenGlWallpaperConfiguration) {
+      handler.post {
+        if (destroyed) {
+          return@post
+        }
+        configuration = newConfiguration
+        frameIntervalMillis = frameIntervalFor(newConfiguration)
+        renderer?.release()
+        renderer = null
+        attachedGeneration = -1L
+        fatalSurfaceGeneration = null
+        invalidateScheduledFrame()
         scheduleFrame(immediate = true)
       }
     }
@@ -445,6 +473,14 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private companion object {
       private const val NANOS_PER_SECOND = 1_000_000_000.0
       private const val SHUTDOWN_WAIT_MILLIS = 1_000L
+
+      private fun frameIntervalFor(configuration: OpenGlWallpaperConfiguration): Long = max(
+        1L,
+        1_000L / configuration.frameRate.coerceIn(
+          ShaderProgramValidator.MIN_FRAME_RATE.toInt(),
+          ShaderProgramValidator.MAX_FRAME_RATE.toInt(),
+        ),
+      )
     }
   }
 

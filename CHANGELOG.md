@@ -8,6 +8,7 @@
 - `startWallpaperRotation`, `stopWallpaperRotation`, `rotateWallpaperNow`, and `getWallpaperRotationStatus` now return an `unsupported` result / a not-running status off Android instead of falling through to a platform call.
 - `getWallpaperRotationStatus()` no longer throws when the platform call fails; it returns a not-running status with `lastError` set instead.
 - OpenGL live wallpaper: an unexpected I/O error while reading a texture source during configuration is now reported as `texture-source-unavailable` instead of `configuration-store-failed`, matching what the renderer reports for the same failure.
+- Video and OpenGL live wallpapers now reload when the user sets the plugin's wallpaper again over itself. Android keeps the running engine for the same component and only sends it a reapply command, which the engines ignored, so the home screen kept the previous video or shader until the process restarted. On Android 10 and older the running engine picks up the new content only when its surface is recreated.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
 
 ## 3.2.0

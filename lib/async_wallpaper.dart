@@ -12,6 +12,10 @@ export 'src/models.dart';
 class AsyncWallpaper {
   AsyncWallpaper._();
 
+  // Mirror the Android-side limits so both sides change together: see
+  // WallpaperSourceLoader.DEFAULT_MAX_ENCODED_BYTES and
+  // ShaderProgramValidator.MAX_FRAGMENT_SHADER_BYTES /
+  // MAX_TEXTURE_COUNT / MAX_TEXTURE_SOURCE_BYTES.
   static const int _maxSourceBytes = 32 * 1024 * 1024;
   static const int _maxOpenGlTextureBytes = 8 * 1024 * 1024;
   static const int _maxOpenGlTextures = 4;
@@ -101,7 +105,8 @@ class AsyncWallpaper {
     }
   }
 
-  /// Applies a static wallpaper and reports the truthful per-target outcome.
+  /// Applies a static wallpaper and reports the per-target outcome Android
+  /// confirmed.
   static Future<WallpaperOperationResult> applyWallpaper(
     StaticWallpaperRequest request,
   ) async {
@@ -258,7 +263,7 @@ class AsyncWallpaper {
   /// [setVideoWallpaper] and [openLiveWallpaperPreview] to keep those states
   /// distinct.
   @Deprecated(
-    'Use setVideoWallpaper and openLiveWallpaperPreview for truthful results.',
+    'Use setVideoWallpaper and openLiveWallpaperPreview for per-target results.',
   )
   static Future<WallpaperResult> setLiveWallpaper(
     LiveWallpaperRequest request,

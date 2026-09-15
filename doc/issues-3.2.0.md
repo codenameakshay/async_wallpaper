@@ -26,6 +26,6 @@ This ledger covers exactly the 19 open issues in scope for the 3.2.0 release. â€
 
 ## What remains intentionally outside a code-only claim
 
-The live-wallpaper rows above are not closed by pretending that a system preview is an applied result. Android does not offer a cross-OEM API to force a live wallpaper onto home, lock, or both displays. The plugin reports the distinction, exposes device capabilities, and documents the limitation so consuming applications can make an honest UX decision.
+The live-wallpaper rows above are not closed by pretending that a system preview is an applied result. Android does not offer a cross-OEM API to force a live wallpaper onto home, lock, or both displays. The plugin reports the distinction, exposes device capabilities, and documents the limitation so consuming applications can make an informed UX decision.
 
 For any reopened report, include the capability snapshot, structured result including target statuses/error values, source kind, strategy, device model, Android release, and OEM build. This lets an OEM-specific behavior be separated from an input, policy, or lifecycle failure.

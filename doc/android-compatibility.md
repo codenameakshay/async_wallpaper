@@ -76,7 +76,7 @@ If your app cannot keep its engine, record the request before you call the plugi
 
 ### Scaling
 
-All five `WallpaperScaleMode` values are implemented for static images:
+All five `WallpaperScaleMode` values are implemented for static images. The output is the device's display size in its natural orientation, so each mode describes what the user sees. The plugin does not draw onto the launcher's wider scrolling canvas, so a launcher does not pan the wallpaper.
 
 | Mode | Behavior |
 | --- | --- |

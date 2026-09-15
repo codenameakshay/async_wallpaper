@@ -166,6 +166,25 @@ class BitmapTransformMathTest {
   }
 
   @Test
+  fun `wallpaper canvas is the display size, not the launcher's wide virtual size`() {
+    assertEquals(1080 to 2400, BitmapTransformMath.wallpaperCanvasSize(1080, 2400, rotated = false))
+  }
+
+  @Test
+  fun `wallpaper canvas uses the natural orientation when measured while rotated`() {
+    assertEquals(1080 to 2400, BitmapTransformMath.wallpaperCanvasSize(2400, 1080, rotated = true))
+  }
+
+  @Test
+  fun `wallpaper canvas stays within the transform bounds and keeps its aspect ratio`() {
+    val (width, height) = BitmapTransformMath.wallpaperCanvasSize(7680, 4320, rotated = false)
+
+    assert(width <= 4_096 && height <= 4_096)
+    assert(width.toLong() * height <= 8L * 1024L * 1024L)
+    assertEquals(7680.0 / 4320.0, width.toDouble() / height, 0.001)
+  }
+
+  @Test
   fun `decoder sampling chooses a power of two within the pixel budget`() {
     assertEquals(
       4,

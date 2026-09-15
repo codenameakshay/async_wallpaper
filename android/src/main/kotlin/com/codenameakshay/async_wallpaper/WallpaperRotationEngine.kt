@@ -202,20 +202,15 @@ internal class WallpaperRotationEngine(
     }
   }
 
-  /** Scales down to the wallpaper target when needed, then persists a JPEG cache entry. */
+  /** Center-crops to the display size, then persists a JPEG cache entry. */
   private fun writeCachedJpeg(bitmap: Bitmap, targetFile: File) {
-    val targetSize = getTargetSize()
-    val needsDownscale = bitmap.width > targetSize.width || bitmap.height > targetSize.height
-    val output = if (needsDownscale) {
-      BitmapTransformer.transform(
-        bitmap = bitmap,
-        mode = WallpaperScaleModeData.CENTER_CROP,
-        targetWidth = targetSize.width,
-        targetHeight = targetSize.height,
-      )
-    } else {
-      bitmap
-    }
+    val (width, height) = BitmapTransformer.wallpaperCanvasSize(appContext)
+    val output = BitmapTransformer.transform(
+      bitmap = bitmap,
+      mode = WallpaperScaleModeData.CENTER_CROP,
+      targetWidth = width,
+      targetHeight = height,
+    )
 
     try {
       FileOutputStream(targetFile).use { stream ->
@@ -242,14 +237,6 @@ internal class WallpaperRotationEngine(
       false
     }
   }
-
-  private fun getTargetSize(): TargetSize {
-    val width = wallpaperManager.desiredMinimumWidth.takeIf { it > 0 } ?: DEFAULT_WIDTH
-    val height = wallpaperManager.desiredMinimumHeight.takeIf { it > 0 } ?: DEFAULT_HEIGHT
-    return TargetSize(width = width, height = height)
-  }
-
-  private data class TargetSize(val width: Int, val height: Int)
 
   private fun targetToFlag(target: Int): Int {
     return when (target) {
@@ -302,8 +289,6 @@ internal class WallpaperRotationEngine(
     private const val CACHE_DIR_NAME = "wallpaper_rotation"
     private const val MIN_INTERVAL_MINUTES = 15
     private const val JPEG_QUALITY = 95
-    private const val DEFAULT_WIDTH = 1080
-    private const val DEFAULT_HEIGHT = 1920
     private const val TARGET_HOME = 0
     private const val TARGET_LOCK = 1
     private const val TARGET_BOTH = 2

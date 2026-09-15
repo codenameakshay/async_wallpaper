@@ -701,16 +701,6 @@ class GlRenderer(
     lastShaderLog = null
   }
 
-  private fun GlTextureSource.validationInput(): ShaderProgramValidator.TextureInput {
-    return when (this) {
-      is GlTextureSource.Bytes -> ShaderProgramValidator.TextureInput(sourceSizeBytes = byteCount.toLong())
-      is GlTextureSource.FilePath -> ShaderProgramValidator.TextureInput(
-        sourceSizeBytes = File(path).takeIf { it.isFile }?.length(),
-      )
-      is GlTextureSource.ContentUri -> ShaderProgramValidator.TextureInput()
-    }
-  }
-
   private class TextureLoadException(
     val code: String,
     override val message: String,

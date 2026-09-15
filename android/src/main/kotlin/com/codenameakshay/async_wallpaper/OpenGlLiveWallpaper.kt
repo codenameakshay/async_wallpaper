@@ -46,6 +46,16 @@ sealed interface GlTextureSource {
   }
 }
 
+internal fun GlTextureSource.validationInput(): ShaderProgramValidator.TextureInput {
+  return when (this) {
+    is GlTextureSource.Bytes -> ShaderProgramValidator.TextureInput(sourceSizeBytes = byteCount.toLong())
+    is GlTextureSource.FilePath -> ShaderProgramValidator.TextureInput(
+      sourceSizeBytes = File(path).takeIf { it.isFile }?.length(),
+    )
+    is GlTextureSource.ContentUri -> ShaderProgramValidator.TextureInput()
+  }
+}
+
 /**
  * Immutable runtime input for the GLES2 wallpaper renderer.
  *
@@ -716,14 +726,4 @@ private fun isWithinOpenGlRoot(rootDirectory: File, candidate: File): Boolean {
     current = current.parentFile
   }
   return false
-}
-
-private fun GlTextureSource.validationInput(): ShaderProgramValidator.TextureInput {
-  return when (this) {
-    is GlTextureSource.Bytes -> ShaderProgramValidator.TextureInput(sourceSizeBytes = byteCount.toLong())
-    is GlTextureSource.FilePath -> ShaderProgramValidator.TextureInput(
-      sourceSizeBytes = File(path).takeIf { it.isFile }?.length(),
-    )
-    is GlTextureSource.ContentUri -> ShaderProgramValidator.TextureInput()
-  }
 }

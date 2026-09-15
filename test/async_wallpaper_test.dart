@@ -347,6 +347,47 @@ void main() {
 
       expect(result.error?.code, isNot(WallpaperErrorCode.invalidInput));
     });
+
+    test('rejects rotation URL sources that are not HTTPS', () async {
+      for (final source in <String>[
+        'http://example.com/a.jpg',
+        'not a url',
+        'https:///missing-host.jpg',
+      ]) {
+        final result = await AsyncWallpaper.startWallpaperRotation(
+          WallpaperRotationRequest(
+            sources: <WallpaperRotationSource>[
+              WallpaperRotationSource(
+                sourceType: WallpaperSourceType.url,
+                source: source,
+              ),
+            ],
+            target: WallpaperTarget.home,
+            intervalMinutes: 60,
+          ),
+        );
+
+        expect(result.error?.code, WallpaperErrorCode.invalidInput);
+        expect(result.error?.message, contains('HTTPS'));
+      }
+    });
+
+    test('accepts an HTTPS rotation URL', () async {
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[
+            WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
+            ),
+          ],
+          target: WallpaperTarget.home,
+          intervalMinutes: 60,
+        ),
+      );
+
+      expect(result.error?.code, isNot(WallpaperErrorCode.invalidInput));
+    });
   });
 
   group('video validation', () {
@@ -361,6 +402,20 @@ void main() {
 
       expect(result.status, WallpaperOperationStatus.awaitingUserConfirmation);
       expect(client.prepareCalls, 1);
+    });
+
+    test('rejects video bytes above the documented 256 MiB limit', () async {
+      final client = _RecordingWallpaperClient();
+      AsyncWallpaper.debugSetClient(client);
+      final result = await AsyncWallpaper.setVideoWallpaper(
+        VideoWallpaperRequest(
+          source: WallpaperSource.bytes(Uint8List(256 * 1024 * 1024 + 1)),
+        ),
+      );
+
+      expect(result.status, WallpaperOperationStatus.failed);
+      expect(result.errorCode, 'invalid-input');
+      expect(client.prepareCalls, 0);
     });
 
     test(

@@ -19,6 +19,16 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Verify workflow actions are pinned
+        shell: bash
+        run: |
+          if grep -rhE 'uses:[[:space:]]*[^#[:space:]]+@' .github/workflows \
+            | grep -vE '@[0-9a-f]{40}([[:space:]]|$)'; then
+            echo 'Pin every action to a 40-character commit SHA.' >&2
+            exit 1
+          fi
+          echo 'All workflow actions are pinned to commit SHAs.'
+
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version-file: .fvmrc

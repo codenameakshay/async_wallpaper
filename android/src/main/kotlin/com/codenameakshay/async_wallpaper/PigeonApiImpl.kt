@@ -108,6 +108,8 @@ class PigeonApiImpl(
         val started = rotationEngine.startRotation(config)
         if (started) {
           reconcileRotationTriggers(config, intervalMinutes)
+        } else {
+          rollbackFailedRotationStart()
         }
         started
       }.getOrElse {
@@ -167,6 +169,20 @@ class PigeonApiImpl(
     } else {
       WallpaperRotationScheduler.cancelTimeOfDay(appContext)
     }
+  }
+
+  /**
+   * A start that could not apply its first wallpaper must not leave schedules or a running flag
+   * behind. The failure reason is preserved for [WallpaperRotationStatusData.lastError].
+   */
+  private fun rollbackFailedRotationStart() {
+    val failureReason = rotationStore.getStatusData().lastError
+    WallpaperRotationScheduler.cancelPeriodic(appContext)
+    WallpaperRotationScheduler.cancelCharging(appContext)
+    WallpaperRotationScheduler.cancelTimeOfDay(appContext)
+    rotationStore.stopRotation()
+    rotationEngine.clearRotationCache()
+    rotationStore.setLastError(failureReason)
   }
 
   override fun getWallpaperRotationStatus(

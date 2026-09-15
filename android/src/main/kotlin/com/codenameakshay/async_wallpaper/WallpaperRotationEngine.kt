@@ -50,7 +50,10 @@ internal class WallpaperRotationEngine(
     if (!firstApplySuccess) {
       store.setLastError("Unable to apply initial wallpaper from playlist.")
     }
-    return true
+    // A start that cannot apply its first wallpaper is a failed start, not a success. Reporting
+    // true here previously told callers rotation was running while lastError already held a
+    // failure, which is the behaviour behind the "success before the wallpaper is set" reports.
+    return firstApplySuccess
   }
 
   fun applyNextWallpaper(): Boolean {

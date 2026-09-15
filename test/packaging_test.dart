@@ -100,7 +100,7 @@ void main() {
     );
   });
 
-  test('iOS packages and example use the shared plugin sources', () {
+  test('iOS Swift package declares Flutter and shares the plugin sources', () {
     final packageContents = File(
       'ios/async_wallpaper/Package.swift',
     ).readAsStringSync();

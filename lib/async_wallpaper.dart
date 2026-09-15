@@ -82,7 +82,7 @@ class AsyncWallpaper {
     }
 
     try {
-      final MaterialYouSupportData data = await _api.checkMaterialYouSupport();
+      final data = await _api.checkMaterialYouSupport();
       return MaterialYouSupport(
         isSupported: data.isSupported == true,
         androidVersion: data.androidVersion ?? 'Unknown',
@@ -122,10 +122,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateSource(
-      request.source,
-      label: 'Wallpaper',
-    );
+    final validationError = _validateSource(request.source, label: 'Wallpaper');
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -149,7 +146,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateSource(
+    final validationError = _validateSource(
       request.source,
       label: 'Video wallpaper',
     );
@@ -172,7 +169,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateSource(
+    final validationError = _validateSource(
       request.source,
       label: 'Video wallpaper',
     );
@@ -195,7 +192,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateOpenGlWallpaperRequest(request);
+    final validationError = _validateOpenGlWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -213,9 +210,8 @@ class AsyncWallpaper {
       return _unsupportedResult;
     }
 
-    final StaticWallpaperRequest structuredRequest =
-        _legacyStaticWallpaperRequest(request);
-    final String? validationError = _validateSource(
+    final structuredRequest = _legacyStaticWallpaperRequest(request);
+    final validationError = _validateSource(
       structuredRequest.source,
       label: 'Wallpaper',
     );
@@ -223,7 +219,7 @@ class AsyncWallpaper {
       return _legacyInvalidInput(validationError);
     }
 
-    final WallpaperOperationResult operation = await _runOperation(
+    final operation = await _runOperation(
       target: request.target,
       operation: 'setting wallpaper',
       call: () => _client.applyWallpaper(structuredRequest),
@@ -271,11 +267,11 @@ class AsyncWallpaper {
       return _unsupportedResult;
     }
 
-    final VideoWallpaperRequest structuredRequest = VideoWallpaperRequest(
+    final structuredRequest = VideoWallpaperRequest(
       source: WallpaperSource.filePath(request.filePath),
       goToHome: request.goToHome,
     );
-    final String? validationError = _validateSource(
+    final validationError = _validateSource(
       structuredRequest.source,
       label: 'Video wallpaper',
     );
@@ -283,7 +279,7 @@ class AsyncWallpaper {
       return _legacyInvalidInput(validationError);
     }
 
-    final WallpaperOperationResult operation = await _runOperation(
+    final operation = await _runOperation(
       target: structuredRequest.target,
       operation: 'opening live wallpaper preview',
       call: () => _client.openLiveWallpaperPreview(structuredRequest),
@@ -340,8 +336,8 @@ class AsyncWallpaper {
         ),
       );
     }
-    final bool hasInvalidSource = request.sources.any(
-      (WallpaperRotationSource source) => source.source.trim().isEmpty,
+    final hasInvalidSource = request.sources.any(
+      (source) => source.source.trim().isEmpty,
     );
     if (hasInvalidSource) {
       return const WallpaperResult.failure(
@@ -369,10 +365,10 @@ class AsyncWallpaper {
       );
     }
 
-    final WallpaperRotationConfigData config = WallpaperRotationConfigData(
+    final config = WallpaperRotationConfigData(
       sources: request.sources
           .map(
-            (WallpaperRotationSource source) => RotationSourceData(
+            (source) => RotationSourceData(
               source: source.source,
               sourceType: rotationSourceTypeToData(source.sourceType),
             ),
@@ -425,8 +421,7 @@ class AsyncWallpaper {
     }
 
     try {
-      final WallpaperRotationStatusData data = await _api
-          .getWallpaperRotationStatus();
+      final data = await _api.getWallpaperRotationStatus();
       return WallpaperRotationStatus(
         isRunning: data.isRunning == true,
         nextRunEpochMs: data.nextRunEpochMs ?? 0,
@@ -486,7 +481,7 @@ class AsyncWallpaper {
     required String exceptionMessage,
   }) async {
     try {
-      final bool success = await call();
+      final success = await call();
       return success
           ? const WallpaperResult.success()
           : WallpaperResult.failure(
@@ -538,7 +533,7 @@ class AsyncWallpaper {
   static StaticWallpaperRequest _legacyStaticWallpaperRequest(
     WallpaperRequest request,
   ) {
-    final WallpaperSource source = switch (request.sourceType) {
+    final source = switch (request.sourceType) {
       WallpaperSourceType.url => WallpaperSource.url(request.source),
       WallpaperSourceType.file => WallpaperSource.filePath(request.source),
     };
@@ -565,8 +560,8 @@ class AsyncWallpaper {
       return 'At most $_maxOpenGlTextures textures may be supplied.';
     }
 
-    for (var index = 0; index < request.textures.length; index += 1) {
-      final String? validationError = _validateSource(
+    for (var index = 0; index < request.textures.length; index++) {
+      final validationError = _validateSource(
         request.textures[index],
         label: 'Texture $index',
         maxBytes: _maxOpenGlTextureBytes,
@@ -583,16 +578,11 @@ class AsyncWallpaper {
     required String label,
     int maxBytes = _maxSourceBytes,
   }) {
-    final String? url = source.url;
-    final String? filePath = source.filePath;
-    final String? contentUri = source.contentUri;
+    final url = source.url;
+    final filePath = source.filePath;
+    final contentUri = source.contentUri;
     final bytes = source.bytes;
-    final int valueCount = <Object?>[
-      url,
-      filePath,
-      contentUri,
-      bytes,
-    ].where((Object? value) => value != null).length;
+    final valueCount = [url, filePath, contentUri, bytes].nonNulls.length;
     if (valueCount != 1) {
       return '$label source must contain exactly one value.';
     }
@@ -620,11 +610,11 @@ class AsyncWallpaper {
   }
 
   static bool _isHttpsUrl(String value) {
-    final String trimmed = value.trim();
+    final trimmed = value.trim();
     if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
-    final Uri? uri = Uri.tryParse(value);
+    final uri = Uri.tryParse(value);
     return uri != null &&
         uri.isAbsolute &&
         uri.scheme.toLowerCase() == 'https' &&
@@ -633,11 +623,11 @@ class AsyncWallpaper {
   }
 
   static bool _isContentUri(String value) {
-    final String trimmed = value.trim();
+    final trimmed = value.trim();
     if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
-    final Uri? uri = Uri.tryParse(value);
+    final uri = Uri.tryParse(value);
     return uri != null &&
         uri.scheme.toLowerCase() == 'content' &&
         uri.host.isNotEmpty;
@@ -668,7 +658,7 @@ class AsyncWallpaper {
   static WallpaperErrorCode _legacyErrorCodeFor(
     WallpaperOperationResult operation,
   ) {
-    final String? errorCode = operation.errorCode?.toLowerCase();
+    final errorCode = operation.errorCode?.toLowerCase();
     if (operation.status == WallpaperOperationStatus.unsupported ||
         errorCode == 'unsupported' ||
         errorCode == 'not-implemented') {

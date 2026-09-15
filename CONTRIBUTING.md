@@ -4,13 +4,13 @@ Thanks for your time.
 If you'd like to report a bug or join in the development
 of Async Wallpaper, then here are some notes on how to do that.
 
-Please **note** we have a [code of conduct](https://github.com/codenameakshay/async_wallpaper/blob/master/CODE_OF_CONDUCT.md), please follow it in all your interactions with the project.
+Please **note** we have a [code of conduct](CODE_OF_CONDUCT.md), please follow it in all your interactions with the project.
 
 ## Contents
 * [Reporting bugs and opening issues](#reporting-bugs-and-opening-issues)
 * [Coding Guidelines](#coding-guidelines)
     * [Pull Requests](#pull-requests)
-    * [MVP architecture](#mvp-architecture)
+    * [Architecture](#architecture)
     * [Style Check](#style-check)
     * [Git Commit Messages](#git-commit-messages)
 * [Security](#security)
@@ -40,13 +40,12 @@ If you're looking for something to work on, have a look at the open issues in th
 
 > We don't have a set format for Pull requests, but we expect you to list changes, bugs generated and other relevant things in PR message.
 
-Refer this pull request [template](https://github.com/codenameakshay/async_wallpaper/blob/master/PULL_REQUEST_TEMPLATE.md).
+### Architecture
 
-### MVP architecture
-Async Wallpaper is built keeping [MVP (model-view-presenter)](https://en.wikipedia.org/wiki/Model–view–presenter) architecture in mind, so any changes that are proposed to Async Wallpaper should follow MVP architecture.
+Async Wallpaper is structured as a public facade (`AsyncWallpaper`) over an internal `WallpaperClient`, which talks to a Pigeon-generated host API implemented natively in Kotlin (Android) and Swift (iOS). Changes should keep that separation: platform-specific logic stays in the native host implementations, not in the Dart facade.
 
 ### Style Check
-Async Wallpaper uses `dartfmt`  for performing style checks on the codebase, which helps us in maintaining the quality of the code. Please check that the code is properly formatted according to `dartfmt` and also resolve all the issues, if any, shown by `dart analyze` before making a pull request. **Pull Requests will only be merged once all the violations are resolved**.
+Async Wallpaper uses `dart format` for performing style checks on the codebase, which helps us in maintaining the quality of the code. Please check that the code is properly formatted according to `dart format` and also resolve all the issues, if any, shown by `dart analyze` before making a pull request. **Pull Requests will only be merged once all the violations are resolved**.
 
 ### Git Commit Messages
 * Use the present tense ("Add feature" not "Added feature")

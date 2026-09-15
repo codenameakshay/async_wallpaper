@@ -71,7 +71,7 @@ class OpenGlWallpaperConfiguration(
 ) {
   val textures: List<GlTextureSource> = textures.map { source ->
     when (source) {
-      is GlTextureSource.Bytes -> GlTextureSource.Bytes(source.copyBytes())
+      is GlTextureSource.Bytes -> source
       is GlTextureSource.FilePath -> source
       is GlTextureSource.ContentUri -> source
     }

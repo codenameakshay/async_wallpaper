@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -15,6 +16,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.net.toUri
+import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
@@ -43,6 +45,10 @@ class PigeonApiImpl(
   private val textureSourceOpener: BoundedSourceOpener = BoundedSourceOpener(
     context,
     ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES,
+  ),
+  private val downloadSourceOpener: BoundedSourceOpener = BoundedSourceOpener(
+    context,
+    MAX_DOWNLOAD_SOURCE_BYTES,
   ),
 ) : WallpaperApi {
   private val appContext = context.applicationContext
@@ -547,12 +553,32 @@ class PigeonApiImpl(
 
   private fun downloadToMediaStore(url: String): Boolean {
     var uri: Uri? = null
+    var temporaryFile: File? = null
     var completed = false
     return try {
       val source = WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url)
+      val openedSource = downloadSourceOpener.openWithMetadata(source)
+      val contentType = openedSource.contentType
+      val downloadedFile = File.createTempFile("async-wallpaper-", ".download", appContext.cacheDir)
+      temporaryFile = downloadedFile
+      openedSource.use { opened ->
+        downloadedFile.outputStream().use { output ->
+          opened.input.copyTo(output)
+        }
+      }
+      val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeFile(downloadedFile.absolutePath, options)
+      val imageFormat = if (options.outWidth > 0 && options.outHeight > 0) {
+        DownloadImageFormat.choose(options.outMimeType, contentType)
+      } else {
+        null
+      } ?: return false
       val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "wallpaper_${System.currentTimeMillis()}.jpg")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        put(
+          MediaStore.Images.Media.DISPLAY_NAME,
+          "wallpaper_${System.currentTimeMillis()}.${imageFormat.extension}",
+        )
+        put(MediaStore.Images.Media.MIME_TYPE, imageFormat.mimeType)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/AsyncWallpaper")
           put(MediaStore.Images.Media.IS_PENDING, 1)
@@ -560,7 +586,7 @@ class PigeonApiImpl(
       }
       val resolver = appContext.contentResolver
       uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-      val written = textureSourceOpener.open(source).use { input ->
+      val written = downloadedFile.inputStream().use { input ->
         resolver.openOutputStream(uri!!)?.use { output ->
           input.copyTo(output)
           true
@@ -570,12 +596,15 @@ class PigeonApiImpl(
         return false
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        resolver.update(
+        val updatedRows = resolver.update(
           uri!!,
           ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) },
           null,
           null,
         )
+        if (updatedRows == 0) {
+          return false
+        }
       }
       completed = true
       true
@@ -587,6 +616,7 @@ class PigeonApiImpl(
       if (!completed && uri != null) {
         runCatching { appContext.contentResolver.delete(uri!!, null, null) }
       }
+      temporaryFile?.delete()
     }
   }
 
@@ -737,6 +767,8 @@ class PigeonApiImpl(
   companion object {
     private const val TAG = "AsyncWallpaper"
     private const val MAX_VIDEO_SOURCE_BYTES = 256L * 1024L * 1024L
+    /** Generous bound for one downloaded wallpaper; validation still happens from a temp file. */
+    private const val MAX_DOWNLOAD_SOURCE_BYTES = 64L * 1024L * 1024L
     private const val MAIN_THREAD_WAIT_MILLIS = 10_000L
 
     private const val ERROR_INVALID_REQUEST = "invalid-request"

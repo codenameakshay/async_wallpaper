@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /** An integer rectangle expressed as left, top, right, and bottom edges. */
 data class RectSpec(
@@ -170,6 +171,20 @@ object BitmapTransformMath {
     } else {
       value.coerceIn(0f, 1f)
     }
+  }
+
+  /**
+   * Returns the largest scale in (0, 1] that keeps [width] x [height] within both [maxDimension]
+   * per side and [maxPixels] total, or `1.0` when the input is already within both bounds.
+   */
+  fun scaleToFit(width: Int, height: Int, maxDimension: Int, maxPixels: Long): Double {
+    val pixelCount = width.toLong() * height.toLong()
+    val pixelScale = sqrt(maxPixels.toDouble() / pixelCount.toDouble())
+    val dimensionScale = min(
+      maxDimension.toDouble() / width.toDouble(),
+      maxDimension.toDouble() / height.toDouble(),
+    )
+    return min(1.0, min(pixelScale, dimensionScale))
   }
 
   private fun fitCenterDestination(

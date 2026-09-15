@@ -9,8 +9,6 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
 import kotlin.math.floor
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * Applies a structured static-wallpaper request without requiring a foreground Activity for the
@@ -309,19 +307,12 @@ class StaticWallpaperEngine(
     val desiredHeight = manager.desiredMinimumHeight.takeIf { it > 0 } ?: metrics.heightPixels
     val safeWidth = desiredWidth.coerceAtLeast(1)
     val safeHeight = desiredHeight.coerceAtLeast(1)
-    val pixelCount = safeWidth.toLong() * safeHeight.toLong()
-    if (pixelCount <= MAX_TRANSFORM_PIXELS &&
-      safeWidth <= MAX_TRANSFORM_DIMENSION &&
-      safeHeight <= MAX_TRANSFORM_DIMENSION
-    ) {
-      return WallpaperDimensions(safeWidth, safeHeight)
-    }
-    val pixelScale = sqrt(MAX_TRANSFORM_PIXELS.toDouble() / pixelCount.toDouble())
-    val dimensionScale = min(
-      MAX_TRANSFORM_DIMENSION.toDouble() / safeWidth.toDouble(),
-      MAX_TRANSFORM_DIMENSION.toDouble() / safeHeight.toDouble(),
+    val scale = BitmapTransformMath.scaleToFit(
+      safeWidth,
+      safeHeight,
+      MAX_TRANSFORM_DIMENSION,
+      MAX_TRANSFORM_PIXELS,
     )
-    val scale = min(1.0, min(pixelScale, dimensionScale))
     return WallpaperDimensions(
       width = floor(safeWidth * scale).toInt().coerceAtLeast(1),
       height = floor(safeHeight * scale).toInt().coerceAtLeast(1),

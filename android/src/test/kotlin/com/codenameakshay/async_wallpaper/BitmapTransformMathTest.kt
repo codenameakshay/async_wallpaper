@@ -1,5 +1,6 @@
 package com.codenameakshay.async_wallpaper
 
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -135,6 +136,33 @@ class BitmapTransformMathTest {
         targetHeight = 100,
       )
     }
+  }
+
+  @Test
+  fun `scale to fit keeps images already within both bounds unscaled`() {
+    assertEquals(
+      1.0,
+      BitmapTransformMath.scaleToFit(width = 100, height = 100, maxDimension = 200, maxPixels = 1_000_000),
+      0.0,
+    )
+  }
+
+  @Test
+  fun `scale to fit is limited by the longer side when only a dimension is exceeded`() {
+    assertEquals(
+      0.512,
+      BitmapTransformMath.scaleToFit(width = 8000, height = 8000, maxDimension = 4096, maxPixels = Long.MAX_VALUE),
+      1e-9,
+    )
+  }
+
+  @Test
+  fun `scale to fit is limited by pixel count when only the total is exceeded`() {
+    assertEquals(
+      sqrt(0.5),
+      BitmapTransformMath.scaleToFit(width = 100, height = 100, maxDimension = 1_000_000, maxPixels = 5_000),
+      1e-9,
+    )
   }
 
   @Test

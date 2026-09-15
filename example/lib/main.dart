@@ -347,20 +347,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   WallpaperSource _selectedSource() {
-    switch (_sourceKind) {
-      case _DemoSourceKind.url:
-        return WallpaperSource.url(_requiredInput(_urlController.text, 'URL'));
-      case _DemoSourceKind.filePath:
-        return WallpaperSource.filePath(
-          _requiredInput(_fileController.text, 'File path'),
-        );
-      case _DemoSourceKind.contentUri:
-        return WallpaperSource.contentUri(
-          _requiredInput(_contentUriController.text, 'Content URI'),
-        );
-      case _DemoSourceKind.bytes:
-        return WallpaperSource.bytes(Uint8List.fromList(_demoPngBytes));
-    }
+    return switch (_sourceKind) {
+      _DemoSourceKind.url => WallpaperSource.url(
+        _requiredInput(_urlController.text, 'URL'),
+      ),
+      _DemoSourceKind.filePath => WallpaperSource.filePath(
+        _requiredInput(_fileController.text, 'File path'),
+      ),
+      _DemoSourceKind.contentUri => WallpaperSource.contentUri(
+        _requiredInput(_contentUriController.text, 'Content URI'),
+      ),
+      _DemoSourceKind.bytes => WallpaperSource.bytes(
+        Uint8List.fromList(_demoPngBytes),
+      ),
+    };
   }
 
   String _requiredInput(String value, String label) {
@@ -480,93 +480,47 @@ class _HomePageState extends State<HomePage> {
               'Replace the text with a source from your app.',
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<_DemoSourceKind>(
+            _enumDropdown<_DemoSourceKind>(
               key: const Key('source-selector'),
-              initialValue: _sourceKind,
-              decoration: const InputDecoration(labelText: 'Source type'),
-              items: _DemoSourceKind.values
-                  .map(
-                    (_DemoSourceKind kind) => DropdownMenuItem<_DemoSourceKind>(
-                      value: kind,
-                      child: Text(_sourceKindLabel(kind)),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: _isBusy
-                  ? null
-                  : (_DemoSourceKind? value) {
-                      if (value != null) {
-                        setState(() => _sourceKind = value);
-                      }
-                    },
+              label: 'Source type',
+              value: _sourceKind,
+              values: _DemoSourceKind.values,
+              labelOf: _sourceKindLabel,
+              onChanged: (_DemoSourceKind value) =>
+                  setState(() => _sourceKind = value),
             ),
             const SizedBox(height: 12),
             _sourceInput(),
             const SizedBox(height: 12),
-            DropdownButtonFormField<WallpaperTarget>(
+            _enumDropdown<WallpaperTarget>(
               key: const Key('target-selector'),
-              initialValue: _target,
-              decoration: const InputDecoration(labelText: 'Requested target'),
-              items: WallpaperTarget.values
-                  .map(
-                    (WallpaperTarget target) =>
-                        DropdownMenuItem<WallpaperTarget>(
-                          value: target,
-                          child: Text(_enumLabel(target.name)),
-                        ),
-                  )
-                  .toList(growable: false),
-              onChanged: _isBusy
-                  ? null
-                  : (WallpaperTarget? value) {
-                      if (value != null) {
-                        setState(() => _target = value);
-                      }
-                    },
+              label: 'Requested target',
+              value: _target,
+              values: WallpaperTarget.values,
+              labelOf: (WallpaperTarget target) => _enumLabel(target.name),
+              onChanged: (WallpaperTarget value) =>
+                  setState(() => _target = value),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<WallpaperScaleMode>(
+            _enumDropdown<WallpaperScaleMode>(
               key: const Key('scale-selector'),
-              initialValue: _scaleMode,
-              decoration: const InputDecoration(labelText: 'Scale mode'),
-              items: WallpaperScaleMode.values
-                  .map(
-                    (WallpaperScaleMode mode) =>
-                        DropdownMenuItem<WallpaperScaleMode>(
-                          value: mode,
-                          child: Text(_enumLabel(mode.name)),
-                        ),
-                  )
-                  .toList(growable: false),
-              onChanged: _isBusy
-                  ? null
-                  : (WallpaperScaleMode? value) {
-                      if (value != null) {
-                        setState(() => _scaleMode = value);
-                      }
-                    },
+              label: 'Scale mode',
+              value: _scaleMode,
+              values: WallpaperScaleMode.values,
+              labelOf: (WallpaperScaleMode mode) => _enumLabel(mode.name),
+              onChanged: (WallpaperScaleMode value) =>
+                  setState(() => _scaleMode = value),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<WallpaperApplyStrategy>(
+            _enumDropdown<WallpaperApplyStrategy>(
               key: const Key('strategy-selector'),
-              initialValue: _strategy,
-              decoration: const InputDecoration(labelText: 'Apply strategy'),
-              items: WallpaperApplyStrategy.values
-                  .map(
-                    (WallpaperApplyStrategy strategy) =>
-                        DropdownMenuItem<WallpaperApplyStrategy>(
-                          value: strategy,
-                          child: Text(_enumLabel(strategy.name)),
-                        ),
-                  )
-                  .toList(growable: false),
-              onChanged: _isBusy
-                  ? null
-                  : (WallpaperApplyStrategy? value) {
-                      if (value != null) {
-                        setState(() => _strategy = value);
-                      }
-                    },
+              label: 'Apply strategy',
+              value: _strategy,
+              values: WallpaperApplyStrategy.values,
+              labelOf: (WallpaperApplyStrategy strategy) =>
+                  _enumLabel(strategy.name),
+              onChanged: (WallpaperApplyStrategy value) =>
+                  setState(() => _strategy = value),
             ),
             FilledButton.icon(
               key: const Key('apply-static-button'),
@@ -582,53 +536,77 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _enumDropdown<T>({
+    required Key key,
+    required String label,
+    required T value,
+    required List<T> values,
+    required String Function(T value) labelOf,
+    required void Function(T value) onChanged,
+  }) {
+    return DropdownButtonFormField<T>(
+      key: key,
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: values
+          .map(
+            (T item) =>
+                DropdownMenuItem<T>(value: item, child: Text(labelOf(item))),
+          )
+          .toList(growable: false),
+      onChanged: _isBusy
+          ? null
+          : (T? selected) {
+              if (selected != null) {
+                onChanged(selected);
+              }
+            },
+    );
+  }
+
   Widget _sourceInput() {
-    switch (_sourceKind) {
-      case _DemoSourceKind.url:
-        return TextField(
-          key: const Key('url-source-input'),
-          controller: _urlController,
-          enabled: !_isBusy,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'HTTPS image or video URL',
-            helperText: 'Use an HTTPS URL that your app is allowed to fetch.',
+    return switch (_sourceKind) {
+      _DemoSourceKind.url => TextField(
+        key: const Key('url-source-input'),
+        controller: _urlController,
+        enabled: !_isBusy,
+        keyboardType: TextInputType.url,
+        decoration: const InputDecoration(
+          labelText: 'HTTPS image or video URL',
+          helperText: 'Use an HTTPS URL that your app is allowed to fetch.',
+        ),
+      ),
+      _DemoSourceKind.filePath => TextField(
+        key: const Key('file-source-input'),
+        controller: _fileController,
+        enabled: !_isBusy,
+        decoration: const InputDecoration(
+          labelText: 'Local file path',
+          helperText: 'Pass the path returned by your own picker or cache.',
+        ),
+      ),
+      _DemoSourceKind.contentUri => TextField(
+        key: const Key('uri-source-input'),
+        controller: _contentUriController,
+        enabled: !_isBusy,
+        keyboardType: TextInputType.url,
+        decoration: const InputDecoration(
+          labelText: 'Android content URI',
+          helperText:
+              'Persist access in your app if the URI outlives a session.',
+        ),
+      ),
+      _DemoSourceKind.bytes => const DecoratedBox(
+        decoration: BoxDecoration(color: Color(0x11000000)),
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            'Embedded bytes: a bundled 1×1 PNG is used for this demo. '
+            'Replace WallpaperSource.bytes(...) with your image bytes.',
           ),
-        );
-      case _DemoSourceKind.filePath:
-        return TextField(
-          key: const Key('file-source-input'),
-          controller: _fileController,
-          enabled: !_isBusy,
-          decoration: const InputDecoration(
-            labelText: 'Local file path',
-            helperText: 'Pass the path returned by your own picker or cache.',
-          ),
-        );
-      case _DemoSourceKind.contentUri:
-        return TextField(
-          key: const Key('uri-source-input'),
-          controller: _contentUriController,
-          enabled: !_isBusy,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'Android content URI',
-            helperText:
-                'Persist access in your app if the URI outlives a session.',
-          ),
-        );
-      case _DemoSourceKind.bytes:
-        return const DecoratedBox(
-          decoration: BoxDecoration(color: Color(0x11000000)),
-          child: Padding(
-            padding: EdgeInsets.all(12),
-            child: Text(
-              'Embedded bytes: a bundled 1×1 PNG is used for this demo. '
-              'Replace WallpaperSource.bytes(...) with your image bytes.',
-            ),
-          ),
-        );
-    }
+        ),
+      ),
+    };
   }
 
   Widget _staticOutcome(BuildContext context) {
@@ -806,16 +784,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   static String _sourceKindLabel(_DemoSourceKind kind) {
-    switch (kind) {
-      case _DemoSourceKind.url:
-        return 'URL';
-      case _DemoSourceKind.filePath:
-        return 'File path';
-      case _DemoSourceKind.contentUri:
-        return 'Content URI';
-      case _DemoSourceKind.bytes:
-        return 'Embedded bytes';
-    }
+    return switch (kind) {
+      _DemoSourceKind.url => 'URL',
+      _DemoSourceKind.filePath => 'File path',
+      _DemoSourceKind.contentUri => 'Content URI',
+      _DemoSourceKind.bytes => 'Embedded bytes',
+    };
   }
 
   static String _enumLabel(String value) {

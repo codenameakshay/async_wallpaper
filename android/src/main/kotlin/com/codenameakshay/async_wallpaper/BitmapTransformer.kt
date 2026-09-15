@@ -135,22 +135,6 @@ object BitmapTransformMath {
     }
   }
 
-  /** Returns null instead of throwing when either source or target dimensions are invalid. */
-  fun calculateOrNull(
-    mode: WallpaperScaleModeData,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    targetWidth: Int,
-    targetHeight: Int,
-    focalX: Float = DEFAULT_FOCAL_POINT,
-    focalY: Float = DEFAULT_FOCAL_POINT,
-  ): BitmapTransformSpec? {
-    if (!hasValidDimensions(sourceWidth, sourceHeight, targetWidth, targetHeight)) {
-      return null
-    }
-    return calculate(mode, sourceWidth, sourceHeight, targetWidth, targetHeight, focalX, focalY)
-  }
-
   /**
    * Returns the source rectangle whose aspect ratio matches the target. This is intentionally
    * exposed as a small pure operation for callers that need crop hints without drawing a bitmap.
@@ -284,23 +268,6 @@ object BitmapTransformMath {
 
   private const val DEFAULT_FOCAL_POINT = 0.5f
 }
-
-/** Convenience top-level alias for crop-hint callers and JVM-only geometry tests. */
-fun calculateCenterCrop(
-  sourceWidth: Int,
-  sourceHeight: Int,
-  targetWidth: Int,
-  targetHeight: Int,
-  focalX: Float = 0.5f,
-  focalY: Float = 0.5f,
-): RectSpec = BitmapTransformMath.calculateCenterCrop(
-  sourceWidth,
-  sourceHeight,
-  targetWidth,
-  targetHeight,
-  focalX,
-  focalY,
-)
 
 /** Applies [BitmapTransformMath] geometry using Android's bitmap and canvas APIs. */
 object BitmapTransformer {

@@ -1,7 +1,6 @@
 package com.codenameakshay.async_wallpaper
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -10,7 +9,7 @@ class BitmapTransformMathTest {
   fun `center crop crops a landscape source around its center`() {
     assertEquals(
       RectSpec(500, 0, 1500, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, 0.5f, 0.5f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, 0.5f, 0.5f),
     )
   }
 
@@ -18,11 +17,11 @@ class BitmapTransformMathTest {
   fun `center crop clamps focal points at both source edges`() {
     assertEquals(
       RectSpec(0, 0, 1000, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, -5f, -2f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, -5f, -2f),
     )
     assertEquals(
       RectSpec(1000, 0, 2000, 1000),
-      calculateCenterCrop(2000, 1000, 1000, 1000, 7f, 3f),
+      BitmapTransformMath.calculateCenterCrop(2000, 1000, 1000, 1000, 7f, 3f),
     )
   }
 
@@ -30,7 +29,7 @@ class BitmapTransformMathTest {
   fun `center crop handles portrait sources with vertical focal positions`() {
     assertEquals(
       RectSpec(0, 1000, 1000, 2000),
-      calculateCenterCrop(1000, 2000, 1000, 1000, 0.5f, 0.75f),
+      BitmapTransformMath.calculateCenterCrop(1000, 2000, 1000, 1000, 0.5f, 0.75f),
     )
   }
 
@@ -126,16 +125,7 @@ class BitmapTransformMathTest {
   }
 
   @Test
-  fun `invalid dimensions return null or fail explicitly`() {
-    assertNull(
-      BitmapTransformMath.calculateOrNull(
-        WallpaperScaleModeData.CENTER_CROP,
-        sourceWidth = 0,
-        sourceHeight = 100,
-        targetWidth = 100,
-        targetHeight = 100,
-      ),
-    )
+  fun `invalid dimensions fail explicitly`() {
     assertThrows(IllegalArgumentException::class.java) {
       BitmapTransformMath.calculate(
         WallpaperScaleModeData.CENTER_CROP,

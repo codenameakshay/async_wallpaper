@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import androidx.core.graphics.createBitmap
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -325,7 +326,7 @@ object BitmapTransformer {
       "Destination rectangle must have positive dimensions."
     }
 
-    val output = Bitmap.createBitmap(
+    val output = createBitmap(
       geometry.outputWidth,
       geometry.outputHeight,
       Bitmap.Config.ARGB_8888,

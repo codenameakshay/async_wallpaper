@@ -1,7 +1,7 @@
 package com.codenameakshay.async_wallpaper
 
 import android.content.Context
-import android.net.Uri
+import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -65,7 +65,7 @@ class BoundedSourceOpener(
   }
 
   private fun openContentUri(value: String): InputStream {
-    val uri = Uri.parse(value)
+    val uri = value.toUri()
     if (!uri.scheme.equals(CONTENT_SCHEME, ignoreCase = true) || uri.authority.isNullOrBlank()) {
       throw invalidSource("Sources of this kind must use a content URI.")
     }

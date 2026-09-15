@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
-import android.net.Uri
+import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -123,7 +123,7 @@ class WallpaperSourceLoader(
   }
 
   private fun contentUriInputSource(value: String): InputSource {
-    val uri = Uri.parse(value)
+    val uri = value.toUri()
     if (!uri.scheme.equals(CONTENT_SCHEME, ignoreCase = true) || uri.authority.isNullOrBlank()) {
       throw invalidSource("Wallpaper content sources must use a content URI.")
     }

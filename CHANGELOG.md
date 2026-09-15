@@ -8,6 +8,7 @@
 - `startWallpaperRotation`, `stopWallpaperRotation`, `rotateWallpaperNow`, and `getWallpaperRotationStatus` now return an `unsupported` result / a not-running status off Android instead of falling through to a platform call.
 - `getWallpaperRotationStatus()` no longer throws when the platform call fails; it returns a not-running status with `lastError` set instead.
 - Results decided in Dart (unsupported platform, invalid input, transport exception) now fill `home`/`lock` for each requested target, the same way Android does, instead of leaving them null.
+- An unsupported video scale mode (`center`, `fill`, `stretch`) now returns `unsupported` with `video-scale-unsupported`, as documented and as Android reports it. The Dart pre-check returned `failed` with `invalid-input`.
 - OpenGL live wallpaper: an unexpected I/O error while reading a texture source during configuration is now reported as `texture-source-unavailable` instead of `configuration-store-failed`, matching what the renderer reports for the same failure.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
 

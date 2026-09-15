@@ -150,6 +150,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
+    final unsupportedScale = _unsupportedVideoScale(request);
+    if (unsupportedScale != null) {
+      return unsupportedScale;
+    }
     final validationError = _validateVideoWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
@@ -170,6 +174,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
+    final unsupportedScale = _unsupportedVideoScale(request);
+    if (unsupportedScale != null) {
+      return unsupportedScale;
+    }
     final validationError = _validateVideoWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
@@ -630,11 +638,25 @@ class AsyncWallpaper {
     return null;
   }
 
-  static String? _validateVideoWallpaperRequest(VideoWallpaperRequest request) {
-    if (request.scaleMode != WallpaperScaleMode.centerCrop &&
-        request.scaleMode != WallpaperScaleMode.fitCenter) {
-      return 'Video live wallpapers support only centerCrop and fitCenter scaling.';
+  /// Mirrors Android's `video-scale-unsupported` result without a platform call.
+  static WallpaperOperationResult? _unsupportedVideoScale(
+    VideoWallpaperRequest request,
+  ) {
+    if (request.scaleMode == WallpaperScaleMode.centerCrop ||
+        request.scaleMode == WallpaperScaleMode.fitCenter) {
+      return null;
     }
+    return _localResult(
+      request.target,
+      status: WallpaperOperationStatus.unsupported,
+      targetStatus: WallpaperTargetStatus.unsupported,
+      errorCode: 'video-scale-unsupported',
+      errorMessage:
+          'Video live wallpapers support only centerCrop and fitCenter scaling.',
+    );
+  }
+
+  static String? _validateVideoWallpaperRequest(VideoWallpaperRequest request) {
     return _validateSource(
       request.source,
       label: 'Video wallpaper',

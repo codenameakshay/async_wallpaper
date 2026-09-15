@@ -442,8 +442,9 @@ void main() {
           );
 
           for (final result in <WallpaperOperationResult>[prepared, preview]) {
-            expect(result.status, WallpaperOperationStatus.failed);
-            expect(result.errorCode, 'invalid-input');
+            expect(result.status, WallpaperOperationStatus.unsupported);
+            expect(result.errorCode, 'video-scale-unsupported');
+            expect(result.home?.status, WallpaperTargetStatus.unsupported);
           }
         }
 

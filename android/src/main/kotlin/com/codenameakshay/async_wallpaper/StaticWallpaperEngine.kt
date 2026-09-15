@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
 import kotlin.math.floor
+import kotlin.concurrent.withLock
 
 /**
  * Applies a structured static-wallpaper request without requiring a foreground Activity for the
@@ -293,12 +294,14 @@ class StaticWallpaperEngine(
   }
 
   private fun setBitmap(bitmap: Bitmap, flag: Int) {
-    wallpaperManagerProvider().setBitmap(
-      bitmap,
-      Rect(0, 0, bitmap.width, bitmap.height),
-      true,
-      flag,
-    )
+    wallpaperMutationLock.withLock {
+      wallpaperManagerProvider().setBitmap(
+        bitmap,
+        Rect(0, 0, bitmap.width, bitmap.height),
+        true,
+        flag,
+      )
+    }
   }
 
   private fun boundedWallpaperDimensions(manager: WallpaperManager): WallpaperDimensions {

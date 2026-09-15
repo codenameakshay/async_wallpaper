@@ -20,17 +20,23 @@ internal class WallpaperRotationEngine(
   private val appContext = context.applicationContext
   private val wallpaperManager = WallpaperManager.getInstance(appContext)
 
-  fun startRotation(config: WallpaperRotationConfigData): Boolean {
-    val intervalMinutes = config.intervalMinutes?.toInt() ?: return false
+  /**
+   * Replaces the cached playlist and starts rotation.
+   *
+   * Holds [rotationLock] for the whole swap so the cache directory cannot be deleted while a
+   * worker or alarm receiver is reading a file out of it.
+   */
+  fun startRotation(config: WallpaperRotationConfigData): Boolean = rotationLock.withLock {
+    val intervalMinutes = config.intervalMinutes?.toInt() ?: return@withLock false
     if (intervalMinutes < MIN_INTERVAL_MINUTES) {
       store.setLastError("Rotation interval must be at least 15 minutes.")
-      return false
+      return@withLock false
     }
 
     val preparedFiles = prepareLocalFiles(config.sources.orEmpty())
     if (preparedFiles.isEmpty()) {
       store.setLastError("No valid wallpapers available for rotation.")
-      return false
+      return@withLock false
     }
 
     val storedConfig = StoredWallpaperRotationConfig(
@@ -53,7 +59,7 @@ internal class WallpaperRotationEngine(
     // A start that cannot apply its first wallpaper is a failed start, not a success. Reporting
     // true here previously told callers rotation was running while lastError already held a
     // failure, which is the behaviour behind the "success before the wallpaper is set" reports.
-    return firstApplySuccess
+    firstApplySuccess
   }
 
   fun applyNextWallpaper(): Boolean {
@@ -206,8 +212,10 @@ internal class WallpaperRotationEngine(
   private fun applyPathToWallpaper(path: String, target: Int): Boolean {
     return runCatching {
       val flag = targetToFlag(target)
-      FileInputStream(path).use { input ->
-        wallpaperManager.setStream(input, null, true, flag)
+      wallpaperMutationLock.withLock {
+        FileInputStream(path).use { input ->
+          wallpaperManager.setStream(input, null, true, flag)
+        }
       }
       true
     }.getOrElse {

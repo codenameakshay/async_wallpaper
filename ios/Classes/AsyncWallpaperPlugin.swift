@@ -90,19 +90,19 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
 
   func downloadWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void) {
     guard let remoteUrl = URL(string: url) else {
-      completion(.success(false))
+      completeOnMain(.success(false), completion)
       return
     }
 
     requestPhotoLibraryPermission { granted in
       guard granted else {
-        completion(.success(false))
+        self.completeOnMain(.success(false), completion)
         return
       }
 
       URLSession.shared.dataTask(with: remoteUrl) { data, _, error in
-        guard error == nil, let data else {
-          completion(.success(false))
+        guard error == nil, let data, !data.isEmpty else {
+          self.completeOnMain(.success(false), completion)
           return
         }
 
@@ -110,7 +110,7 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
           let creationRequest = PHAssetCreationRequest.forAsset()
           creationRequest.addResource(with: .photo, data: data, options: nil)
         }) { saved, _ in
-          completion(.success(saved))
+          self.completeOnMain(.success(saved), completion)
         }
       }.resume()
     }
@@ -147,6 +147,19 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
 
   func rotateWallpaperNow(completion: @escaping (Result<Bool, Error>) -> Void) {
     completion(.success(false))
+  }
+
+  private func completeOnMain<T>(
+    _ result: Result<T, Error>,
+    _ completion: @escaping (Result<T, Error>) -> Void
+  ) {
+    if Thread.isMainThread {
+      completion(result)
+    } else {
+      DispatchQueue.main.async {
+        completion(result)
+      }
+    }
   }
 
   private func requestPhotoLibraryPermission(_ completion: @escaping (Bool) -> Void) {

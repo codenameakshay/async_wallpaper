@@ -12,7 +12,10 @@ internal class WallpaperRotationWorker(
     return if (WallpaperRotationRunner.runNext(applicationContext)) {
       Result.success()
     } else {
-      Result.retry()
+      // The configured interval, charging, and time-of-day triggers already own the retry cadence.
+      // Returning retry() here would also spin for permanent failures such as a deleted or
+      // unreadable playlist file, so fail the run and let the next scheduled trigger try again.
+      Result.failure()
     }
   }
 }

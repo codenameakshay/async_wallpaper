@@ -17,11 +17,13 @@ class AsyncWallpaper {
   // ShaderProgramValidator.MAX_FRAGMENT_SHADER_BYTES /
   // MAX_TEXTURE_COUNT / MAX_TEXTURE_SOURCE_BYTES.
   static const int _maxSourceBytes = 32 * 1024 * 1024;
+  static const int _maxVideoSourceBytes = 256 * 1024 * 1024;
   static const int _maxOpenGlTextureBytes = 8 * 1024 * 1024;
   static const int _maxOpenGlTextures = 4;
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
   static const int _minRotationIntervalMinutes = 15;
+  static const int _maxRotationSources = 100;
 
   static final WallpaperApi _api = WallpaperApi();
   static final WallpaperClient _defaultClient = PigeonWallpaperClient(
@@ -148,10 +150,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final validationError = _validateSource(
-      request.source,
-      label: 'Video wallpaper',
-    );
+    final validationError = _validateVideoWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -171,10 +170,7 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final validationError = _validateSource(
-      request.source,
-      label: 'Video wallpaper',
-    );
+    final validationError = _validateVideoWallpaperRequest(request);
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -338,6 +334,15 @@ class AsyncWallpaper {
         ),
       );
     }
+    if (request.sources.length > _maxRotationSources) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message:
+              'Rotation sources must not exceed $_maxRotationSources entries.',
+        ),
+      );
+    }
     final hasInvalidSource = request.sources.any(
       (source) => source.source.trim().isEmpty,
     );
@@ -346,6 +351,19 @@ class AsyncWallpaper {
         WallpaperError(
           code: WallpaperErrorCode.invalidInput,
           message: 'Rotation source entries cannot be empty.',
+        ),
+      );
+    }
+    final hasInvalidUrl = request.sources.any(
+      (source) =>
+          source.sourceType == WallpaperSourceType.url &&
+          !_isHttpsUrl(source.source),
+    );
+    if (hasInvalidUrl) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation URL sources must be valid HTTPS URLs.',
         ),
       );
     }
@@ -363,6 +381,18 @@ class AsyncWallpaper {
         WallpaperError(
           code: WallpaperErrorCode.invalidInput,
           message: 'At least one rotation trigger is required.',
+        ),
+      );
+    }
+    // Overnight windows and equal start/end full-day windows are allowed.
+    if (request.activeHoursStart < 0 ||
+        request.activeHoursStart > 23 ||
+        request.activeHoursEnd < 0 ||
+        request.activeHoursEnd > 23) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation active hours must be between 0 and 23.',
         ),
       );
     }
@@ -568,6 +598,18 @@ class AsyncWallpaper {
       }
     }
     return null;
+  }
+
+  static String? _validateVideoWallpaperRequest(VideoWallpaperRequest request) {
+    if (request.scaleMode != WallpaperScaleMode.centerCrop &&
+        request.scaleMode != WallpaperScaleMode.fitCenter) {
+      return 'Video live wallpapers support only centerCrop and fitCenter scaling.';
+    }
+    return _validateSource(
+      request.source,
+      label: 'Video wallpaper',
+      maxBytes: _maxVideoSourceBytes,
+    );
   }
 
   static String? _validateSource(

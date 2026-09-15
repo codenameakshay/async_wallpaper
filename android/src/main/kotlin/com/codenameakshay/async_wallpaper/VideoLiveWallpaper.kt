@@ -80,6 +80,7 @@ class VideoLiveWallpaper : WallpaperService() {
       val generation = ++playerGeneration
       mediaPlayer = player
       try {
+        val scaleMode = VideoWallpaperRepository(filesDir).activeScaleMode()
         player.setOnPreparedListener { preparedPlayer ->
           synchronized(lifecycleLock) {
             if (!isCurrentPlayer(preparedPlayer, generation)) {
@@ -102,7 +103,7 @@ class VideoLiveWallpaper : WallpaperService() {
         player.isLooping = true
         // Live wallpaper should never take over the user's audio by default.
         player.setVolume(0f, 0f)
-        player.setVideoScalingMode(requestedScalingMode.mediaPlayerMode())
+        player.setVideoScalingMode(scaleMode.mediaPlayerMode())
         player.prepareAsync()
       } catch (error: Exception) {
         Log.e(TAG, "Failed to prepare live wallpaper player", error)
@@ -161,21 +162,6 @@ class VideoLiveWallpaper : WallpaperService() {
 
   companion object {
     private const val TAG = "VideoLiveWallpaper"
-
-    @Volatile
-    private var requestedScalingMode = VideoWallpaperScaleMode.CENTER_CROP
-
-    /**
-     * Hook for the request layer. Unsupported MediaPlayer modes intentionally
-     * retain the reliable center-crop default rather than pretending to apply
-     * a transform that the platform player cannot perform.
-     */
-    fun configureScaleMode(scaleMode: WallpaperScaleModeData?) {
-      requestedScalingMode = when (scaleMode) {
-        WallpaperScaleModeData.FIT_CENTER -> VideoWallpaperScaleMode.FIT_CENTER
-        else -> VideoWallpaperScaleMode.CENTER_CROP
-      }
-    }
 
     fun setToWallpaper(context: Context) {
       val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {

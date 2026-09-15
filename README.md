@@ -146,7 +146,10 @@ await AsyncWallpaper.rotateWallpaperNow();
 await AsyncWallpaper.stopWallpaperRotation();
 ```
 
-Minimum interval is 15 minutes. URL entries are cached locally before rotation starts.
+Minimum interval is 15 minutes. URL entries are cached locally before rotation starts. Rotation
+uses `WorkManager` for the interval and charging triggers and one inexact daily alarm for the
+time-of-day trigger, so it needs no foreground service and no exact-alarm permission. Rotation URL
+entries must be HTTPS and are fetched through the same bounded loader as static wallpapers.
 
 ### Platform behavior
 

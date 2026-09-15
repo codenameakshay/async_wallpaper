@@ -22,6 +22,25 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Release signing comes from example/android/key.properties (gitignored) or RELEASE_* variables.
+// Debug builds and tests never need it.
+def releaseSigning = new Properties()
+def releaseSigningFile = rootProject.file('key.properties')
+if (releaseSigningFile.exists()) {
+    releaseSigningFile.withInputStream { input ->
+        releaseSigning.load(input)
+    }
+}
+
+def releaseSigningValue = { String propertyName, String environmentName ->
+    releaseSigning.getProperty(propertyName) ?: System.getenv(environmentName)
+}
+def releaseStoreFile = releaseSigningValue('storeFile', 'RELEASE_STORE_FILE')
+def releaseStorePassword = releaseSigningValue('storePassword', 'RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = releaseSigningValue('keyAlias', 'RELEASE_KEY_ALIAS')
+def releaseKeyPassword = releaseSigningValue('keyPassword', 'RELEASE_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
+
 android {
     namespace "com.codenameakshay.async_wallpaper_example"
     compileSdkVersion 36
@@ -45,9 +64,36 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+if (!hasReleaseSigning) {
+    // Fail before any release work runs so the message is never hidden behind a later task error.
+    gradle.taskGraph.whenReady { graph ->
+        def needsReleaseSigning = graph.allTasks.any {
+            it.name in ['assembleRelease', 'bundleRelease']
+        }
+        if (needsReleaseSigning) {
+            throw new GradleException(
+                'Release signing is required. Provide storeFile, storePassword, keyAlias, and keyPassword in example/android/key.properties, or set the RELEASE_* environment variables.'
+            )
         }
     }
 }

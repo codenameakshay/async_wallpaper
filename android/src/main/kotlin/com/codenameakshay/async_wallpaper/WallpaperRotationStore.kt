@@ -76,20 +76,26 @@ internal class WallpaperRotationStore(context: Context) {
     prefs.edit { putInt(KEY_CURRENT_INDEX, index) }
   }
 
+  /**
+   * Persists the cursor and (optionally) the next shuffle order in one edit.
+   *
+   * Writing them separately can leave a cursor paired with the wrong order if the process dies at
+   * a shuffle-cycle boundary, which skips or repeats wallpapers after restart. A null [order]
+   * leaves the stored order untouched; `saveConfig` clears it when a rotation starts.
+   */
+  fun setCurrentIndexAndShuffleOrder(index: Int, order: List<Int>?) {
+    prefs.edit {
+      putInt(KEY_CURRENT_INDEX, index)
+      if (order != null) {
+        putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString())
+      }
+    }
+  }
+
   fun getShuffleOrder(): List<Int> {
     val json = prefs.getString(KEY_SHUFFLE_ORDER, null) ?: return emptyList()
     return jsonArrayToIntList(json)
   }
-
-  fun setShuffleOrder(order: List<Int>) {
-    prefs.edit { putString(KEY_SHUFFLE_ORDER, JSONArray(order).toString()) }
-  }
-
-  fun setLastAppliedEpochMs(epochMs: Long) {
-    prefs.edit { putLong(KEY_LAST_APPLIED_EPOCH_MS, epochMs) }
-  }
-
-  fun getLastAppliedEpochMs(): Long = prefs.getLong(KEY_LAST_APPLIED_EPOCH_MS, 0L)
 
   fun setNextRunEpochMs(epochMs: Long) {
     prefs.edit { putLong(KEY_NEXT_RUN_EPOCH_MS, epochMs) }
@@ -113,8 +119,6 @@ internal class WallpaperRotationStore(context: Context) {
       effectiveIntervalMinutes = config?.intervalMinutes?.toLong() ?: 0L,
     )
   }
-
-  fun isChargingTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_CHARGING_TRIGGER, false)
 
   fun isTimeOfDayTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, false)
 
@@ -159,7 +163,6 @@ internal class WallpaperRotationStore(context: Context) {
     private const val KEY_ORDER_TYPE = "order_type"
     private const val KEY_CURRENT_INDEX = "current_index"
     private const val KEY_SHUFFLE_ORDER = "shuffle_order"
-    private const val KEY_LAST_APPLIED_EPOCH_MS = "last_applied_epoch_ms"
     private const val KEY_NEXT_RUN_EPOCH_MS = "next_run_epoch_ms"
     private const val KEY_LAST_ERROR = "last_error"
   }

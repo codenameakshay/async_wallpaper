@@ -3,6 +3,7 @@ package com.codenameakshay.async_wallpaper
 import android.content.Context
 import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
+import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
@@ -38,11 +39,16 @@ class BoundedSourceOpener(
 
   /** The caller owns and must close the returned stream. */
   fun open(source: WallpaperSourceData): InputStream {
+    return openWithMetadata(source).input
+  }
+
+  /** Opens a source and exposes the response MIME type when the source provides one. */
+  internal fun openWithMetadata(source: WallpaperSourceData): OpenedSource {
     return when (source.kind ?: throw invalidSource("A source kind is required.")) {
       WallpaperSourceKindData.URL -> openHttps(requiredText(source.url, "URL"))
-      WallpaperSourceKindData.FILE_PATH -> openFile(requiredText(source.filePath, "file path"))
-      WallpaperSourceKindData.CONTENT_URI -> openContentUri(requiredText(source.contentUri, "content URI"))
-      WallpaperSourceKindData.BYTES -> openBytes(source.bytes ?: throw invalidSource("Source bytes are required."))
+      WallpaperSourceKindData.FILE_PATH -> OpenedSource(openFile(requiredText(source.filePath, "file path")))
+      WallpaperSourceKindData.CONTENT_URI -> OpenedSource(openContentUri(requiredText(source.contentUri, "content URI")))
+      WallpaperSourceKindData.BYTES -> OpenedSource(openBytes(source.bytes ?: throw invalidSource("Source bytes are required.")))
     }
   }
 
@@ -94,7 +100,7 @@ class BoundedSourceOpener(
     return SizeLimitedInputStream(ByteArrayInputStream(bytes), maxBytes)
   }
 
-  private fun openHttps(value: String): InputStream {
+  private fun openHttps(value: String): OpenedSource {
     var currentUri = parseHttpsUri(value)
     var redirects = 0
     while (true) {
@@ -132,9 +138,12 @@ class BoundedSourceOpener(
         if (connection.contentLengthLong > maxBytes) {
           throw tooLarge()
         }
-        return DisconnectingInputStream(
-          SizeLimitedInputStream(connection.inputStream, maxBytes),
-          connection,
+        return OpenedSource(
+          DisconnectingInputStream(
+            SizeLimitedInputStream(connection.inputStream, maxBytes),
+            connection,
+          ),
+          connection.contentType,
         )
       } catch (error: IOException) {
         connection.disconnect()
@@ -234,5 +243,12 @@ class BoundedSourceOpener(
     private const val HTTP_REDIRECT_START = 300
     private const val HTTP_REDIRECT_END = 399
     private const val BUFFER_SIZE = 8 * 1024
+  }
+
+  internal class OpenedSource(
+    val input: InputStream,
+    val contentType: String? = null,
+  ) : Closeable {
+    override fun close() = input.close()
   }
 }

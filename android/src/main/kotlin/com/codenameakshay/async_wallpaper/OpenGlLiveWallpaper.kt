@@ -23,6 +23,8 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.math.max
 
 /**
@@ -236,6 +238,18 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private var touchY = 0.5f
     private var offsetX = 0f
     private var offsetY = 0f
+    private val frameState = GlRenderer.FrameState(0f, 1, 1, 0.5f, 0.5f, 0f, 0f)
+    private val frameRunnable = Runnable {
+      val generation = scheduledFrameGeneration
+      if (scheduledFrameGeneration == generation) {
+        scheduledFrameGeneration = null
+      }
+      if (destroyed || generation == null || generation != frameGeneration || !canRender()) {
+        return@Runnable
+      }
+      drawFrame()
+      scheduleFrame()
+    }
 
     fun surfaceCreated(newSurface: Surface) {
       handler.post {
@@ -340,19 +354,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         return
       }
       scheduledFrameGeneration = generation
-      handler.postDelayed(
-        {
-          if (scheduledFrameGeneration == generation) {
-            scheduledFrameGeneration = null
-          }
-          if (destroyed || generation != frameGeneration || !canRender()) {
-            return@postDelayed
-          }
-          drawFrame()
-          scheduleFrame()
-        },
-        if (immediate) 0L else frameIntervalMillis,
-      )
+      handler.postDelayed(frameRunnable, if (immediate) 0L else frameIntervalMillis)
     }
 
     private fun drawFrame() {
@@ -377,17 +379,15 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
       }
 
-      val state = GlRenderer.FrameState(
-        elapsedSeconds = ((SystemClock.elapsedRealtimeNanos() - createdAtNanos)
-          .coerceAtLeast(0L) / NANOS_PER_SECOND).toFloat(),
-        width = width,
-        height = height,
-        touchX = touchX,
-        touchY = touchY,
-        offsetX = offsetX,
-        offsetY = offsetY,
-      )
-      handleRendererResult(currentRenderer.render(state))
+      frameState.elapsedSeconds = ((SystemClock.elapsedRealtimeNanos() - createdAtNanos)
+        .coerceAtLeast(0L) / NANOS_PER_SECOND).toFloat()
+      frameState.width = width
+      frameState.height = height
+      frameState.touchX = touchX
+      frameState.touchY = touchY
+      frameState.offsetX = offsetX
+      frameState.offsetY = offsetY
+      handleRendererResult(currentRenderer.render(frameState))
     }
 
     private fun handleRendererResult(result: GlRenderer.Result) {
@@ -427,6 +427,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private fun invalidateScheduledFrame() {
       frameGeneration += 1L
       scheduledFrameGeneration = null
+      handler.removeCallbacks(frameRunnable)
     }
 
     private fun releaseOnRenderThread() {
@@ -535,19 +536,21 @@ private object OpenGlWallpaperConfigurationStore {
   private const val KEY_TEXTURE_PATH_PREFIX = "texture_path_"
   private const val TEXTURE_DIRECTORY = "async_wallpaper_opengl"
   private const val TEXTURE_FILE_SUFFIX = ".texture"
+  // Separate Flutter engines have separate operation queues, so serialize configuration I/O process-wide.
+  private val configurationLock = ReentrantLock()
 
-  fun load(context: Context): OpenGlWallpaperConfiguration {
+  fun load(context: Context): OpenGlWallpaperConfiguration = configurationLock.withLock {
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    val shader = preferences.getString(KEY_SHADER, null) ?: return defaultConfiguration()
+    val shader = preferences.getString(KEY_SHADER, null) ?: return@withLock defaultConfiguration()
     val frameRate = preferences.getInt(KEY_FRAME_RATE, OpenGlWallpaperConfiguration.DEFAULT_FRAME_RATE)
     val count = preferences.getInt(KEY_TEXTURE_COUNT, 0)
     if (count !in 0..ShaderProgramValidator.MAX_TEXTURE_COUNT) {
-      return defaultConfiguration()
+      return@withLock defaultConfiguration()
     }
     val textures = ArrayList<GlTextureSource>(count)
     repeat(count) { index ->
       val path = preferences.getString("$KEY_TEXTURE_PATH_PREFIX$index", null)
-        ?: return defaultConfiguration()
+        ?: return@withLock defaultConfiguration()
       textures += GlTextureSource.FilePath(path)
     }
     val configuration = OpenGlWallpaperConfiguration(shader, textures, frameRate)
@@ -557,11 +560,11 @@ private object OpenGlWallpaperConfigurationStore {
       frameRate = configuration.frameRate.toLong(),
       openGlEs2Available = true,
     )
-    return if (validation.isValid) configuration else defaultConfiguration()
+    if (validation.isValid) configuration else defaultConfiguration()
   }
 
   @Throws(IOException::class, TextureStorageException::class)
-  fun save(context: Context, configuration: OpenGlWallpaperConfiguration) {
+  fun save(context: Context, configuration: OpenGlWallpaperConfiguration) = configurationLock.withLock {
     val rootDirectory = File(context.filesDir, TEXTURE_DIRECTORY)
     if (!rootDirectory.exists() && !rootDirectory.mkdirs()) {
       throw IOException("Unable to create the OpenGL texture directory.")

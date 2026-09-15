@@ -84,6 +84,21 @@ object AndroidCapabilities {
     }.getOrDefault(false)
   }
 
+  /**
+   * Resolves [intent] once and returns it pinned to the component that answered.
+   *
+   * Launching the original implicit intent re-resolves at start time, so a different handler could
+   * receive the flow (and, for the cropper, the content URI) than the one that was checked. Returns
+   * null when nothing handles the intent.
+   */
+  fun resolveExplicit(packageManager: PackageManager, intent: Intent): Intent? {
+    return runCatching {
+      packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+        ?.activityInfo
+        ?.let { info -> Intent(intent).setComponent(ComponentName(info.packageName, info.name)) }
+    }.getOrNull()
+  }
+
   private fun hasWallpaperService(context: Context, serviceClass: Class<*>): Boolean {
     return runCatching {
       context.packageManager.getServiceInfo(

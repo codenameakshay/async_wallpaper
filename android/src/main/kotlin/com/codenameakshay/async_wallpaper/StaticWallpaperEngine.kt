@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
 import kotlin.math.floor
+import kotlin.concurrent.withLock
 
 /**
  * Applies a structured static-wallpaper request without requiring a foreground Activity for the
@@ -71,14 +72,15 @@ class StaticWallpaperEngine(
 
     return try {
       val intent = wallpaperManagerProvider().getCropAndSetWallpaperIntent(uri)
-      if (!AndroidCapabilities.resolves(liveActivity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(liveActivity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           validated.target,
           code = ERROR_SYSTEM_UI_UNAVAILABLE,
           message = "This device has no app that can crop and set wallpapers.",
         )
       } else {
-        liveActivity.startActivity(intent)
+        liveActivity.startActivity(resolvedIntent)
         OperationResultPolicy.previewOpened(validated.target)
       }
     } catch (_: ActivityNotFoundException) {
@@ -121,14 +123,15 @@ class StaticWallpaperEngine(
       ?: return OperationResultPolicy.foregroundRequired(validated.target)
     val intent = Intent(Intent.ACTION_SET_WALLPAPER)
     return try {
-      if (!AndroidCapabilities.resolves(liveActivity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(liveActivity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           validated.target,
           code = ERROR_SYSTEM_UI_UNAVAILABLE,
           message = "This device has no system wallpaper picker.",
         )
       } else {
-        liveActivity.startActivity(intent)
+        liveActivity.startActivity(resolvedIntent)
         OperationResultPolicy.awaitingUserConfirmation(validated.target)
       }
     } catch (_: ActivityNotFoundException) {
@@ -262,20 +265,24 @@ class StaticWallpaperEngine(
    * reporting a false all-or-nothing success.
    */
   private fun applyBoth(bitmap: Bitmap): OperationResultData {
-    return try {
-      setBitmap(bitmap, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-      OperationResultPolicy.applied(WallpaperTargetData.BOTH)
-    } catch (combinedError: Exception) {
-      val home = applyTargetResult(bitmap, WallpaperManager.FLAG_SYSTEM)
-      val lock = applyTargetResult(bitmap, WallpaperManager.FLAG_LOCK)
-      OperationResultPolicy.fromTargetResults(
-        requestedTarget = WallpaperTargetData.BOTH,
-        home = home,
-        lock = lock,
-        fallbackUsed = true,
-        fallbackStrategy = WallpaperApplyStrategyData.DIRECT,
-        combinedError = combinedError,
-      )
+    // Hold the mutation lock across the combined attempt and the two-target fallback so another
+    // engine or a rotation pass cannot land a write between the home and lock set.
+    return wallpaperMutationLock.withLock {
+      try {
+        setBitmap(bitmap, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+        OperationResultPolicy.applied(WallpaperTargetData.BOTH)
+      } catch (combinedError: Exception) {
+        val home = applyTargetResult(bitmap, WallpaperManager.FLAG_SYSTEM)
+        val lock = applyTargetResult(bitmap, WallpaperManager.FLAG_LOCK)
+        OperationResultPolicy.fromTargetResults(
+          requestedTarget = WallpaperTargetData.BOTH,
+          home = home,
+          lock = lock,
+          fallbackUsed = true,
+          fallbackStrategy = WallpaperApplyStrategyData.DIRECT,
+          combinedError = combinedError,
+        )
+      }
     }
   }
 
@@ -293,12 +300,14 @@ class StaticWallpaperEngine(
   }
 
   private fun setBitmap(bitmap: Bitmap, flag: Int) {
-    wallpaperManagerProvider().setBitmap(
-      bitmap,
-      Rect(0, 0, bitmap.width, bitmap.height),
-      true,
-      flag,
-    )
+    wallpaperMutationLock.withLock {
+      wallpaperManagerProvider().setBitmap(
+        bitmap,
+        Rect(0, 0, bitmap.width, bitmap.height),
+        true,
+        flag,
+      )
+    }
   }
 
   private fun boundedWallpaperDimensions(manager: WallpaperManager): WallpaperDimensions {

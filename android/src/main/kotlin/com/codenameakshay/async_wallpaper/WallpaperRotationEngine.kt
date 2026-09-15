@@ -4,32 +4,51 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import com.squareup.picasso.Picasso
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.URI
 import java.util.Collections
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+/** Why a rotation start did or did not take effect, so callers can roll back only when needed. */
+internal enum class RotationStartResult {
+  /** Rotation is configured and the first wallpaper was applied. */
+  STARTED,
+
+  /** The request was rejected before anything was persisted; any existing rotation is untouched. */
+  REJECTED,
+
+  /** The new configuration was persisted but the first wallpaper could not be applied. */
+  FAILED_AFTER_SAVE,
+}
+
 internal class WallpaperRotationEngine(
   context: Context,
   private val store: WallpaperRotationStore,
+  private val sourceLoader: WallpaperSourceLoader = WallpaperSourceLoader(context.applicationContext),
 ) {
   private val appContext = context.applicationContext
   private val wallpaperManager = WallpaperManager.getInstance(appContext)
 
-  fun startRotation(config: WallpaperRotationConfigData): Boolean {
-    val intervalMinutes = config.intervalMinutes?.toInt() ?: return false
+  /**
+   * Replaces the cached playlist and starts rotation.
+   *
+   * Holds [rotationLock] for the whole swap so the cache directory cannot be deleted while a
+   * worker or alarm receiver is reading a file out of it.
+   */
+  fun startRotation(config: WallpaperRotationConfigData): RotationStartResult = rotationLock.withLock {
+    val intervalMinutes = config.intervalMinutes?.toInt() ?: return@withLock RotationStartResult.REJECTED
     if (intervalMinutes < MIN_INTERVAL_MINUTES) {
       store.setLastError("Rotation interval must be at least 15 minutes.")
-      return false
+      return@withLock RotationStartResult.REJECTED
     }
 
     val preparedFiles = prepareLocalFiles(config.sources.orEmpty())
     if (preparedFiles.isEmpty()) {
       store.setLastError("No valid wallpapers available for rotation.")
-      return false
+      return@withLock RotationStartResult.REJECTED
     }
 
     val storedConfig = StoredWallpaperRotationConfig(
@@ -49,7 +68,14 @@ internal class WallpaperRotationEngine(
     if (!firstApplySuccess) {
       store.setLastError("Unable to apply initial wallpaper from playlist.")
     }
-    return true
+    // A start that cannot apply its first wallpaper is a failed start, not a success. Reporting
+    // success here previously told callers rotation was running while lastError already held a
+    // failure, which is the behaviour behind the "success before the wallpaper is set" reports.
+    if (firstApplySuccess) {
+      RotationStartResult.STARTED
+    } else {
+      RotationStartResult.FAILED_AFTER_SAVE
+    }
   }
 
   fun applyNextWallpaper(): Boolean {
@@ -70,11 +96,14 @@ internal class WallpaperRotationEngine(
         val path = config.localSources[sourceIndex]
         if (applyPathToWallpaper(path, config.target)) {
           val nextPosition = (position + 1) % sourceCount
-          store.setCurrentIndex(nextPosition)
-          if (config.orderType == WallpaperRotationStore.ORDER_TYPE_SHUFFLE && nextPosition == 0) {
-            store.setShuffleOrder(generateShuffleOrder(sourceCount))
+          val nextShuffleOrder = if (
+            config.orderType == WallpaperRotationStore.ORDER_TYPE_SHUFFLE && nextPosition == 0
+          ) {
+            generateShuffleOrder(sourceCount)
+          } else {
+            null
           }
-          store.setLastAppliedEpochMs(System.currentTimeMillis())
+          store.setCurrentIndexAndShuffleOrder(nextPosition, nextShuffleOrder)
           store.setLastError(null)
           return@withLock true
         }
@@ -86,7 +115,9 @@ internal class WallpaperRotationEngine(
   }
 
   fun clearRotationCache() {
-    getRotationCacheDirectory().deleteRecursively()
+    rotationLock.withLock {
+      getRotationCacheDirectory().deleteRecursively()
+    }
   }
 
   private fun resolveOrder(config: StoredWallpaperRotationConfig, sourceCount: Int): List<Int> {
@@ -94,12 +125,21 @@ internal class WallpaperRotationEngine(
       return List(sourceCount) { it }
     }
     val savedOrder = store.getShuffleOrder()
-    if (savedOrder.size == sourceCount) {
+    if (savedOrder.isPermutationOf(sourceCount)) {
       return savedOrder
     }
     val newOrder = generateShuffleOrder(sourceCount)
-    store.setShuffleOrder(newOrder)
+    // Keep the regenerated order and the cursor consistent in a single write.
+    store.setCurrentIndexAndShuffleOrder(store.getCurrentIndex(), newOrder)
     return newOrder
+  }
+
+  /** A stored order is only usable when it names every playlist position exactly once. */
+  private fun List<Int>.isPermutationOf(size: Int): Boolean {
+    if (this.size != size) {
+      return false
+    }
+    return toSet().size == size && all { index -> index in 0 until size }
   }
 
   private fun generateShuffleOrder(sourceCount: Int): List<Int> {
@@ -123,8 +163,14 @@ internal class WallpaperRotationEngine(
       }
       val targetFile = File(cacheDir, "wallpaper_$index.jpg")
       val success = when (sourceData?.sourceType) {
-        RotationSourceTypeData.URL -> cacheUrl(source, targetFile)
-        RotationSourceTypeData.FILE -> copyLocalFile(source, targetFile)
+        RotationSourceTypeData.URL -> cacheSource(
+          WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = source),
+          targetFile,
+        )
+        RotationSourceTypeData.FILE -> cacheSource(
+          WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = source),
+          targetFile,
+        )
         null -> false
       }
       if (success) {
@@ -134,54 +180,61 @@ internal class WallpaperRotationEngine(
     return prepared
   }
 
-  private fun cacheUrl(url: String, targetFile: File): Boolean {
-    val targetSize = getTargetSize()
+  /**
+   * Downloads or opens [source] through the shared bounded loader, so rotation obeys the same
+   * HTTPS-only, redirect, content-type, encoded-size, and decoded-pixel policy as every other
+   * wallpaper path.
+   */
+  private fun cacheSource(source: WallpaperSourceData, targetFile: File): Boolean {
     return runCatching {
-      val bitmap = Picasso.get()
-        .load(url)
-        .resize(targetSize.width, targetSize.height)
-        .centerCrop()
-        .onlyScaleDown()
-        .get()
-      FileOutputStream(targetFile).use { output ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)
+      val bitmap = sourceLoader.load(source)
+      try {
+        writeCachedJpeg(bitmap, targetFile)
+      } finally {
+        if (!bitmap.isRecycled) {
+          bitmap.recycle()
+        }
       }
       true
     }.getOrElse {
-      Log.e(TAG, "Failed to cache URL wallpaper: $url", it)
+      Log.e(TAG, "Failed to cache rotation wallpaper: ${logSafeSourceLabel(source)}", it)
       false
     }
   }
 
-  private fun copyLocalFile(sourcePath: String, targetFile: File): Boolean {
+  /** Scales down to the wallpaper target when needed, then persists a JPEG cache entry. */
+  private fun writeCachedJpeg(bitmap: Bitmap, targetFile: File) {
     val targetSize = getTargetSize()
-    return runCatching {
-      val sourceFile = File(sourcePath)
-      if (!sourceFile.exists() || !sourceFile.canRead()) {
-        false
-      } else {
-        val bitmap = Picasso.get()
-          .load(sourceFile)
-          .resize(targetSize.width, targetSize.height)
-          .centerCrop()
-          .onlyScaleDown()
-          .get()
-        FileOutputStream(targetFile).use { output ->
-          bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)
-        }
-        true
+    val needsDownscale = bitmap.width > targetSize.width || bitmap.height > targetSize.height
+    val output = if (needsDownscale) {
+      BitmapTransformer.transform(
+        bitmap = bitmap,
+        mode = WallpaperScaleModeData.CENTER_CROP,
+        targetWidth = targetSize.width,
+        targetHeight = targetSize.height,
+      )
+    } else {
+      bitmap
+    }
+
+    try {
+      FileOutputStream(targetFile).use { stream ->
+        output.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
       }
-    }.getOrElse {
-      Log.e(TAG, "Failed to copy local wallpaper: $sourcePath", it)
-      false
+    } finally {
+      if (output !== bitmap && !output.isRecycled) {
+        output.recycle()
+      }
     }
   }
 
   private fun applyPathToWallpaper(path: String, target: Int): Boolean {
     return runCatching {
       val flag = targetToFlag(target)
-      FileInputStream(path).use { input ->
-        wallpaperManager.setStream(input, null, true, flag)
+      wallpaperMutationLock.withLock {
+        FileInputStream(path).use { input ->
+          wallpaperManager.setStream(input, null, true, flag)
+        }
       }
       true
     }.getOrElse {
@@ -230,10 +283,25 @@ internal class WallpaperRotationEngine(
     return ((value % size) + size) % size
   }
 
+  /**
+   * Log-safe source label: scheme plus host for URLs, file name for local paths. Rotation sources
+   * can carry signed query parameters or private paths, so never log the raw value.
+   */
+  private fun logSafeSourceLabel(source: WallpaperSourceData): String {
+    val value = source.url ?: source.filePath ?: source.contentUri ?: return "<redacted>"
+    val host = runCatching { URI(value).host }.getOrNull()
+    if (!host.isNullOrBlank()) {
+      val scheme = runCatching { URI(value).scheme }.getOrNull()
+      return "$scheme://$host"
+    }
+    return File(value).name.takeIf { it.isNotBlank() } ?: "<redacted>"
+  }
+
   companion object {
     private const val TAG = "WallpaperRotation"
     private const val CACHE_DIR_NAME = "wallpaper_rotation"
     private const val MIN_INTERVAL_MINUTES = 15
+    private const val JPEG_QUALITY = 95
     private const val DEFAULT_WIDTH = 1080
     private const val DEFAULT_HEIGHT = 1920
     private const val TARGET_HOME = 0

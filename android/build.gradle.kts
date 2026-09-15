@@ -52,6 +52,5 @@ android {
 
 dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.2")
-    implementation("com.squareup.picasso:picasso:2.71828")
     testImplementation("junit:junit:4.13.2")
 }

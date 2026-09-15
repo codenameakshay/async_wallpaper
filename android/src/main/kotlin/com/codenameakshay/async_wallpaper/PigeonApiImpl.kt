@@ -7,6 +7,8 @@ import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -15,6 +17,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.net.toUri
+import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
@@ -43,6 +46,10 @@ class PigeonApiImpl(
   private val textureSourceOpener: BoundedSourceOpener = BoundedSourceOpener(
     context,
     ShaderProgramValidator.MAX_TEXTURE_SOURCE_BYTES,
+  ),
+  private val downloadSourceOpener: BoundedSourceOpener = BoundedSourceOpener(
+    context,
+    MAX_DOWNLOAD_SOURCE_BYTES,
   ),
 ) : WallpaperApi {
   private val appContext = context.applicationContext
@@ -99,25 +106,27 @@ class PigeonApiImpl(
     ioExecutor.execute {
       val success = runCatching {
         val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
-        val started = rotationEngine.startRotation(config)
-        if (started) {
-          if (config.enableIntervalTrigger == true) {
-            WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
-            rotationStore.setNextRunEpochMs(
-              System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
-            )
-          } else {
-            WallpaperRotationScheduler.cancelPeriodic(appContext)
-            rotationStore.setNextRunEpochMs(0L)
+        when (rotationEngine.startRotation(config)) {
+          RotationStartResult.STARTED -> {
+            try {
+              reconcileRotationTriggers(config, intervalMinutes)
+              true
+            } catch (error: Exception) {
+              // The wallpaper is already applied but the schedules are unknown; report failure and
+              // tear the rotation down rather than leaving a half-armed trigger set.
+              Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
+              rollbackFailedRotationStart()
+              false
+            }
           }
-          val needsMonitor = config.enableChargingTrigger == true || config.enableTimeOfDayTrigger == true
-          if (needsMonitor) {
-            WallpaperRotationMonitorService.start(appContext)
-          } else {
-            WallpaperRotationMonitorService.stop(appContext)
+          // Only a start that already persisted a new configuration may roll back, so a rejected
+          // request cannot stop a rotation that is still running.
+          RotationStartResult.FAILED_AFTER_SAVE -> {
+            rollbackFailedRotationStart()
+            false
           }
+          RotationStartResult.REJECTED -> false
         }
-        started
       }.getOrElse {
         Log.e(TAG, "startWallpaperRotation failed", it)
         false
@@ -130,7 +139,8 @@ class PigeonApiImpl(
     ioExecutor.execute {
       val success = runCatching {
         WallpaperRotationScheduler.cancelPeriodic(appContext)
-        WallpaperRotationMonitorService.stop(appContext)
+        WallpaperRotationScheduler.cancelCharging(appContext)
+        WallpaperRotationScheduler.cancelTimeOfDay(appContext)
         rotationStore.stopRotation()
         rotationEngine.clearRotationCache()
         true
@@ -140,6 +150,54 @@ class PigeonApiImpl(
       }
       postCallback(callback, Result.success(success))
     }
+  }
+
+  /**
+   * Reconciles every background trigger with the configuration that was just saved. Each trigger
+   * is scheduled or cancelled independently so changing one setting never leaves a stale schedule
+   * for another.
+   */
+  private fun reconcileRotationTriggers(
+    config: WallpaperRotationConfigData,
+    intervalMinutes: Int,
+  ) {
+    if (config.enableIntervalTrigger == true) {
+      WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
+      rotationStore.setNextRunEpochMs(
+        System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
+      )
+    } else {
+      WallpaperRotationScheduler.cancelPeriodic(appContext)
+      rotationStore.setNextRunEpochMs(0L)
+    }
+
+    if (config.enableChargingTrigger == true) {
+      WallpaperRotationScheduler.scheduleCharging(appContext, intervalMinutes)
+    } else {
+      WallpaperRotationScheduler.cancelCharging(appContext)
+    }
+
+    val startHour = config.activeHoursStart?.toInt()
+      ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_START
+    if (config.enableTimeOfDayTrigger == true) {
+      WallpaperRotationScheduler.scheduleTimeOfDay(appContext, startHour)
+    } else {
+      WallpaperRotationScheduler.cancelTimeOfDay(appContext)
+    }
+  }
+
+  /**
+   * A start that could not apply its first wallpaper must not leave schedules or a running flag
+   * behind. The failure reason is preserved for [WallpaperRotationStatusData.lastError].
+   */
+  private fun rollbackFailedRotationStart() {
+    val failureReason = rotationStore.getStatusData().lastError
+    WallpaperRotationScheduler.cancelPeriodic(appContext)
+    WallpaperRotationScheduler.cancelCharging(appContext)
+    WallpaperRotationScheduler.cancelTimeOfDay(appContext)
+    rotationStore.stopRotation()
+    rotationEngine.clearRotationCache()
+    rotationStore.setLastError(failureReason)
   }
 
   override fun getWallpaperRotationStatus(
@@ -223,7 +281,18 @@ class PigeonApiImpl(
         prepared
       } else {
         runOnMainBlocking {
-          openLiveWallpaperUi(target, VideoLiveWallpaper::class.java)
+          val scaleMode = request.scaleMode
+          if (scaleMode == null) {
+            OperationResultPolicy.failed(
+              target,
+              ERROR_INVALID_REQUEST,
+              "A video wallpaper scale mode is required.",
+            )
+          } else {
+            openLiveWallpaperUi(target, VideoLiveWallpaper::class.java) {
+              promoteVideoAsset(target, scaleMode)
+            }
+          }
         }
       }
     }
@@ -268,10 +337,11 @@ class PigeonApiImpl(
       runOnMainBlocking {
         val activity = currentActivity() ?: return@runOnMainBlocking false
         val intent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
-        if (!AndroidCapabilities.resolves(activity.packageManager, intent)) {
+        val resolvedIntent = AndroidCapabilities.resolveExplicit(activity.packageManager, intent)
+        if (resolvedIntent == null) {
           false
         } else {
-          runCatching { activity.startActivity(intent) }.isSuccess
+          runCatching { activity.startActivity(resolvedIntent) }.isSuccess
         }
       }
     }
@@ -328,9 +398,8 @@ class PigeonApiImpl(
 
     return try {
       videoSourceOpener.open(source).use { input ->
-        videoRepository.prepare(input)
+        videoRepository.preparePending(input)
       }
-      VideoLiveWallpaper.configureScaleMode(scaleMode)
       // Preparing changes only an app-private candidate. The user has not selected it yet.
       OperationResultPolicy.awaitingUserConfirmation(target)
     } catch (error: BoundedSourceException) {
@@ -368,6 +437,7 @@ class PigeonApiImpl(
   private fun openLiveWallpaperUi(
     target: WallpaperTargetData,
     serviceClass: Class<*>,
+    beforeLaunch: (() -> OperationResultData?)? = null,
   ): OperationResultData {
     val activity = currentActivity() ?: return OperationResultPolicy.foregroundRequired(target)
     val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
@@ -377,14 +447,16 @@ class PigeonApiImpl(
       )
     }
     return try {
-      if (!AndroidCapabilities.resolves(activity.packageManager, intent)) {
+      val resolvedIntent = AndroidCapabilities.resolveExplicit(activity.packageManager, intent)
+      if (resolvedIntent == null) {
         OperationResultPolicy.failed(
           target,
           ERROR_SYSTEM_UI_UNAVAILABLE,
           "This device has no system live wallpaper preview UI.",
         )
       } else {
-        activity.startActivity(intent)
+        beforeLaunch?.invoke()?.let { return it }
+        activity.startActivity(resolvedIntent)
         // Android owns target selection in this UI. Do not claim home or lock was applied.
         OperationResultPolicy.previewOpened(target)
       }
@@ -406,6 +478,45 @@ class PigeonApiImpl(
         target,
         ERROR_SYSTEM_UI_FAILED,
         "Unable to open live wallpaper preview.",
+        error.message,
+      )
+    }
+  }
+
+  private fun promoteVideoAsset(
+    target: WallpaperTargetData,
+    scaleMode: WallpaperScaleModeData,
+  ): OperationResultData? {
+    val videoScaleMode = when (scaleMode) {
+      WallpaperScaleModeData.CENTER_CROP -> VideoWallpaperScaleMode.CENTER_CROP
+      WallpaperScaleModeData.FIT_CENTER -> VideoWallpaperScaleMode.FIT_CENTER
+      else -> return OperationResultPolicy.unsupported(
+        target,
+        ERROR_VIDEO_SCALE_UNSUPPORTED,
+        "Video live wallpapers support only centerCrop and fitCenter scaling.",
+      )
+    }
+    return try {
+      videoRepository.promotePending(videoScaleMode)
+      null
+    } catch (error: VideoMetadataValidationException) {
+      OperationResultPolicy.failed(
+        target,
+        videoValidationCode(error),
+        error.message ?: "The video source is not playable.",
+      )
+    } catch (error: IOException) {
+      OperationResultPolicy.failed(
+        target,
+        ERROR_VIDEO_PREPARATION_FAILED,
+        "Unable to prepare the video wallpaper.",
+        error.message,
+      )
+    } catch (error: Exception) {
+      OperationResultPolicy.failed(
+        target,
+        ERROR_VIDEO_PREPARATION_FAILED,
+        "Unable to prepare the video wallpaper.",
         error.message,
       )
     }
@@ -526,12 +637,46 @@ class PigeonApiImpl(
 
   private fun downloadToMediaStore(url: String): Boolean {
     var uri: Uri? = null
+    var temporaryFile: File? = null
     var completed = false
     return try {
       val source = WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url)
+      val openedSource = downloadSourceOpener.openWithMetadata(source)
+      val contentType = openedSource.contentType
+      val downloadedFile = File.createTempFile("async-wallpaper-", ".download", appContext.cacheDir)
+      temporaryFile = downloadedFile
+      openedSource.use { opened ->
+        downloadedFile.outputStream().use { output ->
+          opened.input.copyTo(output)
+        }
+      }
+      val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeFile(downloadedFile.absolutePath, options)
+      val imageFormat = if (options.outWidth > 0 && options.outHeight > 0) {
+        DownloadImageFormat.choose(options.outMimeType, contentType)
+      } else {
+        null
+      } ?: return false
+      // A header can report valid dimensions for a truncated file, so decode once with a bounded
+      // sample size to prove the payload is a complete image before publishing it.
+      val decoded = BitmapFactory.decodeFile(
+        downloadedFile.absolutePath,
+        BitmapFactory.Options().apply {
+          inSampleSize = WallpaperSourceLoader.calculateInSampleSize(
+            options.outWidth,
+            options.outHeight,
+            MAX_DOWNLOAD_DECODED_PIXELS,
+          )
+          inPreferredConfig = Bitmap.Config.ARGB_8888
+        },
+      ) ?: return false
+      decoded.recycle()
       val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "wallpaper_${System.currentTimeMillis()}.jpg")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        put(
+          MediaStore.Images.Media.DISPLAY_NAME,
+          "wallpaper_${System.currentTimeMillis()}.${imageFormat.extension}",
+        )
+        put(MediaStore.Images.Media.MIME_TYPE, imageFormat.mimeType)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/AsyncWallpaper")
           put(MediaStore.Images.Media.IS_PENDING, 1)
@@ -539,7 +684,7 @@ class PigeonApiImpl(
       }
       val resolver = appContext.contentResolver
       uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-      val written = textureSourceOpener.open(source).use { input ->
+      val written = downloadedFile.inputStream().use { input ->
         resolver.openOutputStream(uri!!)?.use { output ->
           input.copyTo(output)
           true
@@ -549,12 +694,15 @@ class PigeonApiImpl(
         return false
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        resolver.update(
+        val updatedRows = resolver.update(
           uri!!,
           ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) },
           null,
           null,
         )
+        if (updatedRows == 0) {
+          return false
+        }
       }
       completed = true
       true
@@ -566,6 +714,7 @@ class PigeonApiImpl(
       if (!completed && uri != null) {
         runCatching { appContext.contentResolver.delete(uri!!, null, null) }
       }
+      temporaryFile?.delete()
     }
   }
 
@@ -716,6 +865,9 @@ class PigeonApiImpl(
   companion object {
     private const val TAG = "AsyncWallpaper"
     private const val MAX_VIDEO_SOURCE_BYTES = 256L * 1024L * 1024L
+    /** Generous bound for one downloaded wallpaper; validation still happens from a temp file. */
+    private const val MAX_DOWNLOAD_SOURCE_BYTES = 64L * 1024L * 1024L
+    private const val MAX_DOWNLOAD_DECODED_PIXELS = 16L * 1024L * 1024L
     private const val MAIN_THREAD_WAIT_MILLIS = 10_000L
 
     private const val ERROR_INVALID_REQUEST = "invalid-request"

@@ -30,17 +30,17 @@ class GlRenderer(
   private val configuration: OpenGlWallpaperConfiguration,
 ) {
   data class FrameState(
-    val elapsedSeconds: Float,
-    val width: Int,
-    val height: Int,
+    var elapsedSeconds: Float,
+    var width: Int,
+    var height: Int,
     /** Normalized, top-left-origin touch coordinates. */
-    val touchX: Float,
+    var touchX: Float,
     /** Normalized, top-left-origin touch coordinates. */
-    val touchY: Float,
+    var touchY: Float,
     /** Wallpaper-engine horizontal offset, normally in the inclusive 0..1 range. */
-    val offsetX: Float,
+    var offsetX: Float,
     /** Wallpaper-engine vertical offset, normally in the inclusive 0..1 range. */
-    val offsetY: Float,
+    var offsetY: Float,
   )
 
   sealed class Result {

@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import java.util.Calendar
-import java.util.concurrent.Executors
 
 internal class WallpaperTimeOfDayReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
@@ -16,29 +15,28 @@ internal class WallpaperTimeOfDayReceiver : BroadcastReceiver() {
       return
     }
 
-    val now = Calendar.getInstance()
-    val currentHour = now.get(Calendar.HOUR_OF_DAY)
     val startHour = store.getActiveHoursStart()
     val endHour = store.getActiveHoursEnd()
 
-    if (currentHour < startHour || currentHour >= endHour) {
-      Log.d(TAG, "Skip time-of-day rotation: outside active hours ($currentHour not in $startHour-$endHour)")
+    // The alarm is one-shot, so re-arm it before doing any work. That keeps the next window queued
+    // even when this delivery is skipped or the rotation itself fails.
+    WallpaperRotationScheduler.scheduleTimeOfDay(context, startHour)
+
+    val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    if (!WallpaperRotationScheduleMath.isWithinActiveHours(currentHour, startHour, endHour)) {
+      Log.d(
+        TAG,
+        "Skip time-of-day rotation: outside active hours ($currentHour not in $startHour-$endHour)",
+      )
       return
     }
 
-    ioExecutor.execute {
-      val didRun = WallpaperRotationRunner.runNext(context)
-      if (!didRun) {
-        Log.w(TAG, "Direct time-of-day rotation failed, queue immediate work")
-        WallpaperRotationScheduler.enqueueImmediate(context)
-      } else {
-        Log.d(TAG, "Time-of-day triggered rotation applied")
-      }
-    }
+    // Hand off through WorkManager. A BroadcastReceiver returns immediately, so applying the
+    // wallpaper here on a private executor risks the process being killed before it finishes.
+    WallpaperRotationScheduler.enqueueImmediate(context)
   }
 
   companion object {
     private const val TAG = "TimeOfDayReceiver"
-    private val ioExecutor = Executors.newSingleThreadExecutor()
   }
 }

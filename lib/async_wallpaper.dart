@@ -44,6 +44,16 @@ class AsyncWallpaper {
   static const WallpaperCapabilities _unsupportedCapabilities =
       WallpaperCapabilities(manufacturer: 'Unsupported on this platform');
 
+  static const WallpaperRotationStatus _notRunningRotationStatus =
+      WallpaperRotationStatus(
+        isRunning: false,
+        nextRunEpochMs: 0,
+        currentIndex: 0,
+        cachedCount: 0,
+        totalCount: 0,
+        effectiveIntervalMinutes: 0,
+      );
+
   /// The host platform version.
   ///
   /// This retains the legacy channel behavior and can throw a platform error.
@@ -320,6 +330,9 @@ class AsyncWallpaper {
   static Future<WallpaperResult> startWallpaperRotation(
     WallpaperRotationRequest request,
   ) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     if (request.sources.isEmpty) {
       return const WallpaperResult.failure(
         WallpaperError(
@@ -391,6 +404,9 @@ class AsyncWallpaper {
 
   /// Stops wallpaper rotation and cancels configured background triggers.
   static Future<WallpaperResult> stopWallpaperRotation() async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     return _runLegacyBooleanOperation(
       call: _api.stopWallpaperRotation,
       failureMessage: 'Failed to stop wallpaper rotation.',
@@ -400,22 +416,45 @@ class AsyncWallpaper {
   }
 
   /// Returns the current wallpaper rotation status.
+  ///
+  /// Off Android, and if the platform call throws, this reports a
+  /// conservative not-running snapshot with [WallpaperRotationStatus
+  /// .lastError] set instead of surfacing a channel exception.
   static Future<WallpaperRotationStatus> getWallpaperRotationStatus() async {
-    final WallpaperRotationStatusData data = await _api
-        .getWallpaperRotationStatus();
-    return WallpaperRotationStatus(
-      isRunning: data.isRunning == true,
-      nextRunEpochMs: data.nextRunEpochMs ?? 0,
-      currentIndex: data.currentIndex ?? 0,
-      cachedCount: data.cachedCount ?? 0,
-      totalCount: data.totalCount ?? 0,
-      effectiveIntervalMinutes: data.effectiveIntervalMinutes ?? 0,
-      lastError: data.lastError,
-    );
+    if (!_isAndroid) {
+      return _notRunningRotationStatus;
+    }
+
+    try {
+      final WallpaperRotationStatusData data = await _api
+          .getWallpaperRotationStatus();
+      return WallpaperRotationStatus(
+        isRunning: data.isRunning == true,
+        nextRunEpochMs: data.nextRunEpochMs ?? 0,
+        currentIndex: data.currentIndex ?? 0,
+        cachedCount: data.cachedCount ?? 0,
+        totalCount: data.totalCount ?? 0,
+        effectiveIntervalMinutes: data.effectiveIntervalMinutes ?? 0,
+        lastError: data.lastError,
+      );
+    } catch (_) {
+      return const WallpaperRotationStatus(
+        isRunning: false,
+        nextRunEpochMs: 0,
+        currentIndex: 0,
+        cachedCount: 0,
+        totalCount: 0,
+        effectiveIntervalMinutes: 0,
+        lastError: 'Failed to get wallpaper rotation status.',
+      );
+    }
   }
 
   /// Immediately rotates to the next wallpaper in the current playlist.
   static Future<WallpaperResult> rotateWallpaperNow() async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
     return _runLegacyBooleanOperation(
       call: _api.rotateWallpaperNow,
       failureMessage: 'Failed to rotate wallpaper now.',

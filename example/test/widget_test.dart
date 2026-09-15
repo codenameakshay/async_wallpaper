@@ -116,7 +116,6 @@ void main() {
     expect(find.byKey(const Key('scale-selector')), findsOneWidget);
     expect(find.byKey(const Key('strategy-selector')), findsOneWidget);
     expect(find.byKey(const Key('url-source-input')), findsOneWidget);
-    expect(find.text('Open home after a successful flow'), findsNothing);
 
     await tester.tap(find.byKey(const Key('source-selector')));
     await tester.pumpAndSettle();

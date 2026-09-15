@@ -236,6 +236,18 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private var touchY = 0.5f
     private var offsetX = 0f
     private var offsetY = 0f
+    private val frameState = GlRenderer.FrameState(0f, 1, 1, 0.5f, 0.5f, 0f, 0f)
+    private val frameRunnable = Runnable {
+      val generation = scheduledFrameGeneration
+      if (scheduledFrameGeneration == generation) {
+        scheduledFrameGeneration = null
+      }
+      if (destroyed || generation == null || generation != frameGeneration || !canRender()) {
+        return@Runnable
+      }
+      drawFrame()
+      scheduleFrame()
+    }
 
     fun surfaceCreated(newSurface: Surface) {
       handler.post {
@@ -340,19 +352,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         return
       }
       scheduledFrameGeneration = generation
-      handler.postDelayed(
-        {
-          if (scheduledFrameGeneration == generation) {
-            scheduledFrameGeneration = null
-          }
-          if (destroyed || generation != frameGeneration || !canRender()) {
-            return@postDelayed
-          }
-          drawFrame()
-          scheduleFrame()
-        },
-        if (immediate) 0L else frameIntervalMillis,
-      )
+      handler.postDelayed(frameRunnable, if (immediate) 0L else frameIntervalMillis)
     }
 
     private fun drawFrame() {
@@ -377,17 +377,15 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
       }
 
-      val state = GlRenderer.FrameState(
-        elapsedSeconds = ((SystemClock.elapsedRealtimeNanos() - createdAtNanos)
-          .coerceAtLeast(0L) / NANOS_PER_SECOND).toFloat(),
-        width = width,
-        height = height,
-        touchX = touchX,
-        touchY = touchY,
-        offsetX = offsetX,
-        offsetY = offsetY,
-      )
-      handleRendererResult(currentRenderer.render(state))
+      frameState.elapsedSeconds = ((SystemClock.elapsedRealtimeNanos() - createdAtNanos)
+        .coerceAtLeast(0L) / NANOS_PER_SECOND).toFloat()
+      frameState.width = width
+      frameState.height = height
+      frameState.touchX = touchX
+      frameState.touchY = touchY
+      frameState.offsetX = offsetX
+      frameState.offsetY = offsetY
+      handleRendererResult(currentRenderer.render(frameState))
     }
 
     private fun handleRendererResult(result: GlRenderer.Result) {
@@ -427,6 +425,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private fun invalidateScheduledFrame() {
       frameGeneration += 1L
       scheduledFrameGeneration = null
+      handler.removeCallbacks(frameRunnable)
     }
 
     private fun releaseOnRenderThread() {

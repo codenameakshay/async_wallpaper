@@ -44,15 +44,17 @@ class AsyncWallpaper {
   static const WallpaperCapabilities _unsupportedCapabilities =
       WallpaperCapabilities(manufacturer: 'Unsupported on this platform');
 
-  static const WallpaperRotationStatus _notRunningRotationStatus =
-      WallpaperRotationStatus(
-        isRunning: false,
-        nextRunEpochMs: 0,
-        currentIndex: 0,
-        cachedCount: 0,
-        totalCount: 0,
-        effectiveIntervalMinutes: 0,
-      );
+  static WallpaperRotationStatus _notRunningRotationStatus({
+    String? lastError,
+  }) => WallpaperRotationStatus(
+    isRunning: false,
+    nextRunEpochMs: 0,
+    currentIndex: 0,
+    cachedCount: 0,
+    totalCount: 0,
+    effectiveIntervalMinutes: 0,
+    lastError: lastError,
+  );
 
   /// The host platform version.
   ///
@@ -412,12 +414,13 @@ class AsyncWallpaper {
 
   /// Returns the current wallpaper rotation status.
   ///
-  /// Off Android, and if the platform call throws, this reports a
-  /// conservative not-running snapshot with [WallpaperRotationStatus
-  /// .lastError] set instead of surfacing a channel exception.
+  /// Off Android this returns a not-running snapshot. If the platform call
+  /// throws, it returns the same snapshot with
+  /// [WallpaperRotationStatus.lastError] set instead of surfacing the
+  /// exception.
   static Future<WallpaperRotationStatus> getWallpaperRotationStatus() async {
     if (!_isAndroid) {
-      return _notRunningRotationStatus;
+      return _notRunningRotationStatus();
     }
 
     try {
@@ -432,13 +435,7 @@ class AsyncWallpaper {
         lastError: data.lastError,
       );
     } catch (_) {
-      return const WallpaperRotationStatus(
-        isRunning: false,
-        nextRunEpochMs: 0,
-        currentIndex: 0,
-        cachedCount: 0,
-        totalCount: 0,
-        effectiveIntervalMinutes: 0,
+      return _notRunningRotationStatus(
         lastError: 'Failed to get wallpaper rotation status.',
       );
     }

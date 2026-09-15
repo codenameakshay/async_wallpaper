@@ -3,43 +3,9 @@ package com.codenameakshay.async_wallpaper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ResultContractTest {
-  @Test
-  fun `pre M and pre N retain compatible home-wallpaper defaults when probes do not exist`() {
-    assertTrue(AndroidWallpaperApiPolicy.wallpaperSupported(apiLevel = 22, frameworkValue = null))
-    assertTrue(AndroidWallpaperApiPolicy.settingAllowed(apiLevel = 23, frameworkValue = null))
-    assertFalse(AndroidWallpaperApiPolicy.wallpaperSupported(apiLevel = 23, frameworkValue = null))
-    assertFalse(AndroidWallpaperApiPolicy.settingAllowed(apiLevel = 24, frameworkValue = null))
-  }
-
-  @Test
-  fun `pre N lock and both targets are rejected before a home-only write`() {
-    val lock = requireNotNull(
-      AndroidWallpaperApiPolicy.unsupportedTargetResult(
-        apiLevel = 23,
-        target = WallpaperTargetData.LOCK,
-      ),
-    )
-    val both = requireNotNull(
-      AndroidWallpaperApiPolicy.unsupportedTargetResult(
-        apiLevel = 23,
-        target = WallpaperTargetData.BOTH,
-      ),
-    )
-
-    assertEquals(OperationStatusData.UNSUPPORTED, lock.status)
-    assertEquals(TargetStatusData.UNSUPPORTED, lock.lock?.status)
-    assertEquals(OperationStatusData.UNSUPPORTED, both.status)
-    assertEquals(TargetStatusData.NOT_ATTEMPTED, both.home?.status)
-    assertEquals(TargetStatusData.UNSUPPORTED, both.lock?.status)
-    assertEquals(AndroidWallpaperApiPolicy.ERROR_LOCK_TARGET_UNSUPPORTED, both.errorCode)
-    assertEquals(null, AndroidWallpaperApiPolicy.unsupportedTargetResult(23, WallpaperTargetData.HOME))
-    assertEquals(null, AndroidWallpaperApiPolicy.unsupportedTargetResult(24, WallpaperTargetData.BOTH))
-  }
-
   @Test
   fun `partial both fallback retains the successful target but never reports applied`() {
     val result = OperationResultPolicy.fromTargetResults(
@@ -72,7 +38,7 @@ class ResultContractTest {
     assertEquals(OperationStatusData.APPLIED, result.status)
     assertEquals(TargetStatusData.APPLIED, result.home?.status)
     assertEquals(TargetStatusData.APPLIED, result.lock?.status)
-    assertTrue(result.fallbackUsed == true)
+    assertEquals(true, result.fallbackUsed)
   }
 
   @Test

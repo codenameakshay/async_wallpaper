@@ -41,8 +41,8 @@ object AndroidCapabilities {
       supportsLiveWallpaper = supportsLive,
       supportsOpenGlLiveWallpaper = supportsOpenGl,
       supportsHomeWallpaper = staticSupport.canApplyDirectly,
-      supportsLockWallpaper = staticSupport.canApplyDirectly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N,
-      supportsBothWallpapers = staticSupport.canApplyDirectly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N,
+      supportsLockWallpaper = staticSupport.canApplyDirectly,
+      supportsBothWallpapers = staticSupport.canApplyDirectly,
       canSetWallpaper = staticSupport.canApplyDirectly,
       hasSystemWallpaperPicker = hasPicker,
       // Direct bitmap and preparation work do not require an Activity. Any system UI path does.
@@ -58,23 +58,8 @@ object AndroidCapabilities {
 
   fun staticWallpaperSupport(context: Context): StaticWallpaperSupport {
     val manager = WallpaperManager.getInstance(context.applicationContext)
-    val apiLevel = Build.VERSION.SDK_INT
-    val supported = AndroidWallpaperApiPolicy.wallpaperSupported(
-      apiLevel,
-      if (apiLevel >= Build.VERSION_CODES.M) {
-        runCatching { manager.isWallpaperSupported }.getOrNull()
-      } else {
-        null
-      },
-    )
-    val allowed = AndroidWallpaperApiPolicy.settingAllowed(
-      apiLevel,
-      if (apiLevel >= Build.VERSION_CODES.N) {
-        runCatching { manager.isSetWallpaperAllowed }.getOrNull()
-      } else {
-        null
-      },
-    )
+    val supported = runCatching { manager.isWallpaperSupported }.getOrDefault(false)
+    val allowed = runCatching { manager.isSetWallpaperAllowed }.getOrDefault(false)
     return StaticWallpaperSupport(supported, allowed)
   }
 
@@ -119,58 +104,4 @@ object AndroidCapabilities {
     val minor = version and 0xffff
     return "$major.$minor"
   }
-}
-
-/**
- * Framework-independent compatibility policy for the wallpaper APIs added after Android L.
- *
- * Pre-M has no `isWallpaperSupported` probe, and pre-N has no `isSetWallpaperAllowed` probe;
- * both platforms still support the legacy home-wallpaper `setBitmap(Bitmap)` path. Lock and
- * combined target flags were introduced in N, so they are rejected before a pre-N home write can
- * accidentally occur.
- */
-object AndroidWallpaperApiPolicy {
-  private const val API_M = 23
-  private const val API_N = 24
-
-  fun wallpaperSupported(apiLevel: Int, frameworkValue: Boolean?): Boolean {
-    return if (apiLevel < API_M) true else frameworkValue == true
-  }
-
-  fun settingAllowed(apiLevel: Int, frameworkValue: Boolean?): Boolean {
-    return if (apiLevel < API_N) true else frameworkValue == true
-  }
-
-  /** Returns a truthful no-mutation result when the requested target needs Android N. */
-  fun unsupportedTargetResult(
-    apiLevel: Int,
-    target: WallpaperTargetData,
-  ): OperationResultData? {
-    if (apiLevel >= API_N || target == WallpaperTargetData.HOME) {
-      return null
-    }
-    return when (target) {
-      WallpaperTargetData.LOCK -> OperationResultPolicy.unsupported(
-        target,
-        ERROR_LOCK_TARGET_UNSUPPORTED,
-        "Lock-screen wallpaper is not supported before Android N.",
-      )
-      WallpaperTargetData.BOTH -> OperationResultData(
-        status = OperationStatusData.UNSUPPORTED,
-        requestedTarget = target,
-        // Do not try the legacy home-only API once the lock half cannot be honored.
-        home = OperationResultPolicy.notAttemptedTarget(),
-        lock = OperationResultPolicy.unsupportedTarget(
-          ERROR_LOCK_TARGET_UNSUPPORTED,
-          "Lock-screen wallpaper is not supported before Android N.",
-        ),
-        errorCode = ERROR_LOCK_TARGET_UNSUPPORTED,
-        errorMessage = "Home and lock wallpaper cannot both be applied before Android N.",
-        fallbackUsed = false,
-      )
-      WallpaperTargetData.HOME -> null
-    }
-  }
-
-  const val ERROR_LOCK_TARGET_UNSUPPORTED = "lock-wallpaper-unsupported"
 }

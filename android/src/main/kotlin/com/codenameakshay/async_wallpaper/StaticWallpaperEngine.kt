@@ -30,9 +30,6 @@ class StaticWallpaperEngine(
   /** Applies [request] directly, returning structured failures instead of throwing. */
   fun applyDirect(request: StaticWallpaperRequestData): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     return when (validated.strategy) {
       WallpaperApplyStrategyData.SYSTEM_CROPPER,
       WallpaperApplyStrategyData.SYSTEM_PICKER,
@@ -56,9 +53,6 @@ class StaticWallpaperEngine(
     activity: Activity?,
   ): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     if (validated.strategy != WallpaperApplyStrategyData.SYSTEM_CROPPER) {
       return OperationResultPolicy.failed(
         validated.target,
@@ -119,9 +113,6 @@ class StaticWallpaperEngine(
     activity: Activity?,
   ): OperationResultData {
     val validated = validate(request) ?: return invalidRequest(request.target)
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, validated.target)?.let {
-      return it
-    }
     if (validated.strategy != WallpaperApplyStrategyData.SYSTEM_PICKER) {
       return OperationResultPolicy.failed(
         validated.target,
@@ -179,9 +170,6 @@ class StaticWallpaperEngine(
   }
 
   private fun applyBitmap(request: ValidatedStaticWallpaperRequest): OperationResultData {
-    AndroidWallpaperApiPolicy.unsupportedTargetResult(Build.VERSION.SDK_INT, request.target)?.let {
-      return it
-    }
     val capability = AndroidCapabilities.staticWallpaperSupport(appContext)
     if (!capability.wallpaperSupported) {
       return OperationResultPolicy.unsupported(
@@ -308,16 +296,12 @@ class StaticWallpaperEngine(
   }
 
   private fun setBitmap(bitmap: Bitmap, flag: Int) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      wallpaperManagerProvider().setBitmap(
-        bitmap,
-        Rect(0, 0, bitmap.width, bitmap.height),
-        true,
-        flag,
-      )
-    } else {
-      wallpaperManagerProvider().setBitmap(bitmap)
-    }
+    wallpaperManagerProvider().setBitmap(
+      bitmap,
+      Rect(0, 0, bitmap.width, bitmap.height),
+      true,
+      flag,
+    )
   }
 
   private fun boundedWallpaperDimensions(manager: WallpaperManager): WallpaperDimensions {

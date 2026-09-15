@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('maps a structured applied operation result', () {
-    final WallpaperOperationResult result = operationResultFromData(
+    final result = operationResultFromData(
       OperationResultData(
         status: OperationStatusData.applied,
         requestedTarget: WallpaperTargetData.home,
@@ -21,13 +21,13 @@ void main() {
   });
 
   test('maps preview and foreground-required operation outcomes', () {
-    final WallpaperOperationResult preview = operationResultFromData(
+    final preview = operationResultFromData(
       OperationResultData(
         status: OperationStatusData.previewOpened,
         requestedTarget: WallpaperTargetData.home,
       ),
     );
-    final WallpaperOperationResult foregroundRequired = operationResultFromData(
+    final foregroundRequired = operationResultFromData(
       OperationResultData(
         status: OperationStatusData.foregroundRequired,
         requestedTarget: WallpaperTargetData.home,
@@ -42,23 +42,19 @@ void main() {
   });
 
   test('maps unsupported, cancelled, failed, and awaiting-confirmation', () {
-    final List<(OperationStatusData, WallpaperOperationStatus)> cases =
-        <(OperationStatusData, WallpaperOperationStatus)>[
-          (
-            OperationStatusData.unsupported,
-            WallpaperOperationStatus.unsupported,
-          ),
-          (OperationStatusData.cancelled, WallpaperOperationStatus.cancelled),
-          (OperationStatusData.failed, WallpaperOperationStatus.failed),
-          (
-            OperationStatusData.awaitingUserConfirmation,
-            WallpaperOperationStatus.awaitingUserConfirmation,
-          ),
-        ];
+    final cases = <(OperationStatusData, WallpaperOperationStatus)>[
+      (OperationStatusData.unsupported, WallpaperOperationStatus.unsupported),
+      (OperationStatusData.cancelled, WallpaperOperationStatus.cancelled),
+      (OperationStatusData.failed, WallpaperOperationStatus.failed),
+      (
+        OperationStatusData.awaitingUserConfirmation,
+        WallpaperOperationStatus.awaitingUserConfirmation,
+      ),
+    ];
 
     for (final (OperationStatusData dataStatus, WallpaperOperationStatus status)
         in cases) {
-      final WallpaperOperationResult result = operationResultFromData(
+      final result = operationResultFromData(
         OperationResultData(
           status: dataStatus,
           requestedTarget: WallpaperTargetData.lock,
@@ -76,7 +72,7 @@ void main() {
   });
 
   test('keeps partial both-screen target outcomes and fallback metadata', () {
-    final WallpaperOperationResult result = operationResultFromData(
+    final result = operationResultFromData(
       OperationResultData(
         status: OperationStatusData.failed,
         requestedTarget: WallpaperTargetData.both,
@@ -113,7 +109,7 @@ void main() {
   });
 
   test('does not report malformed applied transport data as applied', () {
-    final WallpaperOperationResult result = operationResultFromData(
+    final result = operationResultFromData(
       OperationResultData(
         status: OperationStatusData.applied,
         requestedTarget: WallpaperTargetData.both,
@@ -130,29 +126,28 @@ void main() {
   });
 
   test('maps every source kind into transport data', () {
-    final List<(WallpaperSource, WallpaperSourceKindData)> cases =
-        <(WallpaperSource, WallpaperSourceKindData)>[
-          (
-            const WallpaperSource.url('https://example.com/wallpaper.jpg'),
-            WallpaperSourceKindData.url,
-          ),
-          (
-            const WallpaperSource.filePath('/data/local/tmp/wallpaper.jpg'),
-            WallpaperSourceKindData.filePath,
-          ),
-          (
-            const WallpaperSource.contentUri('content://media/images/42'),
-            WallpaperSourceKindData.contentUri,
-          ),
-          (
-            WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
-            WallpaperSourceKindData.bytes,
-          ),
-        ];
+    final cases = <(WallpaperSource, WallpaperSourceKindData)>[
+      (
+        const WallpaperSource.url('https://example.com/wallpaper.jpg'),
+        WallpaperSourceKindData.url,
+      ),
+      (
+        const WallpaperSource.filePath('/data/local/tmp/wallpaper.jpg'),
+        WallpaperSourceKindData.filePath,
+      ),
+      (
+        const WallpaperSource.contentUri('content://media/images/42'),
+        WallpaperSourceKindData.contentUri,
+      ),
+      (
+        WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
+        WallpaperSourceKindData.bytes,
+      ),
+    ];
 
     for (final (WallpaperSource source, WallpaperSourceKindData kind)
         in cases) {
-      final WallpaperSourceData data = wallpaperSourceToData(source);
+      final data = wallpaperSourceToData(source);
 
       expect(data.kind, kind);
       expect(data.url, source.url);
@@ -163,23 +158,21 @@ void main() {
   });
 
   test('defensively copies byte sources into transport data', () {
-    final WallpaperSource source = WallpaperSource.bytes(
-      Uint8List.fromList(<int>[1, 2, 3]),
-    );
-    final WallpaperSourceData data = wallpaperSourceToData(source);
+    final source = WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3]));
+    final data = wallpaperSourceToData(source);
     data.bytes![0] = 99;
 
     expect(source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
   });
 
   test('round-trips every wallpaper target', () {
-    for (final WallpaperTarget target in WallpaperTarget.values) {
+    for (final target in WallpaperTarget.values) {
       expect(wallpaperTargetFromData(wallpaperTargetToData(target)), target);
     }
   });
 
   test('maps every scale mode to a unique transport value', () {
-    final Set<WallpaperScaleModeData> mapped = WallpaperScaleMode.values
+    final mapped = WallpaperScaleMode.values
         .map(wallpaperScaleModeToData)
         .toSet();
 
@@ -187,8 +180,7 @@ void main() {
   });
 
   test('round-trips every apply strategy', () {
-    for (final WallpaperApplyStrategy strategy
-        in WallpaperApplyStrategy.values) {
+    for (final strategy in WallpaperApplyStrategy.values) {
       expect(
         wallpaperApplyStrategyFromData(wallpaperApplyStrategyToData(strategy)),
         strategy,
@@ -197,28 +189,24 @@ void main() {
   });
 
   test('maps every operation status from transport data', () {
-    const List<(OperationStatusData, WallpaperOperationStatus)> cases =
-        <(OperationStatusData, WallpaperOperationStatus)>[
-          (OperationStatusData.applied, WallpaperOperationStatus.applied),
-          (
-            OperationStatusData.previewOpened,
-            WallpaperOperationStatus.previewOpened,
-          ),
-          (
-            OperationStatusData.awaitingUserConfirmation,
-            WallpaperOperationStatus.awaitingUserConfirmation,
-          ),
-          (OperationStatusData.cancelled, WallpaperOperationStatus.cancelled),
-          (OperationStatusData.failed, WallpaperOperationStatus.failed),
-          (
-            OperationStatusData.unsupported,
-            WallpaperOperationStatus.unsupported,
-          ),
-          (
-            OperationStatusData.foregroundRequired,
-            WallpaperOperationStatus.foregroundRequired,
-          ),
-        ];
+    const cases = <(OperationStatusData, WallpaperOperationStatus)>[
+      (OperationStatusData.applied, WallpaperOperationStatus.applied),
+      (
+        OperationStatusData.previewOpened,
+        WallpaperOperationStatus.previewOpened,
+      ),
+      (
+        OperationStatusData.awaitingUserConfirmation,
+        WallpaperOperationStatus.awaitingUserConfirmation,
+      ),
+      (OperationStatusData.cancelled, WallpaperOperationStatus.cancelled),
+      (OperationStatusData.failed, WallpaperOperationStatus.failed),
+      (OperationStatusData.unsupported, WallpaperOperationStatus.unsupported),
+      (
+        OperationStatusData.foregroundRequired,
+        WallpaperOperationStatus.foregroundRequired,
+      ),
+    ];
 
     for (final (OperationStatusData data, WallpaperOperationStatus status)
         in cases) {
@@ -227,25 +215,22 @@ void main() {
   });
 
   test('maps every target status from transport data', () {
-    const List<(TargetStatusData, WallpaperTargetStatus)> cases =
-        <(TargetStatusData, WallpaperTargetStatus)>[
-          (TargetStatusData.applied, WallpaperTargetStatus.applied),
-          (TargetStatusData.failed, WallpaperTargetStatus.failed),
-          (TargetStatusData.unsupported, WallpaperTargetStatus.unsupported),
-          (TargetStatusData.notAttempted, WallpaperTargetStatus.notAttempted),
-        ];
+    const cases = <(TargetStatusData, WallpaperTargetStatus)>[
+      (TargetStatusData.applied, WallpaperTargetStatus.applied),
+      (TargetStatusData.failed, WallpaperTargetStatus.failed),
+      (TargetStatusData.unsupported, WallpaperTargetStatus.unsupported),
+      (TargetStatusData.notAttempted, WallpaperTargetStatus.notAttempted),
+    ];
 
     for (final (TargetStatusData data, WallpaperTargetStatus status) in cases) {
-      final WallpaperTargetResult result = targetResultFromData(
-        TargetResultData(status: data),
-      );
+      final result = targetResultFromData(TargetResultData(status: data));
 
       expect(result.status, status);
     }
   });
 
   test('maps every capability field with safe nullable defaults', () {
-    final WallpaperCapabilitiesData data = WallpaperCapabilitiesData(
+    final data = WallpaperCapabilitiesData(
       supportsStaticWallpaper: true,
       supportsLiveWallpaper: true,
       supportsOpenGlLiveWallpaper: true,
@@ -260,10 +245,8 @@ void main() {
       openGlVersion: 'OpenGL ES 3.2',
       openGlRenderer: 'Example GPU',
     );
-    final WallpaperCapabilities capabilities = capabilitiesFromData(data);
-    final WallpaperCapabilities defaults = capabilitiesFromData(
-      WallpaperCapabilitiesData(),
-    );
+    final capabilities = capabilitiesFromData(data);
+    final defaults = capabilitiesFromData(WallpaperCapabilitiesData());
 
     expect(capabilities.supportsStaticWallpaper, isTrue);
     expect(capabilities.supportsLiveWallpaper, isTrue);
@@ -284,15 +267,13 @@ void main() {
   });
 
   test('maps a structured static request to transport data', () {
-    const StaticWallpaperRequest request = StaticWallpaperRequest(
+    const request = StaticWallpaperRequest(
       source: WallpaperSource.filePath('/data/local/tmp/static.jpg'),
       target: WallpaperTarget.lock,
       scaleMode: WallpaperScaleMode.fill,
       strategy: WallpaperApplyStrategy.direct,
     );
-    final StaticWallpaperRequestData data = staticWallpaperRequestToData(
-      request,
-    );
+    final data = staticWallpaperRequestToData(request);
 
     expect(data.source?.kind, WallpaperSourceKindData.filePath);
     expect(data.target, WallpaperTargetData.lock);
@@ -301,15 +282,13 @@ void main() {
   });
 
   test('maps video and OpenGL request data to transport data', () {
-    const VideoWallpaperRequest videoRequest = VideoWallpaperRequest(
+    const videoRequest = VideoWallpaperRequest(
       source: WallpaperSource.contentUri('content://media/video/7'),
       target: WallpaperTarget.both,
       scaleMode: WallpaperScaleMode.fitCenter,
     );
-    final VideoWallpaperRequestData videoData = videoWallpaperRequestToData(
-      videoRequest,
-    );
-    final OpenGlLiveWallpaperRequest openGlRequest = OpenGlLiveWallpaperRequest(
+    final videoData = videoWallpaperRequestToData(videoRequest);
+    final openGlRequest = OpenGlLiveWallpaperRequest(
       fragmentShader: 'void main() {}',
       textures: <WallpaperSource>[
         WallpaperSource.bytes(Uint8List.fromList(<int>[7, 8, 9])),
@@ -318,9 +297,7 @@ void main() {
       target: WallpaperTarget.lock,
       frameRate: 30,
     );
-    final OpenGlWallpaperRequestData openGlData = openGlWallpaperRequestToData(
-      openGlRequest,
-    );
+    final openGlData = openGlWallpaperRequestToData(openGlRequest);
 
     expect(videoData.source?.contentUri, 'content://media/video/7');
     expect(videoData.target, WallpaperTargetData.both);

@@ -123,10 +123,10 @@ void main() {
     test(
       'rejects malformed static source shapes before a platform call',
       () async {
-        final _RecordingWallpaperClient client = _RecordingWallpaperClient();
+        final client = _RecordingWallpaperClient();
         AsyncWallpaper.debugSetClient(client);
 
-        final List<StaticWallpaperRequest> requests = <StaticWallpaperRequest>[
+        final requests = <StaticWallpaperRequest>[
           const StaticWallpaperRequest(
             source: WallpaperSource.url('http://example.com/wallpaper.jpg'),
             target: WallpaperTarget.home,
@@ -151,9 +151,8 @@ void main() {
           ),
         ];
 
-        for (final StaticWallpaperRequest request in requests) {
-          final WallpaperOperationResult result =
-              await AsyncWallpaper.applyWallpaper(request);
+        for (final request in requests) {
+          final result = await AsyncWallpaper.applyWallpaper(request);
 
           expect(result.status, WallpaperOperationStatus.failed);
           expect(result.errorCode, 'invalid-input');
@@ -163,15 +162,14 @@ void main() {
     );
 
     test('bounds in-memory wallpaper bytes before a platform call', () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient();
+      final client = _RecordingWallpaperClient();
       AsyncWallpaper.debugSetClient(client);
-      final StaticWallpaperRequest request = StaticWallpaperRequest(
+      final request = StaticWallpaperRequest(
         source: WallpaperSource.bytes(Uint8List(32 * 1024 * 1024 + 1)),
         target: WallpaperTarget.home,
       );
 
-      final WallpaperOperationResult result =
-          await AsyncWallpaper.applyWallpaper(request);
+      final result = await AsyncWallpaper.applyWallpaper(request);
 
       expect(result.status, WallpaperOperationStatus.failed);
       expect(result.errorCode, 'invalid-input');
@@ -179,36 +177,31 @@ void main() {
     });
 
     test('validates OpenGL limits before a platform call', () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient();
+      final client = _RecordingWallpaperClient();
       AsyncWallpaper.debugSetClient(client);
-      final String oversizedShader = List<String>.filled(
-        64 * 1024 + 1,
-        'x',
-      ).join();
-      final List<OpenGlLiveWallpaperRequest> requests =
-          <OpenGlLiveWallpaperRequest>[
-            OpenGlLiveWallpaperRequest(fragmentShader: '  '),
-            OpenGlLiveWallpaperRequest(fragmentShader: oversizedShader),
-            OpenGlLiveWallpaperRequest(
-              fragmentShader: 'void main() {}',
-              frameRate: 0,
-            ),
-            OpenGlLiveWallpaperRequest(
-              fragmentShader: 'void main() {}',
-              textures: List<WallpaperSource>.filled(
-                5,
-                const WallpaperSource.filePath('/tmp/texture.png'),
-              ),
-            ),
-            OpenGlLiveWallpaperRequest(
-              fragmentShader: 'void main() {}',
-              textures: <WallpaperSource>[WallpaperSource.bytes(Uint8List(0))],
-            ),
-          ];
+      final oversizedShader = List<String>.filled(64 * 1024 + 1, 'x').join();
+      final requests = <OpenGlLiveWallpaperRequest>[
+        OpenGlLiveWallpaperRequest(fragmentShader: '  '),
+        OpenGlLiveWallpaperRequest(fragmentShader: oversizedShader),
+        OpenGlLiveWallpaperRequest(
+          fragmentShader: 'void main() {}',
+          frameRate: 0,
+        ),
+        OpenGlLiveWallpaperRequest(
+          fragmentShader: 'void main() {}',
+          textures: List<WallpaperSource>.filled(
+            5,
+            const WallpaperSource.filePath('/tmp/texture.png'),
+          ),
+        ),
+        OpenGlLiveWallpaperRequest(
+          fragmentShader: 'void main() {}',
+          textures: <WallpaperSource>[WallpaperSource.bytes(Uint8List(0))],
+        ),
+      ];
 
-      for (final OpenGlLiveWallpaperRequest request in requests) {
-        final WallpaperOperationResult result =
-            await AsyncWallpaper.setOpenGlLiveWallpaper(request);
+      for (final request in requests) {
+        final result = await AsyncWallpaper.setOpenGlLiveWallpaper(request);
 
         expect(result.status, WallpaperOperationStatus.failed);
         expect(result.errorCode, 'invalid-input');
@@ -217,26 +210,24 @@ void main() {
     });
 
     test('preserves legacy empty-input errors', () async {
-      final WallpaperResult staticResult = await AsyncWallpaper.setWallpaper(
+      final staticResult = await AsyncWallpaper.setWallpaper(
         const WallpaperRequest(
           target: WallpaperTarget.both,
           sourceType: WallpaperSourceType.url,
           source: '',
         ),
       );
-      final WallpaperResult materialResult =
-          await AsyncWallpaper.setMaterialYouWallpaper(
-            const MaterialYouWallpaperRequest(url: ''),
-          );
-      final WallpaperResult liveResult = await AsyncWallpaper.setLiveWallpaper(
+      final materialResult = await AsyncWallpaper.setMaterialYouWallpaper(
+        const MaterialYouWallpaperRequest(url: ''),
+      );
+      final liveResult = await AsyncWallpaper.setLiveWallpaper(
         const LiveWallpaperRequest(filePath: ''),
       );
-      final WallpaperResult downloadResult =
-          await AsyncWallpaper.downloadWallpaper(
-            const DownloadWallpaperRequest(url: ''),
-          );
+      final downloadResult = await AsyncWallpaper.downloadWallpaper(
+        const DownloadWallpaperRequest(url: ''),
+      );
 
-      for (final WallpaperResult result in <WallpaperResult>[
+      for (final result in <WallpaperResult>[
         staticResult,
         materialResult,
         liveResult,
@@ -248,53 +239,50 @@ void main() {
     });
 
     test('fails for empty rotation source list', () async {
-      final WallpaperResult result =
-          await AsyncWallpaper.startWallpaperRotation(
-            const WallpaperRotationRequest(
-              sources: <WallpaperRotationSource>[],
-              target: WallpaperTarget.both,
-              intervalMinutes: 60,
-            ),
-          );
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[],
+          target: WallpaperTarget.both,
+          intervalMinutes: 60,
+        ),
+      );
 
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
 
     test('fails for rotation interval below fifteen minutes', () async {
-      final WallpaperResult result =
-          await AsyncWallpaper.startWallpaperRotation(
-            const WallpaperRotationRequest(
-              sources: <WallpaperRotationSource>[
-                WallpaperRotationSource(
-                  sourceType: WallpaperSourceType.url,
-                  source: 'https://example.com/a.jpg',
-                ),
-              ],
-              target: WallpaperTarget.both,
-              intervalMinutes: 10,
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[
+            WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
             ),
-          );
+          ],
+          target: WallpaperTarget.both,
+          intervalMinutes: 10,
+        ),
+      );
 
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
     });
 
     test('fails for empty rotation triggers', () async {
-      final WallpaperResult result =
-          await AsyncWallpaper.startWallpaperRotation(
-            const WallpaperRotationRequest(
-              sources: <WallpaperRotationSource>[
-                WallpaperRotationSource(
-                  sourceType: WallpaperSourceType.url,
-                  source: 'https://example.com/a.jpg',
-                ),
-              ],
-              target: WallpaperTarget.both,
-              intervalMinutes: 60,
-              triggers: <WallpaperRotationTrigger>{},
+      final result = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[
+            WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
             ),
-          );
+          ],
+          target: WallpaperTarget.both,
+          intervalMinutes: 60,
+          triggers: <WallpaperRotationTrigger>{},
+        ),
+      );
 
       expect(result.isSuccess, isFalse);
       expect(result.error?.code, WallpaperErrorCode.invalidInput);
@@ -304,8 +292,8 @@ void main() {
   test(
     'routes structured static requests through the testing client',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient();
-      const StaticWallpaperRequest request = StaticWallpaperRequest(
+      final client = _RecordingWallpaperClient();
+      const request = StaticWallpaperRequest(
         source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
         target: WallpaperTarget.lock,
         scaleMode: WallpaperScaleMode.fitCenter,
@@ -315,8 +303,7 @@ void main() {
       client.staticResult = _appliedForTarget(request.target);
 
       AsyncWallpaper.debugSetClient(client);
-      final WallpaperOperationResult result =
-          await AsyncWallpaper.applyWallpaper(request);
+      final result = await AsyncWallpaper.applyWallpaper(request);
 
       expect(result.status, WallpaperOperationStatus.applied);
       expect(client.staticCalls, 1);
@@ -327,19 +314,18 @@ void main() {
   test(
     'routes video, preview, and OpenGL calls through the testing client',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient();
-      const VideoWallpaperRequest videoRequest = VideoWallpaperRequest(
+      final client = _RecordingWallpaperClient();
+      const videoRequest = VideoWallpaperRequest(
         source: WallpaperSource.contentUri('content://media/video/7'),
         target: WallpaperTarget.both,
         scaleMode: WallpaperScaleMode.fitCenter,
         goToHome: true,
       );
-      final OpenGlLiveWallpaperRequest openGlRequest =
-          OpenGlLiveWallpaperRequest(
-            fragmentShader: 'void main() {}',
-            target: WallpaperTarget.lock,
-            frameRate: 30,
-          );
+      final openGlRequest = OpenGlLiveWallpaperRequest(
+        fragmentShader: 'void main() {}',
+        target: WallpaperTarget.lock,
+        frameRate: 30,
+      );
       client.videoResult = const WallpaperOperationResult(
         status: WallpaperOperationStatus.awaitingUserConfirmation,
         requestedTarget: WallpaperTarget.both,
@@ -351,12 +337,13 @@ void main() {
       client.openGlResult = _appliedForTarget(WallpaperTarget.lock);
       AsyncWallpaper.debugSetClient(client);
 
-      final WallpaperOperationResult prepared =
-          await AsyncWallpaper.setVideoWallpaper(videoRequest);
-      final WallpaperOperationResult preview =
-          await AsyncWallpaper.openLiveWallpaperPreview(videoRequest);
-      final WallpaperOperationResult applied =
-          await AsyncWallpaper.setOpenGlLiveWallpaper(openGlRequest);
+      final prepared = await AsyncWallpaper.setVideoWallpaper(videoRequest);
+      final preview = await AsyncWallpaper.openLiveWallpaperPreview(
+        videoRequest,
+      );
+      final applied = await AsyncWallpaper.setOpenGlLiveWallpaper(
+        openGlRequest,
+      );
 
       expect(
         prepared.status,
@@ -374,10 +361,10 @@ void main() {
   );
 
   test('maps a complete structured static result to legacy success', () async {
-    final _RecordingWallpaperClient client = _RecordingWallpaperClient(
+    final client = _RecordingWallpaperClient(
       staticResult: _appliedForTarget(WallpaperTarget.both),
     );
-    const WallpaperRequest request = WallpaperRequest(
+    const request = WallpaperRequest(
       target: WallpaperTarget.both,
       sourceType: WallpaperSourceType.url,
       source: 'https://example.com/wallpaper.jpg',
@@ -385,7 +372,7 @@ void main() {
     );
     AsyncWallpaper.debugSetClient(client);
 
-    final WallpaperResult result = await AsyncWallpaper.setWallpaper(request);
+    final result = await AsyncWallpaper.setWallpaper(request);
 
     expect(result.isSuccess, isTrue);
     expect(client.staticCalls, 1);
@@ -397,7 +384,7 @@ void main() {
   test(
     'does not report partial or non-applied static outcomes as success',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient(
+      final client = _RecordingWallpaperClient(
         staticResult: const WallpaperOperationResult(
           status: WallpaperOperationStatus.applied,
           requestedTarget: WallpaperTarget.both,
@@ -408,22 +395,20 @@ void main() {
           errorDetails: 'native lock details',
         ),
       );
-      const WallpaperRequest request = WallpaperRequest(
+      const request = WallpaperRequest(
         target: WallpaperTarget.both,
         sourceType: WallpaperSourceType.url,
         source: 'https://example.com/wallpaper.jpg',
       );
       AsyncWallpaper.debugSetClient(client);
 
-      final WallpaperResult partial = await AsyncWallpaper.setWallpaper(
-        request,
-      );
+      final partial = await AsyncWallpaper.setWallpaper(request);
       expect(partial.isSuccess, isFalse);
       expect(partial.error?.code, WallpaperErrorCode.platformFailure);
       expect(partial.error?.message, 'Lock wallpaper failed.');
       expect(partial.error?.details, 'native lock details');
 
-      for (final WallpaperOperationStatus status in <WallpaperOperationStatus>[
+      for (final status in <WallpaperOperationStatus>[
         WallpaperOperationStatus.previewOpened,
         WallpaperOperationStatus.awaitingUserConfirmation,
         WallpaperOperationStatus.cancelled,
@@ -433,7 +418,7 @@ void main() {
           status: status,
           requestedTarget: WallpaperTarget.home,
         );
-        final WallpaperResult result = await AsyncWallpaper.setWallpaper(
+        final result = await AsyncWallpaper.setWallpaper(
           const WallpaperRequest(
             target: WallpaperTarget.home,
             sourceType: WallpaperSourceType.url,
@@ -449,7 +434,7 @@ void main() {
   test(
     'legacy live wallpaper reports UI-opening success without claiming apply',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient(
+      final client = _RecordingWallpaperClient(
         previewResult: const WallpaperOperationResult(
           status: WallpaperOperationStatus.previewOpened,
           requestedTarget: WallpaperTarget.home,
@@ -457,13 +442,9 @@ void main() {
       );
       AsyncWallpaper.debugSetClient(client);
 
-      final WallpaperResult previewResult =
-          await AsyncWallpaper.setLiveWallpaper(
-            const LiveWallpaperRequest(
-              filePath: '/tmp/live.mp4',
-              goToHome: true,
-            ),
-          );
+      final previewResult = await AsyncWallpaper.setLiveWallpaper(
+        const LiveWallpaperRequest(filePath: '/tmp/live.mp4', goToHome: true),
+      );
 
       expect(previewResult.isSuccess, isTrue);
       expect(client.prepareCalls, 0);
@@ -475,7 +456,7 @@ void main() {
         status: WallpaperOperationStatus.awaitingUserConfirmation,
         requestedTarget: WallpaperTarget.home,
       );
-      final WallpaperResult awaiting = await AsyncWallpaper.setLiveWallpaper(
+      final awaiting = await AsyncWallpaper.setLiveWallpaper(
         const LiveWallpaperRequest(filePath: '/tmp/live.mp4'),
       );
       expect(awaiting.isSuccess, isTrue);
@@ -484,7 +465,7 @@ void main() {
         status: WallpaperOperationStatus.cancelled,
         requestedTarget: WallpaperTarget.home,
       );
-      final WallpaperResult cancelled = await AsyncWallpaper.setLiveWallpaper(
+      final cancelled = await AsyncWallpaper.setLiveWallpaper(
         const LiveWallpaperRequest(filePath: '/tmp/live.mp4'),
       );
       expect(cancelled.isSuccess, isFalse);
@@ -492,17 +473,15 @@ void main() {
   );
 
   test('maps transport exceptions to stable unknown results', () async {
-    final _RecordingWallpaperClient client = _RecordingWallpaperClient()
-      ..throwStatic = true;
+    final client = _RecordingWallpaperClient()..throwStatic = true;
     AsyncWallpaper.debugSetClient(client);
-    const StaticWallpaperRequest structuredRequest = StaticWallpaperRequest(
+    const structuredRequest = StaticWallpaperRequest(
       source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
       target: WallpaperTarget.home,
     );
 
-    final WallpaperOperationResult structured =
-        await AsyncWallpaper.applyWallpaper(structuredRequest);
-    final WallpaperResult legacy = await AsyncWallpaper.setWallpaper(
+    final structured = await AsyncWallpaper.applyWallpaper(structuredRequest);
+    final legacy = await AsyncWallpaper.setWallpaper(
       const WallpaperRequest(
         target: WallpaperTarget.home,
         sourceType: WallpaperSourceType.url,
@@ -519,7 +498,7 @@ void main() {
   test(
     'returns capabilities through the client and fails conservatively',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient(
+      final client = _RecordingWallpaperClient(
         capabilities: const WallpaperCapabilities(
           supportsStaticWallpaper: true,
           supportsLiveWallpaper: true,
@@ -536,14 +515,12 @@ void main() {
       );
       AsyncWallpaper.debugSetClient(client);
 
-      final WallpaperCapabilities capabilities =
-          await AsyncWallpaper.getCapabilities();
+      final capabilities = await AsyncWallpaper.getCapabilities();
       expect(capabilities.supportsStaticWallpaper, isTrue);
       expect(capabilities.manufacturer, 'Example OEM');
 
       client.throwCapabilities = true;
-      final WallpaperCapabilities fallback =
-          await AsyncWallpaper.getCapabilities();
+      final fallback = await AsyncWallpaper.getCapabilities();
       expect(fallback.supportsStaticWallpaper, isFalse);
       expect(fallback.canSetWallpaper, isFalse);
     },
@@ -552,19 +529,17 @@ void main() {
   test(
     'uses conservative results without touching the client off Android',
     () async {
-      final _RecordingWallpaperClient client = _RecordingWallpaperClient();
+      final client = _RecordingWallpaperClient();
       AsyncWallpaper.debugSetClient(client);
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      const StaticWallpaperRequest request = StaticWallpaperRequest(
+      const request = StaticWallpaperRequest(
         source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
         target: WallpaperTarget.home,
       );
 
-      final WallpaperOperationResult operation =
-          await AsyncWallpaper.applyWallpaper(request);
-      final WallpaperCapabilities capabilities =
-          await AsyncWallpaper.getCapabilities();
-      final WallpaperResult legacy = await AsyncWallpaper.setWallpaper(
+      final operation = await AsyncWallpaper.applyWallpaper(request);
+      final capabilities = await AsyncWallpaper.getCapabilities();
+      final legacy = await AsyncWallpaper.setWallpaper(
         const WallpaperRequest(
           target: WallpaperTarget.home,
           sourceType: WallpaperSourceType.url,
@@ -580,7 +555,7 @@ void main() {
   );
 
   test('resets the testing client between facade calls', () async {
-    final _RecordingWallpaperClient client = _RecordingWallpaperClient();
+    final client = _RecordingWallpaperClient();
     AsyncWallpaper.debugSetClient(client);
 
     await AsyncWallpaper.applyWallpaper(
@@ -605,7 +580,7 @@ void main() {
     test('rotation methods return unsupported off Android', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
-      final WallpaperResult start = await AsyncWallpaper.startWallpaperRotation(
+      final start = await AsyncWallpaper.startWallpaperRotation(
         const WallpaperRotationRequest(
           sources: <WallpaperRotationSource>[
             WallpaperRotationSource(
@@ -617,15 +592,10 @@ void main() {
           intervalMinutes: 60,
         ),
       );
-      final WallpaperResult stop = await AsyncWallpaper.stopWallpaperRotation();
-      final WallpaperResult rotateNow =
-          await AsyncWallpaper.rotateWallpaperNow();
+      final stop = await AsyncWallpaper.stopWallpaperRotation();
+      final rotateNow = await AsyncWallpaper.rotateWallpaperNow();
 
-      for (final WallpaperResult result in <WallpaperResult>[
-        start,
-        stop,
-        rotateNow,
-      ]) {
+      for (final result in <WallpaperResult>[start, stop, rotateNow]) {
         expect(result.isSuccess, isFalse);
         expect(result.error?.code, WallpaperErrorCode.unsupported);
       }
@@ -634,8 +604,7 @@ void main() {
     test('rotation status reports not running off Android', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
-      final WallpaperRotationStatus status =
-          await AsyncWallpaper.getWallpaperRotationStatus();
+      final status = await AsyncWallpaper.getWallpaperRotationStatus();
 
       expect(status.isRunning, isFalse);
       expect(status.nextRunEpochMs, 0);
@@ -648,8 +617,7 @@ void main() {
     test(
       'rotation status reports not running when the platform call throws',
       () async {
-        final WallpaperRotationStatus status =
-            await AsyncWallpaper.getWallpaperRotationStatus();
+        final status = await AsyncWallpaper.getWallpaperRotationStatus();
 
         expect(status.isRunning, isFalse);
         expect(status.lastError, isNotNull);

@@ -59,7 +59,7 @@ class WallpaperSource {
 
   /// A defensive copy of the byte value when this is a byte source.
   Uint8List? get bytes {
-    final Uint8List? value = _bytes;
+    final value = _bytes;
     return value == null ? null : Uint8List.fromList(value);
   }
 }

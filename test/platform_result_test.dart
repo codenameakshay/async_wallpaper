@@ -87,41 +87,38 @@ OperationResultData _appliedResult(WallpaperTargetData target) {
 
 void main() {
   test('Pigeon client maps every source kind into the wire request', () async {
-    final _RecordingWallpaperApi api = _RecordingWallpaperApi();
-    final PigeonWallpaperClient client = PigeonWallpaperClient(api: api);
-    final List<(WallpaperSource, WallpaperSourceKindData)> sources =
-        <(WallpaperSource, WallpaperSourceKindData)>[
-          (
-            const WallpaperSource.url('https://example.com/wallpaper.jpg'),
-            WallpaperSourceKindData.url,
-          ),
-          (
-            const WallpaperSource.filePath('/tmp/wallpaper.jpg'),
-            WallpaperSourceKindData.filePath,
-          ),
-          (
-            const WallpaperSource.contentUri('content://media/images/42'),
-            WallpaperSourceKindData.contentUri,
-          ),
-          (
-            WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
-            WallpaperSourceKindData.bytes,
-          ),
-        ];
+    final api = _RecordingWallpaperApi();
+    final client = PigeonWallpaperClient(api: api);
+    final sources = <(WallpaperSource, WallpaperSourceKindData)>[
+      (
+        const WallpaperSource.url('https://example.com/wallpaper.jpg'),
+        WallpaperSourceKindData.url,
+      ),
+      (
+        const WallpaperSource.filePath('/tmp/wallpaper.jpg'),
+        WallpaperSourceKindData.filePath,
+      ),
+      (
+        const WallpaperSource.contentUri('content://media/images/42'),
+        WallpaperSourceKindData.contentUri,
+      ),
+      (
+        WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3])),
+        WallpaperSourceKindData.bytes,
+      ),
+    ];
 
     for (final (WallpaperSource source, WallpaperSourceKindData sourceKind)
         in sources) {
-      final StaticWallpaperRequest request = StaticWallpaperRequest(
+      final request = StaticWallpaperRequest(
         source: source,
         target: WallpaperTarget.home,
         scaleMode: WallpaperScaleMode.fitCenter,
         strategy: WallpaperApplyStrategy.systemCropper,
       );
 
-      final WallpaperOperationResult result = await client.applyWallpaper(
-        request,
-      );
-      final StaticWallpaperRequestData data = api.staticRequests.last;
+      final result = await client.applyWallpaper(request);
+      final data = api.staticRequests.last;
 
       expect(result.status, WallpaperOperationStatus.applied);
       expect(data.source?.kind, sourceKind);
@@ -133,11 +130,11 @@ void main() {
   });
 
   test('Pigeon client maps every target into the wire request', () async {
-    final _RecordingWallpaperApi api = _RecordingWallpaperApi();
-    final PigeonWallpaperClient client = PigeonWallpaperClient(api: api);
+    final api = _RecordingWallpaperApi();
+    final client = PigeonWallpaperClient(api: api);
 
-    for (final WallpaperTarget target in WallpaperTarget.values) {
-      final StaticWallpaperRequest request = StaticWallpaperRequest(
+    for (final target in WallpaperTarget.values) {
+      final request = StaticWallpaperRequest(
         source: const WallpaperSource.url('https://example.com/wallpaper.jpg'),
         target: target,
         scaleMode: WallpaperScaleMode.centerCrop,
@@ -145,7 +142,7 @@ void main() {
       );
 
       await client.applyWallpaper(request);
-      final StaticWallpaperRequestData data = api.staticRequests.last;
+      final data = api.staticRequests.last;
 
       expect(data.target, wallpaperTargetToData(target));
     }
@@ -154,14 +151,14 @@ void main() {
   test(
     'Pigeon client maps capabilities and video/OpenGL operation outcomes',
     () async {
-      final _RecordingWallpaperApi api = _RecordingWallpaperApi();
-      final PigeonWallpaperClient client = PigeonWallpaperClient(api: api);
-      const VideoWallpaperRequest video = VideoWallpaperRequest(
+      final api = _RecordingWallpaperApi();
+      final client = PigeonWallpaperClient(api: api);
+      const video = VideoWallpaperRequest(
         source: WallpaperSource.contentUri('content://media/video/7'),
         target: WallpaperTarget.both,
         scaleMode: WallpaperScaleMode.fitCenter,
       );
-      final OpenGlLiveWallpaperRequest openGl = OpenGlLiveWallpaperRequest(
+      final openGl = OpenGlLiveWallpaperRequest(
         fragmentShader: 'void main() {}',
         textures: <WallpaperSource>[
           WallpaperSource.bytes(Uint8List.fromList(<int>[7, 8, 9])),
@@ -171,13 +168,10 @@ void main() {
         frameRate: 30,
       );
 
-      final WallpaperCapabilities capabilities = await client.getCapabilities();
-      final WallpaperOperationResult prepared = await client
-          .prepareVideoWallpaper(video);
-      final WallpaperOperationResult preview = await client
-          .openLiveWallpaperPreview(video);
-      final WallpaperOperationResult applied = await client
-          .applyOpenGlWallpaper(openGl);
+      final capabilities = await client.getCapabilities();
+      final prepared = await client.prepareVideoWallpaper(video);
+      final preview = await client.openLiveWallpaperPreview(video);
+      final applied = await client.applyOpenGlWallpaper(openGl);
 
       // Wiring check: proves capabilities flow from the host through the
       // client, not a re-test of every capabilitiesFromData default (see

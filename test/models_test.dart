@@ -6,18 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('WallpaperSource', () {
     test('constructs each supported source variant', () {
-      const WallpaperSource url = WallpaperSource.url(
-        'https://example.com/wallpaper.jpg',
-      );
-      const WallpaperSource filePath = WallpaperSource.filePath(
+      const url = WallpaperSource.url('https://example.com/wallpaper.jpg');
+      const filePath = WallpaperSource.filePath(
         '/data/local/tmp/wallpaper.jpg',
       );
-      const WallpaperSource contentUri = WallpaperSource.contentUri(
+      const contentUri = WallpaperSource.contentUri(
         'content://media/external/images/media/42',
       );
-      final WallpaperSource bytes = WallpaperSource.bytes(
-        Uint8List.fromList(<int>[1, 2, 3]),
-      );
+      final bytes = WallpaperSource.bytes(Uint8List.fromList(<int>[1, 2, 3]));
 
       expect(url.url, 'https://example.com/wallpaper.jpg');
       expect(filePath.filePath, '/data/local/tmp/wallpaper.jpg');
@@ -26,11 +22,11 @@ void main() {
     });
 
     test('defensively copies byte sources', () {
-      final Uint8List input = Uint8List.fromList(<int>[1, 2, 3]);
-      final WallpaperSource source = WallpaperSource.bytes(input);
+      final input = Uint8List.fromList(<int>[1, 2, 3]);
+      final source = WallpaperSource.bytes(input);
 
       input[0] = 9;
-      final Uint8List firstRead = source.bytes!;
+      final firstRead = source.bytes!;
       firstRead[1] = 8;
 
       expect(source.bytes, Uint8List.fromList(<int>[1, 2, 3]));
@@ -38,15 +34,15 @@ void main() {
   });
 
   test('constructs an immutable structured static wallpaper request', () {
-    final Uint8List input = Uint8List.fromList(<int>[4, 5, 6]);
-    final StaticWallpaperRequest request = StaticWallpaperRequest(
+    final input = Uint8List.fromList(<int>[4, 5, 6]);
+    final request = StaticWallpaperRequest(
       source: WallpaperSource.bytes(input),
       target: WallpaperTarget.lock,
       scaleMode: WallpaperScaleMode.fill,
       strategy: WallpaperApplyStrategy.direct,
       goToHome: true,
     );
-    const StaticWallpaperRequest defaults = StaticWallpaperRequest(
+    const defaults = StaticWallpaperRequest(
       source: WallpaperSource.url('https://example.com/default.jpg'),
       target: WallpaperTarget.home,
     );
@@ -64,7 +60,7 @@ void main() {
   });
 
   test('both target result exposes independent screen outcomes', () {
-    const WallpaperOperationResult result = WallpaperOperationResult(
+    const result = WallpaperOperationResult(
       status: WallpaperOperationStatus.applied,
       requestedTarget: WallpaperTarget.both,
       home: WallpaperTargetResult(status: WallpaperTargetStatus.applied),
@@ -86,16 +82,16 @@ void main() {
   test(
     'constructs video and OpenGL requests without retaining texture lists',
     () {
-      final List<WallpaperSource> textures = <WallpaperSource>[
+      final textures = <WallpaperSource>[
         const WallpaperSource.url('https://example.com/texture.png'),
       ];
-      const VideoWallpaperRequest video = VideoWallpaperRequest(
+      const video = VideoWallpaperRequest(
         source: WallpaperSource.filePath('/data/local/tmp/wallpaper.mp4'),
         target: WallpaperTarget.home,
         scaleMode: WallpaperScaleMode.fitCenter,
         goToHome: true,
       );
-      final OpenGlLiveWallpaperRequest openGl = OpenGlLiveWallpaperRequest(
+      final openGl = OpenGlLiveWallpaperRequest(
         fragmentShader: 'void main() {}',
         textures: textures,
         target: WallpaperTarget.lock,

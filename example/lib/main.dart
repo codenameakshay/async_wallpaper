@@ -153,7 +153,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        final ColorScheme scheme =
+        final scheme =
             lightDynamic ?? ColorScheme.fromSeed(seedColor: Colors.blue);
         return MaterialApp(
           title: 'Async Wallpaper Example',
@@ -220,8 +220,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final WallpaperCapabilities capabilities = await widget.api
-          .getCapabilities();
+      final capabilities = await widget.api.getCapabilities();
       if (!mounted) {
         return;
       }
@@ -259,7 +258,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final WallpaperOperationResult result = await operation();
+      final result = await operation();
       if (!mounted) {
         return;
       }
@@ -364,7 +363,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _requiredInput(String value, String label) {
-    final String trimmed = value.trim();
+    final trimmed = value.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('$label cannot be empty.');
     }
@@ -372,7 +371,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _resultSummary(WallpaperOperationResult result) {
-    final List<String> details = <String>[result.status.name];
+    final details = <String>[result.status.name];
     if (result.fallbackUsed) {
       details.add(
         'fallback ${result.fallbackStrategy?.name ?? 'strategy'} used',
@@ -394,7 +393,7 @@ class _HomePageState extends State<HomePage> {
     if (targetResult == null) {
       return '$targetLabel: not reported';
     }
-    final List<String> details = <String>[targetResult.status.name];
+    final details = <String>[targetResult.status.name];
     if (targetResult.errorCode != null) {
       details.add(targetResult.errorCode!);
     }
@@ -610,7 +609,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _staticOutcome(BuildContext context) {
-    final WallpaperOperationResult? result = _staticResult;
+    final result = _staticResult;
     return _resultPanel(
       context,
       title: 'Static outcome',
@@ -623,7 +622,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _capabilitiesCard(BuildContext context) {
-    final WallpaperCapabilities? capabilities = _capabilities;
+    final capabilities = _capabilities;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),

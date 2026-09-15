@@ -6,12 +6,12 @@ import 'models.dart';
 
 /// Converts a domain source into its Pigeon transport representation.
 WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
-  final String? url = source.url;
+  final url = source.url;
   if (url != null) {
     return WallpaperSourceData(kind: WallpaperSourceKindData.url, url: url);
   }
 
-  final String? filePath = source.filePath;
+  final filePath = source.filePath;
   if (filePath != null) {
     return WallpaperSourceData(
       kind: WallpaperSourceKindData.filePath,
@@ -19,7 +19,7 @@ WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
     );
   }
 
-  final String? contentUri = source.contentUri;
+  final contentUri = source.contentUri;
   if (contentUri != null) {
     return WallpaperSourceData(
       kind: WallpaperSourceKindData.contentUri,
@@ -27,7 +27,7 @@ WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
     );
   }
 
-  final Uint8List? bytes = source.bytes;
+  final bytes = source.bytes;
   if (bytes != null) {
     return WallpaperSourceData(
       kind: WallpaperSourceKindData.bytes,
@@ -144,14 +144,11 @@ WallpaperOperationResult operationResultFromData(OperationResultData data) {
   WallpaperTargetResult? lock;
 
   try {
-    final WallpaperOperationStatus status = wallpaperOperationStatusFromData(
-      data.status,
-    );
+    final status = wallpaperOperationStatusFromData(data.status);
     target = wallpaperTargetFromData(data.requestedTarget);
     home = data.home == null ? null : targetResultFromData(data.home!);
     lock = data.lock == null ? null : targetResultFromData(data.lock!);
-    final WallpaperApplyStrategy? fallbackStrategy =
-        data.fallbackStrategy == null
+    final fallbackStrategy = data.fallbackStrategy == null
         ? null
         : wallpaperApplyStrategyFromData(data.fallbackStrategy);
 
@@ -356,8 +353,8 @@ WallpaperOperationResult _malformedOperationResult(
   required WallpaperTargetResult? lock,
   required Object? reason,
 }) {
-  final String? nativeDetails = data.errorDetails ?? data.errorMessage;
-  final String details = <String>[
+  final nativeDetails = data.errorDetails ?? data.errorMessage;
+  final details = <String>[
     ?nativeDetails,
     if (reason != null) reason.toString(),
   ].join('; ');

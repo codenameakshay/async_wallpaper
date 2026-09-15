@@ -1,4 +1,8 @@
 include: package:flutter_lints/flutter.yaml
 
+linter:
+  rules:
+    - omit_local_variable_types
+
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

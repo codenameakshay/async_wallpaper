@@ -122,7 +122,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateStaticWallpaperRequest(request);
+    final String? validationError = _validateSource(
+      request.source,
+      label: 'Wallpaper',
+    );
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -146,7 +149,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateVideoWallpaperRequest(request);
+    final String? validationError = _validateSource(
+      request.source,
+      label: 'Video wallpaper',
+    );
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -166,7 +172,10 @@ class AsyncWallpaper {
       return _unsupportedOperation(request.target);
     }
 
-    final String? validationError = _validateVideoWallpaperRequest(request);
+    final String? validationError = _validateSource(
+      request.source,
+      label: 'Video wallpaper',
+    );
     if (validationError != null) {
       return _invalidOperation(request.target, validationError);
     }
@@ -203,14 +212,12 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    if (request.source.trim().isEmpty) {
-      return _legacyInvalidInput('Wallpaper source cannot be empty.');
-    }
 
     final StaticWallpaperRequest structuredRequest =
         _legacyStaticWallpaperRequest(request);
-    final String? validationError = _validateStaticWallpaperRequest(
-      structuredRequest,
+    final String? validationError = _validateSource(
+      structuredRequest.source,
+      label: 'Wallpaper',
     );
     if (validationError != null) {
       return _legacyInvalidInput(validationError);
@@ -233,9 +240,6 @@ class AsyncWallpaper {
   ) async {
     if (!_isAndroid) {
       return _unsupportedResult;
-    }
-    if (request.url.trim().isEmpty) {
-      return _legacyInvalidInput('Material You wallpaper URL cannot be empty.');
     }
     if (!_isHttpsUrl(request.url)) {
       return _legacyInvalidInput(
@@ -266,16 +270,14 @@ class AsyncWallpaper {
     if (!_isAndroid) {
       return _unsupportedResult;
     }
-    if (request.filePath.trim().isEmpty) {
-      return _legacyInvalidInput('Live wallpaper file path cannot be empty.');
-    }
 
     final VideoWallpaperRequest structuredRequest = VideoWallpaperRequest(
       source: WallpaperSource.filePath(request.filePath),
       goToHome: request.goToHome,
     );
-    final String? validationError = _validateVideoWallpaperRequest(
-      structuredRequest,
+    final String? validationError = _validateSource(
+      structuredRequest.source,
+      label: 'Video wallpaper',
     );
     if (validationError != null) {
       return _legacyInvalidInput(validationError);
@@ -311,9 +313,6 @@ class AsyncWallpaper {
   ) async {
     if (!_isAndroid && !_isIOS) {
       return _unsupportedResult;
-    }
-    if (request.url.trim().isEmpty) {
-      return _legacyInvalidInput('Wallpaper URL cannot be empty.');
     }
     if (!_isHttpsUrl(request.url)) {
       return _legacyInvalidInput('Wallpaper URL must be a valid HTTPS URL.');
@@ -507,7 +506,6 @@ class AsyncWallpaper {
     }
   }
 
-  /// Maps structured [WallpaperOperationResult] to legacy [WallpaperResult]: `invalid-input`/`foregroundRequired`/`unsupported` become [WallpaperErrorCode.invalidInput]/[WallpaperErrorCode.unsupported]; only `applied`/`previewOpened`/`awaitingUserConfirmation` are treated as success for the legacy boolean contract.
   static WallpaperOperationResult _unsupportedOperation(
     WallpaperTarget target,
   ) {
@@ -549,16 +547,6 @@ class AsyncWallpaper {
       target: request.target,
       goToHome: request.goToHome,
     );
-  }
-
-  static String? _validateStaticWallpaperRequest(
-    StaticWallpaperRequest request,
-  ) {
-    return _validateSource(request.source, label: 'Wallpaper');
-  }
-
-  static String? _validateVideoWallpaperRequest(VideoWallpaperRequest request) {
-    return _validateSource(request.source, label: 'Video wallpaper');
   }
 
   static String? _validateOpenGlWallpaperRequest(
@@ -632,7 +620,8 @@ class AsyncWallpaper {
   }
 
   static bool _isHttpsUrl(String value) {
-    if (value.trim().isEmpty || value.trim() != value) {
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
     final Uri? uri = Uri.tryParse(value);
@@ -644,7 +633,8 @@ class AsyncWallpaper {
   }
 
   static bool _isContentUri(String value) {
-    if (value.trim().isEmpty || value.trim() != value) {
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed != value) {
       return false;
     }
     final Uri? uri = Uri.tryParse(value);
@@ -671,6 +661,10 @@ class AsyncWallpaper {
     );
   }
 
+  /// Maps a native error code to a legacy [WallpaperErrorCode]: `unsupported`
+  /// and `not-implemented` become [WallpaperErrorCode.unsupported]; any
+  /// `invalid-*` code becomes [WallpaperErrorCode.invalidInput]; anything
+  /// else defaults to [WallpaperErrorCode.platformFailure].
   static WallpaperErrorCode _legacyErrorCodeFor(
     WallpaperOperationResult operation,
   ) {
@@ -689,6 +683,9 @@ class AsyncWallpaper {
     return WallpaperErrorCode.platformFailure;
   }
 
+  /// Only `applied` (with every requested target applied), `previewOpened`,
+  /// and `awaitingUserConfirmation` (for UI-opening operations) count as
+  /// success under the legacy boolean contract.
   static bool _isLegacySuccess(
     WallpaperOperationResult operation, {
     required bool uiOpeningOperation,

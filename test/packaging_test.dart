@@ -33,6 +33,24 @@ void main() {
       isTrue,
     );
 
+    // Without these, Android 11+ reports the system wallpaper UIs as missing.
+    final queries = RegExp(
+      r'<queries>([\s\S]*?)</queries>',
+    ).firstMatch(manifest)?.group(1);
+    expect(queries, isNotNull);
+    final queriedActions = RegExp(
+      r'<action android:name="([^"]+)" />',
+    ).allMatches(queries!).map((match) => match.group(1)!).toList();
+    expect(
+      queriedActions,
+      unorderedEquals(<String>[
+        'android.service.wallpaper.CHANGE_LIVE_WALLPAPER',
+        'android.service.wallpaper.LIVE_WALLPAPER_CHOOSER',
+        'android.intent.action.SET_WALLPAPER',
+        'android.service.wallpaper.CROP_AND_SET_WALLPAPER',
+      ]),
+    );
+
     final services = RegExp(
       r'<service\b[\s\S]*?</service>',
     ).allMatches(manifest).map((match) => match.group(0)!).toList();

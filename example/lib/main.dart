@@ -525,7 +525,8 @@ class _HomePageState extends State<HomePage> {
       return '$targetLabel: not reported';
     }
     final details = <String>[targetResult.status.name];
-    if (targetResult.errorCode != null) {
+    if (targetResult.errorCode != null &&
+        targetResult.errorCode != targetResult.status.name) {
       details.add(targetResult.errorCode!);
     }
     if (targetResult.errorMessage != null) {

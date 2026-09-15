@@ -367,6 +367,41 @@ void main() {
     );
   });
 
+  testWidgets('does not repeat an error code that matches the status', (
+    WidgetTester tester,
+  ) async {
+    const unsupported = WallpaperTargetResult(
+      status: WallpaperTargetStatus.unsupported,
+      errorCode: 'unsupported',
+      errorMessage: 'Not on this platform.',
+    );
+    final api = _FakeWallpaperDemoApi()
+      ..staticResult = const WallpaperOperationResult(
+        status: WallpaperOperationStatus.unsupported,
+        requestedTarget: WallpaperTarget.both,
+        home: unsupported,
+        lock: unsupported,
+        errorCode: 'unsupported',
+        errorMessage: 'Not on this platform.',
+      );
+    await _pumpExample(tester, api);
+
+    await _tapVisible(tester, find.byKey(const Key('apply-static-button')));
+    await tester.pump();
+    expect(
+      find.text('Status: unsupported — Not on this platform.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Home: unsupported — Not on this platform.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Lock: unsupported — Not on this platform.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('embedded demo bytes are a decodable image', (
     WidgetTester tester,
   ) async {

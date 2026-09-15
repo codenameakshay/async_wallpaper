@@ -491,9 +491,10 @@ class AsyncWallpaper {
     try {
       return await call();
     } catch (error) {
-      return WallpaperOperationResult(
+      return _localResult(
+        target,
         status: WallpaperOperationStatus.failed,
-        requestedTarget: target,
+        targetStatus: WallpaperTargetStatus.failed,
         errorCode: 'unknown',
         errorMessage: 'Unexpected exception while $operation.',
         errorDetails: error.toString(),
@@ -531,9 +532,10 @@ class AsyncWallpaper {
   static WallpaperOperationResult _unsupportedOperation(
     WallpaperTarget target,
   ) {
-    return WallpaperOperationResult(
+    return _localResult(
+      target,
       status: WallpaperOperationStatus.unsupported,
-      requestedTarget: target,
+      targetStatus: WallpaperTargetStatus.unsupported,
       errorCode: 'unsupported',
       errorMessage: 'This operation is not supported on this platform.',
     );
@@ -543,11 +545,39 @@ class AsyncWallpaper {
     WallpaperTarget target,
     String message,
   ) {
-    return WallpaperOperationResult(
+    return _localResult(
+      target,
       status: WallpaperOperationStatus.failed,
-      requestedTarget: target,
+      targetStatus: WallpaperTargetStatus.failed,
       errorCode: 'invalid-input',
       errorMessage: message,
+    );
+  }
+
+  /// Builds a result decided in Dart with the same per-target shape Android
+  /// reports: every requested target carries the outcome.
+  static WallpaperOperationResult _localResult(
+    WallpaperTarget target, {
+    required WallpaperOperationStatus status,
+    required WallpaperTargetStatus targetStatus,
+    required String errorCode,
+    required String errorMessage,
+    String? errorDetails,
+  }) {
+    final targetResult = WallpaperTargetResult(
+      status: targetStatus,
+      errorCode: errorCode,
+      errorMessage: errorMessage,
+      errorDetails: errorDetails,
+    );
+    return WallpaperOperationResult(
+      status: status,
+      requestedTarget: target,
+      home: target == WallpaperTarget.lock ? null : targetResult,
+      lock: target == WallpaperTarget.home ? null : targetResult,
+      errorCode: errorCode,
+      errorMessage: errorMessage,
+      errorDetails: errorDetails,
     );
   }
 

@@ -11,6 +11,7 @@ import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.view.Surface
+import androidx.core.graphics.scale
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -515,7 +516,7 @@ class GlRenderer(
     }
     val scaledWidth = max(1, (bitmap.width * scale).toInt())
     val scaledHeight = max(1, (bitmap.height * scale).toInt())
-    val scaled = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
+    val scaled = bitmap.scale(scaledWidth, scaledHeight)
     if (scaled !== bitmap) {
       bitmap.recycle()
     }

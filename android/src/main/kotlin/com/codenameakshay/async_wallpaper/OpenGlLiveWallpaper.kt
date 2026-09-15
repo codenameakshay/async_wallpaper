@@ -13,6 +13,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
+import androidx.core.net.toUri
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -83,7 +84,7 @@ internal fun GlTextureSource.readBoundedBytes(context: Context): ByteArray {
       FileInputStream(file).use(::readBoundedTextureBytes)
     }
     is GlTextureSource.ContentUri -> {
-      val parsedUri = android.net.Uri.parse(uri)
+      val parsedUri = uri.toUri()
       if (!parsedUri.scheme.equals("content", ignoreCase = true) || parsedUri.authority.isNullOrBlank()) {
         throw IOException("Texture URI must be a readable content URI.")
       }

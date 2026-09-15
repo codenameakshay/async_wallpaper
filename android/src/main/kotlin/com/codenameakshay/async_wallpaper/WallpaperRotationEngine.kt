@@ -8,6 +8,7 @@ import com.squareup.picasso.Picasso
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.URI
 import java.util.Collections
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -148,7 +149,7 @@ internal class WallpaperRotationEngine(
       }
       true
     }.getOrElse {
-      Log.e(TAG, "Failed to cache URL wallpaper: $url", it)
+      Log.e(TAG, "Failed to cache URL wallpaper: ${logSafeSourceLabel(url)}", it)
       false
     }
   }
@@ -172,7 +173,7 @@ internal class WallpaperRotationEngine(
         true
       }
     }.getOrElse {
-      Log.e(TAG, "Failed to copy local wallpaper: $sourcePath", it)
+      Log.e(TAG, "Failed to copy local wallpaper: ${logSafeSourceLabel(sourcePath)}", it)
       false
     }
   }
@@ -228,6 +229,19 @@ internal class WallpaperRotationEngine(
       return 0
     }
     return ((value % size) + size) % size
+  }
+
+  /**
+   * Log-safe source label: scheme plus host for URLs, file name for local paths. Rotation sources
+   * can carry signed query parameters or private paths, so never log the raw value.
+   */
+  private fun logSafeSourceLabel(source: String): String {
+    val host = runCatching { URI(source).host }.getOrNull()
+    if (!host.isNullOrBlank()) {
+      val scheme = runCatching { URI(source).scheme }.getOrNull()
+      return "$scheme://$host"
+    }
+    return File(source).name.takeIf { it.isNotBlank() } ?: "<redacted>"
   }
 
   companion object {

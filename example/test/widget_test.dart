@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:async_wallpaper/async_wallpaper.dart';
 import 'package:async_wallpaper_example/main.dart';
@@ -185,6 +186,37 @@ void main() {
     await _tapVisible(tester, find.byKey(const Key('preview-video-button')));
     await tester.pump();
     expect(find.text('Video preview: previewOpened'), findsOneWidget);
+  });
+
+  testWidgets('shows why a video operation did not succeed', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeWallpaperDemoApi()
+      ..videoPreparationResult = const WallpaperOperationResult(
+        status: WallpaperOperationStatus.unsupported,
+        requestedTarget: WallpaperTarget.home,
+        errorCode: 'unsupported',
+        errorMessage: 'Not on this platform.',
+      );
+    await _pumpExample(tester, api);
+
+    await _tapVisible(tester, find.byKey(const Key('prepare-video-button')));
+    await tester.pump();
+    expect(
+      find.text('Video preparation: unsupported — Not on this platform.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('embedded demo bytes are a decodable image', (
+    WidgetTester tester,
+  ) async {
+    final image = await tester.runAsync(() async {
+      final codec = await ui.instantiateImageCodec(demoPngBytes);
+      return (await codec.getNextFrame()).image;
+    });
+    expect(image!.width, 1);
+    expect(image.height, 1);
   });
 
   testWidgets('serializes actions while an operation is in flight', (

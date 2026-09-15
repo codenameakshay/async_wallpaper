@@ -98,35 +98,30 @@ class PigeonApiImpl(
     ioExecutor.execute {
       val success = runCatching {
         val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
-        if (intervalMinutes < MIN_ROTATION_INTERVAL_MINUTES) {
-          false
-        } else {
-          val started = rotationEngine.startRotation(config)
-          if (started) {
-            if (config.enableIntervalTrigger == true) {
-              WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
-              rotationStore.setNextRunEpochMs(
-                System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
-              )
-            } else {
-              WallpaperRotationScheduler.cancelPeriodic(appContext)
-              rotationStore.setNextRunEpochMs(0L)
-            }
-            val needsMonitor = config.enableChargingTrigger == true || config.enableTimeOfDayTrigger == true
-            if (needsMonitor) {
-              Log.d(TAG, "Starting rotation monitor service")
-              WallpaperRotationMonitorService.start(appContext)
-            } else {
-              WallpaperRotationMonitorService.stop(appContext)
-            }
+        val started = rotationEngine.startRotation(config)
+        if (started) {
+          if (config.enableIntervalTrigger == true) {
+            WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
+            rotationStore.setNextRunEpochMs(
+              System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
+            )
+          } else {
+            WallpaperRotationScheduler.cancelPeriodic(appContext)
+            rotationStore.setNextRunEpochMs(0L)
           }
-          started
+          val needsMonitor = config.enableChargingTrigger == true || config.enableTimeOfDayTrigger == true
+          if (needsMonitor) {
+            WallpaperRotationMonitorService.start(appContext)
+          } else {
+            WallpaperRotationMonitorService.stop(appContext)
+          }
         }
+        started
       }.getOrElse {
         Log.e(TAG, "startWallpaperRotation failed", it)
         false
       }
-      postBoolean(callback, success)
+      postCallback(callback, Result.success(success))
     }
   }
 
@@ -142,7 +137,7 @@ class PigeonApiImpl(
         Log.e(TAG, "stopWallpaperRotation failed", it)
         false
       }
-      postBoolean(callback, success)
+      postCallback(callback, Result.success(success))
     }
   }
 
@@ -256,141 +251,18 @@ class PigeonApiImpl(
     }
   }
 
-  override fun setHomeWallpaperFromUrl(
-    url: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url),
-      WallpaperTargetData.HOME,
-      callback,
-    )
-  }
-
-  override fun setLockWallpaperFromUrl(
-    url: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url),
-      WallpaperTargetData.LOCK,
-      callback,
-    )
-  }
-
-  override fun setBothWallpaperFromUrl(
-    url: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url),
-      WallpaperTargetData.BOTH,
-      callback,
-    )
-  }
-
-  /**
-   * Legacy chooser endpoint. Its URL was never passed to Android; retain that source-compatible
-   * behavior, but require the current Activity rather than launching UI from the app context.
-   */
-  override fun setWallpaper(url: String, goToHome: Boolean, callback: (Result<Boolean>) -> Unit) {
+  override fun setMaterialYouWallpaper(url: String, callback: (Result<Boolean>) -> Unit) {
+    // Material You effects remain a launcher/system concern; apply the supplied image to both
+    // targets directly when Android permits it.
     enqueueBoolean(callback) {
-      runOnMainBlocking {
-        openGenericWallpaperPicker()
-      }
-    }
-  }
-
-  override fun setHomeWallpaperFromFile(
-    filePath: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = filePath),
-      WallpaperTargetData.HOME,
-      callback,
-    )
-  }
-
-  override fun setLockWallpaperFromFile(
-    filePath: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = filePath),
-      WallpaperTargetData.LOCK,
-      callback,
-    )
-  }
-
-  override fun setBothWallpaperFromFile(
-    filePath: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = filePath),
-      WallpaperTargetData.BOTH,
-      callback,
-    )
-  }
-
-  /**
-   * The old implementation copied a file into public MediaStore solely to launch cropper UI.
-   * Use the direct path instead: it preserves file-source support without leaking duplicate media
-   * items or requiring a foreground Activity.
-   */
-  override fun setWallpaperFromFile(
-    filePath: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    setLegacyStaticWallpaper(
-      WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = filePath),
-      WallpaperTargetData.HOME,
-      callback,
-    )
-  }
-
-  override fun setMaterialYouWallpaper(
-    url: String,
-    goToHome: Boolean,
-    enableEffects: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    // Material You effects remain a launcher/system concern; preserve historical behavior by
-    // applying the supplied image to both targets when Android permits it.
-    setBothWallpaperFromUrl(url, goToHome, callback)
-  }
-
-  override fun setLiveWallpaper(
-    filePath: String,
-    goToHome: Boolean,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    enqueueBoolean(callback) {
-      if (!runOnMainBlocking { currentActivity() != null }) {
-        return@enqueueBoolean false
-      }
-      val request = VideoWallpaperRequestData(
-        source = WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = filePath),
-        target = WallpaperTargetData.HOME,
-        scaleMode = WallpaperScaleModeData.CENTER_CROP,
-      )
-      val prepared = prepareVideoAsset(request)
-      if (prepared.status != OperationStatusData.AWAITING_USER_CONFIRMATION) {
-        false
-      } else {
-        runOnMainBlocking {
-          openLiveWallpaperUi(WallpaperTargetData.HOME, VideoLiveWallpaper::class.java).status ==
-            OperationStatusData.PREVIEW_OPENED
-        }
-      }
+      staticWallpaperEngine.applyDirect(
+        StaticWallpaperRequestData(
+          source = WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url),
+          target = WallpaperTargetData.BOTH,
+          scaleMode = WallpaperScaleModeData.CENTER_CROP,
+          strategy = WallpaperApplyStrategyData.DIRECT,
+        ),
+      ).status == OperationStatusData.APPLIED
     }
   }
 
@@ -411,23 +283,6 @@ class PigeonApiImpl(
   override fun downloadWallpaper(url: String, callback: (Result<Boolean>) -> Unit) {
     enqueueBoolean(callback) {
       downloadToMediaStore(url)
-    }
-  }
-
-  private fun setLegacyStaticWallpaper(
-    source: WallpaperSourceData,
-    target: WallpaperTargetData,
-    callback: (Result<Boolean>) -> Unit,
-  ) {
-    enqueueBoolean(callback) {
-      staticWallpaperEngine.applyDirect(
-        StaticWallpaperRequestData(
-          source = source,
-          target = target,
-          scaleMode = WallpaperScaleModeData.CENTER_CROP,
-          strategy = WallpaperApplyStrategyData.DIRECT,
-        ),
-      ).status == OperationStatusData.APPLIED
     }
   }
 
@@ -669,16 +524,6 @@ class PigeonApiImpl(
         }
         GlTextureSource.Bytes(bytes)
       }
-    }
-  }
-
-  private fun openGenericWallpaperPicker(): Boolean {
-    val activity = currentActivity() ?: return false
-    val intent = Intent(Intent.ACTION_SET_WALLPAPER)
-    return if (!AndroidCapabilities.resolves(activity.packageManager, intent)) {
-      false
-    } else {
-      runCatching { activity.startActivity(intent) }.isSuccess
     }
   }
 

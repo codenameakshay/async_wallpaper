@@ -31,6 +31,12 @@ enum OperationStatusData {
 /// The outcome for one wallpaper target within an operation.
 enum TargetStatusData { applied, failed, unsupported, notAttempted }
 
+/// The location and representation of a rotation playlist entry.
+enum RotationSourceTypeData { url, file }
+
+/// The order in which rotation playlist entries are applied.
+enum RotationOrderData { sequential, shuffle }
+
 /// A static, content-provider, or in-memory wallpaper source.
 class WallpaperSourceData {
   WallpaperSourceKindData? kind;
@@ -48,7 +54,7 @@ class TargetResultData {
   String? errorDetails;
 }
 
-/// A truthful, structured result from the host platform.
+/// Structured result, including per-target outcomes, reported by the host platform.
 class OperationResultData {
   OperationStatusData? status;
   WallpaperTargetData? requestedTarget;
@@ -84,7 +90,6 @@ class StaticWallpaperRequestData {
   WallpaperTargetData? target;
   WallpaperScaleModeData? scaleMode;
   WallpaperApplyStrategyData? strategy;
-  bool? goToHome;
 }
 
 /// Parameters for preparing or previewing a video live wallpaper.
@@ -92,7 +97,6 @@ class VideoWallpaperRequestData {
   WallpaperSourceData? source;
   WallpaperTargetData? target;
   WallpaperScaleModeData? scaleMode;
-  bool? goToHome;
 }
 
 /// Parameters for applying a shader-based OpenGL live wallpaper.
@@ -101,7 +105,6 @@ class OpenGlWallpaperRequestData {
   List<WallpaperSourceData?>? textures;
   WallpaperTargetData? target;
   int? frameRate;
-  bool? goToHome;
 }
 
 class MaterialYouSupportData {
@@ -112,19 +115,19 @@ class MaterialYouSupportData {
 
 class RotationSourceData {
   String? source;
-  int? sourceType;
+  RotationSourceTypeData? sourceType;
 }
 
 class WallpaperRotationConfigData {
   List<RotationSourceData?>? sources;
-  int? target;
+  WallpaperTargetData? target;
   int? intervalMinutes;
   bool? enableIntervalTrigger;
   bool? enableChargingTrigger;
   bool? enableTimeOfDayTrigger;
   int? activeHoursStart;
   int? activeHoursEnd;
-  int? orderType;
+  RotationOrderData? orderType;
 }
 
 class WallpaperRotationStatusData {
@@ -178,36 +181,8 @@ abstract class WallpaperApi {
   @async
   OperationResultData applyOpenGlWallpaper(OpenGlWallpaperRequestData request);
 
-  /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
   @async
-  bool setHomeWallpaperFromUrl(String url, bool goToHome);
-
-  @async
-  bool setLockWallpaperFromUrl(String url, bool goToHome);
-
-  @async
-  bool setBothWallpaperFromUrl(String url, bool goToHome);
-
-  @async
-  bool setWallpaper(String url, bool goToHome);
-
-  @async
-  bool setHomeWallpaperFromFile(String filePath, bool goToHome);
-
-  @async
-  bool setLockWallpaperFromFile(String filePath, bool goToHome);
-
-  @async
-  bool setBothWallpaperFromFile(String filePath, bool goToHome);
-
-  @async
-  bool setWallpaperFromFile(String filePath, bool goToHome);
-
-  @async
-  bool setMaterialYouWallpaper(String url, bool goToHome, bool enableEffects);
-
-  @async
-  bool setLiveWallpaper(String filePath, bool goToHome);
+  bool setMaterialYouWallpaper(String url);
 
   @async
   bool openWallpaperChooser();

@@ -64,6 +64,12 @@ enum OperationStatusData {
 /// The outcome for one wallpaper target within an operation.
 enum TargetStatusData { applied, failed, unsupported, notAttempted }
 
+/// The location and representation of a rotation playlist entry.
+enum RotationSourceTypeData { url, file }
+
+/// The order in which rotation playlist entries are applied.
+enum RotationOrderData { sequential, shuffle }
+
 /// A static, content-provider, or in-memory wallpaper source.
 class WallpaperSourceData {
   WallpaperSourceData({
@@ -172,7 +178,7 @@ class TargetResultData {
   int get hashCode => Object.hashAll(_toList());
 }
 
-/// A truthful, structured result from the host platform.
+/// Structured result, including per-target outcomes, reported by the host platform.
 class OperationResultData {
   OperationResultData({
     this.status,
@@ -364,7 +370,6 @@ class StaticWallpaperRequestData {
     this.target,
     this.scaleMode,
     this.strategy,
-    this.goToHome,
   });
 
   WallpaperSourceData? source;
@@ -375,10 +380,8 @@ class StaticWallpaperRequestData {
 
   WallpaperApplyStrategyData? strategy;
 
-  bool? goToHome;
-
   List<Object?> _toList() {
-    return <Object?>[source, target, scaleMode, strategy, goToHome];
+    return <Object?>[source, target, scaleMode, strategy];
   }
 
   Object encode() {
@@ -392,7 +395,6 @@ class StaticWallpaperRequestData {
       target: result[1] as WallpaperTargetData?,
       scaleMode: result[2] as WallpaperScaleModeData?,
       strategy: result[3] as WallpaperApplyStrategyData?,
-      goToHome: result[4] as bool?,
     );
   }
 
@@ -416,12 +418,7 @@ class StaticWallpaperRequestData {
 
 /// Parameters for preparing or previewing a video live wallpaper.
 class VideoWallpaperRequestData {
-  VideoWallpaperRequestData({
-    this.source,
-    this.target,
-    this.scaleMode,
-    this.goToHome,
-  });
+  VideoWallpaperRequestData({this.source, this.target, this.scaleMode});
 
   WallpaperSourceData? source;
 
@@ -429,10 +426,8 @@ class VideoWallpaperRequestData {
 
   WallpaperScaleModeData? scaleMode;
 
-  bool? goToHome;
-
   List<Object?> _toList() {
-    return <Object?>[source, target, scaleMode, goToHome];
+    return <Object?>[source, target, scaleMode];
   }
 
   Object encode() {
@@ -445,7 +440,6 @@ class VideoWallpaperRequestData {
       source: result[0] as WallpaperSourceData?,
       target: result[1] as WallpaperTargetData?,
       scaleMode: result[2] as WallpaperScaleModeData?,
-      goToHome: result[3] as bool?,
     );
   }
 
@@ -474,7 +468,6 @@ class OpenGlWallpaperRequestData {
     this.textures,
     this.target,
     this.frameRate,
-    this.goToHome,
   });
 
   String? fragmentShader;
@@ -485,10 +478,8 @@ class OpenGlWallpaperRequestData {
 
   int? frameRate;
 
-  bool? goToHome;
-
   List<Object?> _toList() {
-    return <Object?>[fragmentShader, textures, target, frameRate, goToHome];
+    return <Object?>[fragmentShader, textures, target, frameRate];
   }
 
   Object encode() {
@@ -502,7 +493,6 @@ class OpenGlWallpaperRequestData {
       textures: (result[1] as List<Object?>?)?.cast<WallpaperSourceData?>(),
       target: result[2] as WallpaperTargetData?,
       frameRate: result[3] as int?,
-      goToHome: result[4] as bool?,
     );
   }
 
@@ -572,7 +562,7 @@ class RotationSourceData {
 
   String? source;
 
-  int? sourceType;
+  RotationSourceTypeData? sourceType;
 
   List<Object?> _toList() {
     return <Object?>[source, sourceType];
@@ -586,7 +576,7 @@ class RotationSourceData {
     result as List<Object?>;
     return RotationSourceData(
       source: result[0] as String?,
-      sourceType: result[1] as int?,
+      sourceType: result[1] as RotationSourceTypeData?,
     );
   }
 
@@ -622,7 +612,7 @@ class WallpaperRotationConfigData {
 
   List<RotationSourceData?>? sources;
 
-  int? target;
+  WallpaperTargetData? target;
 
   int? intervalMinutes;
 
@@ -636,7 +626,7 @@ class WallpaperRotationConfigData {
 
   int? activeHoursEnd;
 
-  int? orderType;
+  RotationOrderData? orderType;
 
   List<Object?> _toList() {
     return <Object?>[
@@ -660,14 +650,14 @@ class WallpaperRotationConfigData {
     result as List<Object?>;
     return WallpaperRotationConfigData(
       sources: (result[0] as List<Object?>?)?.cast<RotationSourceData?>(),
-      target: result[1] as int?,
+      target: result[1] as WallpaperTargetData?,
       intervalMinutes: result[2] as int?,
       enableIntervalTrigger: result[3] as bool?,
       enableChargingTrigger: result[4] as bool?,
       enableTimeOfDayTrigger: result[5] as bool?,
       activeHoursStart: result[6] as int?,
       activeHoursEnd: result[7] as int?,
-      orderType: result[8] as int?,
+      orderType: result[8] as RotationOrderData?,
     );
   }
 
@@ -786,38 +776,44 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is TargetStatusData) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    } else if (value is WallpaperSourceData) {
+    } else if (value is RotationSourceTypeData) {
       buffer.putUint8(135);
-      writeValue(buffer, value.encode());
-    } else if (value is TargetResultData) {
+      writeValue(buffer, value.index);
+    } else if (value is RotationOrderData) {
       buffer.putUint8(136);
-      writeValue(buffer, value.encode());
-    } else if (value is OperationResultData) {
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperSourceData) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperCapabilitiesData) {
+    } else if (value is TargetResultData) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    } else if (value is StaticWallpaperRequestData) {
+    } else if (value is OperationResultData) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    } else if (value is VideoWallpaperRequestData) {
+    } else if (value is WallpaperCapabilitiesData) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    } else if (value is OpenGlWallpaperRequestData) {
+    } else if (value is StaticWallpaperRequestData) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    } else if (value is MaterialYouSupportData) {
+    } else if (value is VideoWallpaperRequestData) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is RotationSourceData) {
+    } else if (value is OpenGlWallpaperRequestData) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationConfigData) {
+    } else if (value is MaterialYouSupportData) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationStatusData) {
+    } else if (value is RotationSourceData) {
       buffer.putUint8(145);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationConfigData) {
+      buffer.putUint8(146);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationStatusData) {
+      buffer.putUint8(147);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -846,26 +842,32 @@ class _PigeonCodec extends StandardMessageCodec {
         final int? value = readValue(buffer) as int?;
         return value == null ? null : TargetStatusData.values[value];
       case 135:
-        return WallpaperSourceData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : RotationSourceTypeData.values[value];
       case 136:
-        return TargetResultData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : RotationOrderData.values[value];
       case 137:
-        return OperationResultData.decode(readValue(buffer)!);
+        return WallpaperSourceData.decode(readValue(buffer)!);
       case 138:
-        return WallpaperCapabilitiesData.decode(readValue(buffer)!);
+        return TargetResultData.decode(readValue(buffer)!);
       case 139:
-        return StaticWallpaperRequestData.decode(readValue(buffer)!);
+        return OperationResultData.decode(readValue(buffer)!);
       case 140:
-        return VideoWallpaperRequestData.decode(readValue(buffer)!);
+        return WallpaperCapabilitiesData.decode(readValue(buffer)!);
       case 141:
-        return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
+        return StaticWallpaperRequestData.decode(readValue(buffer)!);
       case 142:
-        return MaterialYouSupportData.decode(readValue(buffer)!);
+        return VideoWallpaperRequestData.decode(readValue(buffer)!);
       case 143:
-        return RotationSourceData.decode(readValue(buffer)!);
+        return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
       case 144:
-        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+        return MaterialYouSupportData.decode(readValue(buffer)!);
       case 145:
+        return RotationSourceData.decode(readValue(buffer)!);
+      case 146:
+        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+      case 147:
         return WallpaperRotationStatusData.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1121,268 +1123,7 @@ class WallpaperApi {
     }
   }
 
-  /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
-  Future<bool> setHomeWallpaperFromUrl(String url, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromUrl$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[url, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setLockWallpaperFromUrl(String url, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromUrl$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[url, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setBothWallpaperFromUrl(String url, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromUrl$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[url, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setWallpaper(String url, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaper$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[url, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setHomeWallpaperFromFile(String filePath, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromFile$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[filePath, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setLockWallpaperFromFile(String filePath, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromFile$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[filePath, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setBothWallpaperFromFile(String filePath, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromFile$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[filePath, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setWallpaperFromFile(String filePath, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaperFromFile$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[filePath, goToHome],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setMaterialYouWallpaper(
-    String url,
-    bool goToHome,
-    bool enableEffects,
-  ) async {
+  Future<bool> setMaterialYouWallpaper(String url) async {
     final String pigeonVar_channelName =
         'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setMaterialYouWallpaper$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel =
@@ -1392,39 +1133,7 @@ class WallpaperApi {
           binaryMessenger: pigeonVar_binaryMessenger,
         );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[url, goToHome, enableEffects],
-    );
-    final List<Object?>? pigeonVar_replyList =
-        await pigeonVar_sendFuture as List<Object?>?;
-    if (pigeonVar_replyList == null) {
-      throw _createConnectionError(pigeonVar_channelName);
-    } else if (pigeonVar_replyList.length > 1) {
-      throw PlatformException(
-        code: pigeonVar_replyList[0]! as String,
-        message: pigeonVar_replyList[1] as String?,
-        details: pigeonVar_replyList[2],
-      );
-    } else if (pigeonVar_replyList[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (pigeonVar_replyList[0] as bool?)!;
-    }
-  }
-
-  Future<bool> setLiveWallpaper(String filePath, bool goToHome) async {
-    final String pigeonVar_channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLiveWallpaper$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel =
-        BasicMessageChannel<Object?>(
-          pigeonVar_channelName,
-          pigeonChannelCodec,
-          binaryMessenger: pigeonVar_binaryMessenger,
-        );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[filePath, goToHome],
+      <Object?>[url],
     );
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;

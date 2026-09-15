@@ -3,7 +3,6 @@ package com.codenameakshay.async_wallpaper
 import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.Build
 import android.util.Log
 import com.squareup.picasso.Picasso
 import java.io.File
@@ -35,14 +34,14 @@ internal class WallpaperRotationEngine(
 
     val storedConfig = StoredWallpaperRotationConfig(
       localSources = preparedFiles,
-      target = (config.target ?: TARGET_BOTH).toInt(),
+      target = targetToStored(config.target),
       intervalMinutes = intervalMinutes,
       enableIntervalTrigger = config.enableIntervalTrigger == true,
       enableChargingTrigger = config.enableChargingTrigger == true,
       enableTimeOfDayTrigger = config.enableTimeOfDayTrigger == true,
       activeHoursStart = config.activeHoursStart?.toInt() ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_START,
       activeHoursEnd = config.activeHoursEnd?.toInt() ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_END,
-      orderType = (config.orderType ?: WallpaperRotationStore.ORDER_TYPE_SEQUENTIAL.toLong()).toInt(),
+      orderType = orderTypeToStored(config.orderType),
     )
     store.saveConfig(storedConfig)
 
@@ -119,15 +118,14 @@ internal class WallpaperRotationEngine(
     val prepared = mutableListOf<String>()
     sources.forEachIndexed { index, sourceData ->
       val source = sourceData?.source?.trim().orEmpty()
-      val sourceType = sourceData?.sourceType?.toInt()
       if (source.isEmpty()) {
         return@forEachIndexed
       }
       val targetFile = File(cacheDir, "wallpaper_$index.jpg")
-      val success = when (sourceType) {
-        SOURCE_TYPE_URL -> cacheUrl(source, targetFile)
-        SOURCE_TYPE_FILE -> copyLocalFile(source, targetFile)
-        else -> false
+      val success = when (sourceData?.sourceType) {
+        RotationSourceTypeData.URL -> cacheUrl(source, targetFile)
+        RotationSourceTypeData.FILE -> copyLocalFile(source, targetFile)
+        null -> false
       }
       if (success) {
         prepared.add(targetFile.absolutePath)
@@ -183,11 +181,7 @@ internal class WallpaperRotationEngine(
     return runCatching {
       val flag = targetToFlag(target)
       FileInputStream(path).use { input ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-          wallpaperManager.setStream(input, null, true, flag)
-        } else {
-          wallpaperManager.setStream(input)
-        }
+        wallpaperManager.setStream(input, null, true, flag)
       }
       true
     }.getOrElse {
@@ -212,6 +206,21 @@ internal class WallpaperRotationEngine(
     }
   }
 
+  private fun targetToStored(target: WallpaperTargetData?): Int {
+    return when (target) {
+      WallpaperTargetData.HOME -> TARGET_HOME
+      WallpaperTargetData.LOCK -> TARGET_LOCK
+      WallpaperTargetData.BOTH, null -> TARGET_BOTH
+    }
+  }
+
+  private fun orderTypeToStored(orderType: RotationOrderData?): Int {
+    return when (orderType) {
+      RotationOrderData.SEQUENTIAL, null -> WallpaperRotationStore.ORDER_TYPE_SEQUENTIAL
+      RotationOrderData.SHUFFLE -> WallpaperRotationStore.ORDER_TYPE_SHUFFLE
+    }
+  }
+
   private fun getRotationCacheDirectory(): File = File(appContext.filesDir, CACHE_DIR_NAME)
 
   private fun positiveModulo(value: Int, size: Int): Int {
@@ -227,11 +236,9 @@ internal class WallpaperRotationEngine(
     private const val MIN_INTERVAL_MINUTES = 15
     private const val DEFAULT_WIDTH = 1080
     private const val DEFAULT_HEIGHT = 1920
-    private const val SOURCE_TYPE_URL = 0
-    private const val SOURCE_TYPE_FILE = 1
     private const val TARGET_HOME = 0
     private const val TARGET_LOCK = 1
-    private const val TARGET_BOTH = 2L
+    private const val TARGET_BOTH = 2
     private val rotationLock = ReentrantLock()
   }
 }

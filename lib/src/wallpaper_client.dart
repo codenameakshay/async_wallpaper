@@ -220,6 +220,20 @@ WallpaperOperationStatus wallpaperOperationStatusFromData(
   }
 }
 
+/// Converts a rotation source type into its Pigeon transport representation.
+RotationSourceTypeData rotationSourceTypeToData(WallpaperSourceType type) =>
+    switch (type) {
+      WallpaperSourceType.url => RotationSourceTypeData.url,
+      WallpaperSourceType.file => RotationSourceTypeData.file,
+    };
+
+/// Converts a rotation order into its Pigeon transport representation.
+RotationOrderData rotationOrderToData(WallpaperRotationOrder order) =>
+    switch (order) {
+      WallpaperRotationOrder.sequential => RotationOrderData.sequential,
+      WallpaperRotationOrder.shuffle => RotationOrderData.shuffle,
+    };
+
 /// Converts a per-target domain result into Pigeon transport data.
 TargetResultData targetResultToData(WallpaperTargetResult result) {
   return TargetResultData(
@@ -357,7 +371,6 @@ StaticWallpaperRequestData staticWallpaperRequestToData(
     target: wallpaperTargetToData(request.target),
     scaleMode: wallpaperScaleModeToData(request.scaleMode),
     strategy: wallpaperApplyStrategyToData(request.strategy),
-    goToHome: request.goToHome,
   );
 }
 
@@ -372,7 +385,6 @@ StaticWallpaperRequest staticWallpaperRequestFromData(
     target: wallpaperTargetFromData(data.target),
     scaleMode: wallpaperScaleModeFromData(data.scaleMode),
     strategy: wallpaperApplyStrategyFromData(data.strategy),
-    goToHome: data.goToHome ?? false,
   );
 }
 
@@ -392,7 +404,6 @@ StaticWallpaperRequestData legacyWallpaperRequestToData(
     target: wallpaperTargetToData(request.target),
     scaleMode: WallpaperScaleModeData.centerCrop,
     strategy: WallpaperApplyStrategyData.automatic,
-    goToHome: request.goToHome,
   );
 }
 
@@ -404,7 +415,6 @@ VideoWallpaperRequestData videoWallpaperRequestToData(
     source: wallpaperSourceToData(request.source),
     target: wallpaperTargetToData(request.target),
     scaleMode: wallpaperScaleModeToData(request.scaleMode),
-    goToHome: request.goToHome,
   );
 }
 
@@ -418,7 +428,6 @@ VideoWallpaperRequest videoWallpaperRequestFromData(
     ),
     target: wallpaperTargetFromData(data.target),
     scaleMode: wallpaperScaleModeFromData(data.scaleMode),
-    goToHome: data.goToHome ?? false,
   );
 }
 
@@ -433,7 +442,6 @@ OpenGlWallpaperRequestData openGlWallpaperRequestToData(
         .toList(growable: false),
     target: wallpaperTargetToData(request.target),
     frameRate: request.frameRate,
-    goToHome: request.goToHome,
   );
 }
 
@@ -454,7 +462,6 @@ OpenGlLiveWallpaperRequest openGlWallpaperRequestFromData(
     textures: textures,
     target: wallpaperTargetFromData(data.target),
     frameRate: _required(data.frameRate, 'OpenGL frame rate'),
-    goToHome: data.goToHome ?? false,
   );
 }
 

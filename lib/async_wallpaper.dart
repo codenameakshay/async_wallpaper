@@ -231,11 +231,7 @@ class AsyncWallpaper {
     }
 
     try {
-      final bool success = await _api.setMaterialYouWallpaper(
-        request.url,
-        request.goToHome,
-        request.enableEffects,
-      );
+      final bool success = await _api.setMaterialYouWallpaper(request.url);
       return success
           ? const WallpaperResult.success()
           : const WallpaperResult.failure(
@@ -404,11 +400,11 @@ class AsyncWallpaper {
             .map(
               (WallpaperRotationSource source) => RotationSourceData(
                 source: source.source,
-                sourceType: source.sourceType.index,
+                sourceType: rotationSourceTypeToData(source.sourceType),
               ),
             )
             .toList(),
-        target: request.target.index,
+        target: wallpaperTargetToData(request.target),
         intervalMinutes: request.intervalMinutes,
         enableIntervalTrigger: request.triggers.contains(
           WallpaperRotationTrigger.interval,
@@ -421,7 +417,7 @@ class AsyncWallpaper {
         ),
         activeHoursStart: request.activeHoursStart,
         activeHoursEnd: request.activeHoursEnd,
-        orderType: request.order.index,
+        orderType: rotationOrderToData(request.order),
       );
       final bool success = await _api.startWallpaperRotation(config);
       return success

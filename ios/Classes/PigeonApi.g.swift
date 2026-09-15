@@ -179,6 +179,18 @@ enum TargetStatusData: Int {
   case notAttempted = 3
 }
 
+/// The location and representation of a rotation playlist entry.
+enum RotationSourceTypeData: Int {
+  case url = 0
+  case file = 1
+}
+
+/// The order in which rotation playlist entries are applied.
+enum RotationOrderData: Int {
+  case sequential = 0
+  case shuffle = 1
+}
+
 /// A static, content-provider, or in-memory wallpaper source.
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -261,7 +273,7 @@ struct TargetResultData: Hashable {
   }
 }
 
-/// A truthful, structured result from the host platform.
+/// Structured result, including per-target outcomes, reported by the host platform.
 ///
 /// Generated class from Pigeon that represents data sent in messages.
 struct OperationResultData: Hashable {
@@ -403,7 +415,6 @@ struct StaticWallpaperRequestData: Hashable {
   var target: WallpaperTargetData? = nil
   var scaleMode: WallpaperScaleModeData? = nil
   var strategy: WallpaperApplyStrategyData? = nil
-  var goToHome: Bool? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -412,14 +423,12 @@ struct StaticWallpaperRequestData: Hashable {
     let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
     let scaleMode: WallpaperScaleModeData? = nilOrValue(pigeonVar_list[2])
     let strategy: WallpaperApplyStrategyData? = nilOrValue(pigeonVar_list[3])
-    let goToHome: Bool? = nilOrValue(pigeonVar_list[4])
 
     return StaticWallpaperRequestData(
       source: source,
       target: target,
       scaleMode: scaleMode,
-      strategy: strategy,
-      goToHome: goToHome
+      strategy: strategy
     )
   }
   func toList() -> [Any?] {
@@ -428,7 +437,6 @@ struct StaticWallpaperRequestData: Hashable {
       target,
       scaleMode,
       strategy,
-      goToHome,
     ]
   }
   static func == (lhs: StaticWallpaperRequestData, rhs: StaticWallpaperRequestData) -> Bool {
@@ -445,7 +453,6 @@ struct VideoWallpaperRequestData: Hashable {
   var source: WallpaperSourceData? = nil
   var target: WallpaperTargetData? = nil
   var scaleMode: WallpaperScaleModeData? = nil
-  var goToHome: Bool? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -453,13 +460,11 @@ struct VideoWallpaperRequestData: Hashable {
     let source: WallpaperSourceData? = nilOrValue(pigeonVar_list[0])
     let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
     let scaleMode: WallpaperScaleModeData? = nilOrValue(pigeonVar_list[2])
-    let goToHome: Bool? = nilOrValue(pigeonVar_list[3])
 
     return VideoWallpaperRequestData(
       source: source,
       target: target,
-      scaleMode: scaleMode,
-      goToHome: goToHome
+      scaleMode: scaleMode
     )
   }
   func toList() -> [Any?] {
@@ -467,7 +472,6 @@ struct VideoWallpaperRequestData: Hashable {
       source,
       target,
       scaleMode,
-      goToHome,
     ]
   }
   static func == (lhs: VideoWallpaperRequestData, rhs: VideoWallpaperRequestData) -> Bool {
@@ -485,7 +489,6 @@ struct OpenGlWallpaperRequestData: Hashable {
   var textures: [WallpaperSourceData?]? = nil
   var target: WallpaperTargetData? = nil
   var frameRate: Int64? = nil
-  var goToHome: Bool? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -494,14 +497,12 @@ struct OpenGlWallpaperRequestData: Hashable {
     let textures: [WallpaperSourceData?]? = nilOrValue(pigeonVar_list[1])
     let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[2])
     let frameRate: Int64? = nilOrValue(pigeonVar_list[3])
-    let goToHome: Bool? = nilOrValue(pigeonVar_list[4])
 
     return OpenGlWallpaperRequestData(
       fragmentShader: fragmentShader,
       textures: textures,
       target: target,
-      frameRate: frameRate,
-      goToHome: goToHome
+      frameRate: frameRate
     )
   }
   func toList() -> [Any?] {
@@ -510,7 +511,6 @@ struct OpenGlWallpaperRequestData: Hashable {
       textures,
       target,
       frameRate,
-      goToHome,
     ]
   }
   static func == (lhs: OpenGlWallpaperRequestData, rhs: OpenGlWallpaperRequestData) -> Bool {
@@ -556,13 +556,13 @@ struct MaterialYouSupportData: Hashable {
 /// Generated class from Pigeon that represents data sent in messages.
 struct RotationSourceData: Hashable {
   var source: String? = nil
-  var sourceType: Int64? = nil
+  var sourceType: RotationSourceTypeData? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> RotationSourceData? {
     let source: String? = nilOrValue(pigeonVar_list[0])
-    let sourceType: Int64? = nilOrValue(pigeonVar_list[1])
+    let sourceType: RotationSourceTypeData? = nilOrValue(pigeonVar_list[1])
 
     return RotationSourceData(
       source: source,
@@ -585,27 +585,27 @@ struct RotationSourceData: Hashable {
 /// Generated class from Pigeon that represents data sent in messages.
 struct WallpaperRotationConfigData: Hashable {
   var sources: [RotationSourceData?]? = nil
-  var target: Int64? = nil
+  var target: WallpaperTargetData? = nil
   var intervalMinutes: Int64? = nil
   var enableIntervalTrigger: Bool? = nil
   var enableChargingTrigger: Bool? = nil
   var enableTimeOfDayTrigger: Bool? = nil
   var activeHoursStart: Int64? = nil
   var activeHoursEnd: Int64? = nil
-  var orderType: Int64? = nil
+  var orderType: RotationOrderData? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> WallpaperRotationConfigData? {
     let sources: [RotationSourceData?]? = nilOrValue(pigeonVar_list[0])
-    let target: Int64? = nilOrValue(pigeonVar_list[1])
+    let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
     let intervalMinutes: Int64? = nilOrValue(pigeonVar_list[2])
     let enableIntervalTrigger: Bool? = nilOrValue(pigeonVar_list[3])
     let enableChargingTrigger: Bool? = nilOrValue(pigeonVar_list[4])
     let enableTimeOfDayTrigger: Bool? = nilOrValue(pigeonVar_list[5])
     let activeHoursStart: Int64? = nilOrValue(pigeonVar_list[6])
     let activeHoursEnd: Int64? = nilOrValue(pigeonVar_list[7])
-    let orderType: Int64? = nilOrValue(pigeonVar_list[8])
+    let orderType: RotationOrderData? = nilOrValue(pigeonVar_list[8])
 
     return WallpaperRotationConfigData(
       sources: sources,
@@ -728,26 +728,38 @@ private class PigeonApiPigeonCodecReader: FlutterStandardReader {
       }
       return nil
     case 135:
-      return WallpaperSourceData.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return RotationSourceTypeData(rawValue: enumResultAsInt)
+      }
+      return nil
     case 136:
-      return TargetResultData.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return RotationOrderData(rawValue: enumResultAsInt)
+      }
+      return nil
     case 137:
-      return OperationResultData.fromList(self.readValue() as! [Any?])
+      return WallpaperSourceData.fromList(self.readValue() as! [Any?])
     case 138:
-      return WallpaperCapabilitiesData.fromList(self.readValue() as! [Any?])
+      return TargetResultData.fromList(self.readValue() as! [Any?])
     case 139:
-      return StaticWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return OperationResultData.fromList(self.readValue() as! [Any?])
     case 140:
-      return VideoWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return WallpaperCapabilitiesData.fromList(self.readValue() as! [Any?])
     case 141:
-      return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return StaticWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 142:
-      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
+      return VideoWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 143:
-      return RotationSourceData.fromList(self.readValue() as! [Any?])
+      return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 144:
-      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
+      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
     case 145:
+      return RotationSourceData.fromList(self.readValue() as! [Any?])
+    case 146:
+      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
+    case 147:
       return WallpaperRotationStatusData.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -775,38 +787,44 @@ private class PigeonApiPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? TargetStatusData {
       super.writeByte(134)
       super.writeValue(value.rawValue)
-    } else if let value = value as? WallpaperSourceData {
+    } else if let value = value as? RotationSourceTypeData {
       super.writeByte(135)
-      super.writeValue(value.toList())
-    } else if let value = value as? TargetResultData {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? RotationOrderData {
       super.writeByte(136)
-      super.writeValue(value.toList())
-    } else if let value = value as? OperationResultData {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperSourceData {
       super.writeByte(137)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperCapabilitiesData {
+    } else if let value = value as? TargetResultData {
       super.writeByte(138)
       super.writeValue(value.toList())
-    } else if let value = value as? StaticWallpaperRequestData {
+    } else if let value = value as? OperationResultData {
       super.writeByte(139)
       super.writeValue(value.toList())
-    } else if let value = value as? VideoWallpaperRequestData {
+    } else if let value = value as? WallpaperCapabilitiesData {
       super.writeByte(140)
       super.writeValue(value.toList())
-    } else if let value = value as? OpenGlWallpaperRequestData {
+    } else if let value = value as? StaticWallpaperRequestData {
       super.writeByte(141)
       super.writeValue(value.toList())
-    } else if let value = value as? MaterialYouSupportData {
+    } else if let value = value as? VideoWallpaperRequestData {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? RotationSourceData {
+    } else if let value = value as? OpenGlWallpaperRequestData {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationConfigData {
+    } else if let value = value as? MaterialYouSupportData {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationStatusData {
+    } else if let value = value as? RotationSourceData {
       super.writeByte(145)
+      super.writeValue(value.toList())
+    } else if let value = value as? WallpaperRotationConfigData {
+      super.writeByte(146)
+      super.writeValue(value.toList())
+    } else if let value = value as? WallpaperRotationStatusData {
+      super.writeByte(147)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -843,17 +861,7 @@ protocol WallpaperApi {
   func openLiveWallpaperPreview(request: VideoWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
   /// Applies a shader-based OpenGL live wallpaper.
   func applyOpenGlWallpaper(request: OpenGlWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
-  /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
-  func setHomeWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setLockWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setBothWallpaperFromUrl(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setWallpaper(url: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setHomeWallpaperFromFile(filePath: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setLockWallpaperFromFile(filePath: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setBothWallpaperFromFile(filePath: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setWallpaperFromFile(filePath: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setMaterialYouWallpaper(url: String, goToHome: Bool, enableEffects: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
-  func setLiveWallpaper(filePath: String, goToHome: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
+  func setMaterialYouWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void)
   func openWallpaperChooser(completion: @escaping (Result<Bool, Error>) -> Void)
   func downloadWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void)
   func startWallpaperRotation(config: WallpaperRotationConfigData, completion: @escaping (Result<Bool, Error>) -> Void)
@@ -986,159 +994,12 @@ class WallpaperApiSetup {
     } else {
       applyOpenGlWallpaperChannel.setMessageHandler(nil)
     }
-    /// Legacy 3.1 endpoints remain until their facade adapters migrate in Task 5.
-    let setHomeWallpaperFromUrlChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromUrl\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setHomeWallpaperFromUrlChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let urlArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setHomeWallpaperFromUrl(url: urlArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setHomeWallpaperFromUrlChannel.setMessageHandler(nil)
-    }
-    let setLockWallpaperFromUrlChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromUrl\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setLockWallpaperFromUrlChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let urlArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setLockWallpaperFromUrl(url: urlArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setLockWallpaperFromUrlChannel.setMessageHandler(nil)
-    }
-    let setBothWallpaperFromUrlChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromUrl\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setBothWallpaperFromUrlChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let urlArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setBothWallpaperFromUrl(url: urlArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setBothWallpaperFromUrlChannel.setMessageHandler(nil)
-    }
-    let setWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setWallpaperChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let urlArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setWallpaper(url: urlArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setWallpaperChannel.setMessageHandler(nil)
-    }
-    let setHomeWallpaperFromFileChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setHomeWallpaperFromFile\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setHomeWallpaperFromFileChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let filePathArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setHomeWallpaperFromFile(filePath: filePathArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setHomeWallpaperFromFileChannel.setMessageHandler(nil)
-    }
-    let setLockWallpaperFromFileChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLockWallpaperFromFile\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setLockWallpaperFromFileChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let filePathArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setLockWallpaperFromFile(filePath: filePathArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setLockWallpaperFromFileChannel.setMessageHandler(nil)
-    }
-    let setBothWallpaperFromFileChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setBothWallpaperFromFile\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setBothWallpaperFromFileChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let filePathArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setBothWallpaperFromFile(filePath: filePathArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setBothWallpaperFromFileChannel.setMessageHandler(nil)
-    }
-    let setWallpaperFromFileChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setWallpaperFromFile\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setWallpaperFromFileChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let filePathArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setWallpaperFromFile(filePath: filePathArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setWallpaperFromFileChannel.setMessageHandler(nil)
-    }
     let setMaterialYouWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setMaterialYouWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       setMaterialYouWallpaperChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let urlArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        let enableEffectsArg = args[2] as! Bool
-        api.setMaterialYouWallpaper(url: urlArg, goToHome: goToHomeArg, enableEffects: enableEffectsArg) { result in
+        api.setMaterialYouWallpaper(url: urlArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -1149,24 +1010,6 @@ class WallpaperApiSetup {
       }
     } else {
       setMaterialYouWallpaperChannel.setMessageHandler(nil)
-    }
-    let setLiveWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setLiveWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
-    if let api = api {
-      setLiveWallpaperChannel.setMessageHandler { message, reply in
-        let args = message as! [Any?]
-        let filePathArg = args[0] as! String
-        let goToHomeArg = args[1] as! Bool
-        api.setLiveWallpaper(filePath: filePathArg, goToHome: goToHomeArg) { result in
-          switch result {
-          case .success(let res):
-            reply(wrapResult(res))
-          case .failure(let error):
-            reply(wrapError(error))
-          }
-        }
-      }
-    } else {
-      setLiveWallpaperChannel.setMessageHandler(nil)
     }
     let openWallpaperChooserChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.openWallpaperChooser\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

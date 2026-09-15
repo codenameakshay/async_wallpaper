@@ -2,6 +2,7 @@
 
 - `startWallpaperRotation`, `stopWallpaperRotation`, `rotateWallpaperNow`, and `getWallpaperRotationStatus` now return an `unsupported` result / a not-running status off Android instead of falling through to a platform call.
 - `getWallpaperRotationStatus()` no longer throws when the platform call fails; it returns a not-running status with `lastError` set instead.
+- OpenGL live wallpaper: an unexpected I/O error while reading a texture source during configuration is now reported as `texture-source-unavailable` instead of `configuration-store-failed`, matching what the renderer reports for the same failure.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
 
 ## 3.2.0

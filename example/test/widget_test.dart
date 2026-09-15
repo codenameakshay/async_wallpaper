@@ -84,6 +84,73 @@ class _FakeWallpaperDemoApi implements WallpaperDemoApi {
     videoPreparationCalls += 1;
     return Future<WallpaperOperationResult>.value(videoPreparationResult);
   }
+
+  WallpaperResult legacyResult = const WallpaperResult.success();
+  WallpaperRotationStatus rotationStatus = const WallpaperRotationStatus(
+    isRunning: false,
+    nextRunEpochMs: 0,
+    currentIndex: 0,
+    cachedCount: 0,
+    totalCount: 0,
+    effectiveIntervalMinutes: 0,
+  );
+  DownloadWallpaperRequest? downloadRequest;
+  WallpaperRequest? legacyRequest;
+  WallpaperRotationRequest? rotationRequest;
+
+  @override
+  Future<String> platformVersion() => Future<String>.value('Android 16');
+
+  @override
+  Future<MaterialYouSupport> checkMaterialYouSupport() =>
+      Future<MaterialYouSupport>.value(
+        const MaterialYouSupport(
+          isSupported: true,
+          androidVersion: '16',
+          sdkInt: 36,
+        ),
+      );
+
+  @override
+  Future<WallpaperResult> setWallpaper(WallpaperRequest request) {
+    legacyRequest = request;
+    return Future<WallpaperResult>.value(legacyResult);
+  }
+
+  @override
+  Future<WallpaperResult> setMaterialYouWallpaper(
+    MaterialYouWallpaperRequest request,
+  ) => Future<WallpaperResult>.value(legacyResult);
+
+  @override
+  Future<WallpaperResult> openWallpaperChooser() =>
+      Future<WallpaperResult>.value(legacyResult);
+
+  @override
+  Future<WallpaperResult> downloadWallpaper(DownloadWallpaperRequest request) {
+    downloadRequest = request;
+    return Future<WallpaperResult>.value(legacyResult);
+  }
+
+  @override
+  Future<WallpaperResult> startWallpaperRotation(
+    WallpaperRotationRequest request,
+  ) {
+    rotationRequest = request;
+    return Future<WallpaperResult>.value(legacyResult);
+  }
+
+  @override
+  Future<WallpaperResult> stopWallpaperRotation() =>
+      Future<WallpaperResult>.value(legacyResult);
+
+  @override
+  Future<WallpaperRotationStatus> getWallpaperRotationStatus() =>
+      Future<WallpaperRotationStatus>.value(rotationStatus);
+
+  @override
+  Future<WallpaperResult> rotateWallpaperNow() =>
+      Future<WallpaperResult>.value(legacyResult);
 }
 
 Widget _example(_FakeWallpaperDemoApi api) {
@@ -205,6 +272,98 @@ void main() {
     expect(
       find.text('Video preparation: unsupported — Not on this platform.'),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('runs the remaining public APIs from the More APIs card', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeWallpaperDemoApi();
+    await _pumpExample(tester, api);
+    final outcome = find.byKey(const Key('more-outcome-text'));
+
+    await _tapVisible(tester, find.byKey(const Key('download-button')));
+    await tester.pump();
+    expect(api.downloadRequest?.url, startsWith('https://'));
+    expect(
+      tester.widget<Text>(outcome).data,
+      'Last result: Download wallpaper: success',
+    );
+
+    await _tapVisible(tester, find.byKey(const Key('platform-version-button')));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(outcome).data,
+      'Last result: Platform version: Android 16',
+    );
+
+    await _tapVisible(
+      tester,
+      find.byKey(const Key('material-you-check-button')),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<Text>(outcome).data,
+      'Last result: Material You: supported on SDK 36',
+    );
+
+    api.legacyResult = const WallpaperResult.failure(
+      WallpaperError(
+        code: WallpaperErrorCode.platformFailure,
+        message: 'Failed to open wallpaper chooser.',
+      ),
+    );
+    await _tapVisible(tester, find.byKey(const Key('chooser-button')));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(outcome).data,
+      'Last result: Open wallpaper chooser: failed — platformFailure — '
+      'Failed to open wallpaper chooser.',
+    );
+
+    api.rotationStatus = const WallpaperRotationStatus(
+      isRunning: false,
+      nextRunEpochMs: 0,
+      currentIndex: 0,
+      cachedCount: 0,
+      totalCount: 0,
+      effectiveIntervalMinutes: 0,
+      lastError: 'No rotation configured.',
+    );
+    await _tapVisible(tester, find.byKey(const Key('rotation-status-button')));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(outcome).data,
+      'Last result: Rotation status: not running — No rotation configured.',
+    );
+
+    api.legacyResult = const WallpaperResult.success();
+    await _tapVisible(tester, find.byKey(const Key('rotation-start-button')));
+    await tester.pump();
+    expect(api.rotationRequest?.intervalMinutes, 15);
+    expect(
+      api.rotationRequest?.sources.first.sourceType,
+      WallpaperSourceType.url,
+    );
+  });
+
+  testWidgets('legacy set wallpaper rejects sources it cannot send', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeWallpaperDemoApi();
+    await _pumpExample(tester, api);
+
+    await tester.tap(find.byKey(const Key('source-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Embedded bytes').last);
+    await tester.pumpAndSettle();
+
+    await _tapVisible(tester, find.byKey(const Key('legacy-set-button')));
+    await tester.pump();
+    expect(api.legacyRequest, isNull);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('more-outcome-text'))).data,
+      contains('accepts only a URL or file path source'),
     );
   });
 

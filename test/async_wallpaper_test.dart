@@ -51,23 +51,14 @@ class _RecordingWallpaperClient implements WallpaperClient {
   WallpaperCapabilities capabilities;
   bool throwStatic = false;
   bool throwCapabilities = false;
-  int applyCalls = 0;
   int staticCalls = 0;
   int prepareCalls = 0;
   int previewCalls = 0;
   int openGlCalls = 0;
-  WallpaperRequest? appliedRequest;
   StaticWallpaperRequest? staticRequest;
   VideoWallpaperRequest? videoRequest;
   VideoWallpaperRequest? previewRequest;
   OpenGlLiveWallpaperRequest? openGlRequest;
-
-  @override
-  Future<WallpaperOperationResult> apply(WallpaperRequest request) async {
-    applyCalls += 1;
-    appliedRequest = request;
-    return staticResult;
-  }
 
   @override
   Future<WallpaperCapabilities> getCapabilities() async {
@@ -397,7 +388,6 @@ void main() {
     final WallpaperResult result = await AsyncWallpaper.setWallpaper(request);
 
     expect(result.isSuccess, isTrue);
-    expect(client.applyCalls, 0);
     expect(client.staticCalls, 1);
     expect(client.staticRequest?.source.url, request.source);
     expect(client.staticRequest?.target, request.target);
@@ -593,7 +583,6 @@ void main() {
     final _RecordingWallpaperClient client = _RecordingWallpaperClient();
     AsyncWallpaper.debugSetClient(client);
 
-    expect(AsyncWallpaper.debugHasClientOverride, isTrue);
     await AsyncWallpaper.applyWallpaper(
       const StaticWallpaperRequest(
         source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
@@ -603,6 +592,68 @@ void main() {
     expect(client.staticCalls, 1);
 
     AsyncWallpaper.debugResetClient();
-    expect(AsyncWallpaper.debugHasClientOverride, isFalse);
+    await AsyncWallpaper.applyWallpaper(
+      const StaticWallpaperRequest(
+        source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
+        target: WallpaperTarget.home,
+      ),
+    );
+    expect(client.staticCalls, 1, reason: 'the default client should be used');
+  });
+
+  group('AsyncWallpaper rotation', () {
+    test('rotation methods return unsupported off Android', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+      final WallpaperResult start = await AsyncWallpaper.startWallpaperRotation(
+        const WallpaperRotationRequest(
+          sources: <WallpaperRotationSource>[
+            WallpaperRotationSource(
+              sourceType: WallpaperSourceType.url,
+              source: 'https://example.com/a.jpg',
+            ),
+          ],
+          target: WallpaperTarget.both,
+          intervalMinutes: 60,
+        ),
+      );
+      final WallpaperResult stop = await AsyncWallpaper.stopWallpaperRotation();
+      final WallpaperResult rotateNow =
+          await AsyncWallpaper.rotateWallpaperNow();
+
+      for (final WallpaperResult result in <WallpaperResult>[
+        start,
+        stop,
+        rotateNow,
+      ]) {
+        expect(result.isSuccess, isFalse);
+        expect(result.error?.code, WallpaperErrorCode.unsupported);
+      }
+    });
+
+    test('rotation status reports not running off Android', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+      final WallpaperRotationStatus status =
+          await AsyncWallpaper.getWallpaperRotationStatus();
+
+      expect(status.isRunning, isFalse);
+      expect(status.nextRunEpochMs, 0);
+      expect(status.currentIndex, 0);
+      expect(status.cachedCount, 0);
+      expect(status.totalCount, 0);
+      expect(status.effectiveIntervalMinutes, 0);
+    });
+
+    test(
+      'rotation status reports not running when the platform call throws',
+      () async {
+        final WallpaperRotationStatus status =
+            await AsyncWallpaper.getWallpaperRotationStatus();
+
+        expect(status.isRunning, isFalse);
+        expect(status.lastError, isNotNull);
+      },
+    );
   });
 }

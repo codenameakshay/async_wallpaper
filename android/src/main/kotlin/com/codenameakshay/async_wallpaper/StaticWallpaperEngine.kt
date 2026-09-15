@@ -8,7 +8,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
-import kotlin.math.floor
 import kotlin.concurrent.withLock
 
 /**
@@ -190,12 +189,12 @@ class StaticWallpaperEngine(
     var transformedBitmap: Bitmap? = null
     return try {
       sourceBitmap = sourceLoader.load(request.source)
-      val dimensions = boundedWallpaperDimensions(wallpaperManagerProvider())
+      val (width, height) = BitmapTransformer.wallpaperCanvasSize(appContext)
       transformedBitmap = BitmapTransformer.transform(
         bitmap = sourceBitmap,
         mode = request.scaleMode,
-        targetWidth = dimensions.width,
-        targetHeight = dimensions.height,
+        targetWidth = width,
+        targetHeight = height,
       )
       applyTransformedBitmap(request.target, transformedBitmap)
     } catch (error: WallpaperSourceException) {
@@ -310,24 +309,6 @@ class StaticWallpaperEngine(
     }
   }
 
-  private fun boundedWallpaperDimensions(manager: WallpaperManager): WallpaperDimensions {
-    val metrics = appContext.resources.displayMetrics
-    val desiredWidth = manager.desiredMinimumWidth.takeIf { it > 0 } ?: metrics.widthPixels
-    val desiredHeight = manager.desiredMinimumHeight.takeIf { it > 0 } ?: metrics.heightPixels
-    val safeWidth = desiredWidth.coerceAtLeast(1)
-    val safeHeight = desiredHeight.coerceAtLeast(1)
-    val scale = BitmapTransformMath.scaleToFit(
-      safeWidth,
-      safeHeight,
-      MAX_TRANSFORM_DIMENSION,
-      MAX_TRANSFORM_PIXELS,
-    )
-    return WallpaperDimensions(
-      width = floor(safeWidth * scale).toInt().coerceAtLeast(1),
-      height = floor(safeHeight * scale).toInt().coerceAtLeast(1),
-    )
-  }
-
   private fun invalidRequest(target: WallpaperTargetData?): OperationResultData {
     return OperationResultPolicy.failed(
       target ?: WallpaperTargetData.HOME,
@@ -357,11 +338,6 @@ class StaticWallpaperEngine(
     val strategy: WallpaperApplyStrategyData,
   )
 
-  private data class WallpaperDimensions(
-    val width: Int,
-    val height: Int,
-  )
-
   companion object {
     const val ERROR_INVALID_REQUEST = "invalid-request"
     const val ERROR_WALLPAPER_UNSUPPORTED = "wallpaper-unsupported"
@@ -375,8 +351,6 @@ class StaticWallpaperEngine(
     const val ERROR_SYSTEM_UI_FAILED = "system-ui-failed"
 
     private const val CONTENT_SCHEME = "content"
-    private const val MAX_TRANSFORM_PIXELS = 8L * 1024L * 1024L
-    private const val MAX_TRANSFORM_DIMENSION = 4_096
   }
 }
 

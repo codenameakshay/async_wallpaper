@@ -1,11 +1,17 @@
 package com.codenameakshay.async_wallpaper
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Point
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
+import android.view.Display
+import android.view.Surface
 import androidx.core.graphics.createBitmap
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -188,6 +194,29 @@ object BitmapTransformMath {
     return min(1.0, min(pixelScale, dimensionScale))
   }
 
+  /**
+   * Returns the wallpaper canvas for a display measured as [displayWidth] x [displayHeight], in the
+   * display's natural orientation and within the transform bounds. [rotated] means the size was
+   * measured while the display was turned 90 or 270 degrees.
+   *
+   * The launcher's desired wallpaper size is deliberately not used: it is a wide virtual canvas,
+   * and Android shows a screen-sized window from its left edge, so scale modes computed against it
+   * do not match what the user sees.
+   */
+  fun wallpaperCanvasSize(
+    displayWidth: Int,
+    displayHeight: Int,
+    rotated: Boolean,
+    maxDimension: Int = MAX_CANVAS_DIMENSION,
+    maxPixels: Long = MAX_CANVAS_PIXELS,
+  ): Pair<Int, Int> {
+    val width = (if (rotated) displayHeight else displayWidth).coerceAtLeast(1)
+    val height = (if (rotated) displayWidth else displayHeight).coerceAtLeast(1)
+    val scale = scaleToFit(width, height, maxDimension, maxPixels)
+    return floor(width * scale).toInt().coerceAtLeast(1) to
+      floor(height * scale).toInt().coerceAtLeast(1)
+  }
+
   private fun fitCenterDestination(
     sourceWidth: Int,
     sourceHeight: Int,
@@ -283,10 +312,26 @@ object BitmapTransformMath {
   }
 
   private const val DEFAULT_FOCAL_POINT = 0.5f
+  private const val MAX_CANVAS_DIMENSION = 4_096
+  private const val MAX_CANVAS_PIXELS = 8L * 1024L * 1024L
 }
 
 /** Applies [BitmapTransformMath] geometry using Android's bitmap and canvas APIs. */
 object BitmapTransformer {
+  /** The wallpaper canvas for the default display; needs no Activity, so workers can use it. */
+  fun wallpaperCanvasSize(context: Context): Pair<Int, Int> {
+    val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+    val size = Point()
+    if (display != null) {
+      @Suppress("DEPRECATION")
+      display.getRealSize(size)
+    } else {
+      context.resources.displayMetrics.let { size.set(it.widthPixels, it.heightPixels) }
+    }
+    val rotated = display?.rotation == Surface.ROTATION_90 || display?.rotation == Surface.ROTATION_270
+    return BitmapTransformMath.wallpaperCanvasSize(size.x, size.y, rotated)
+  }
+
   /** Calculates and applies a scale mode in one call. */
   fun transform(
     bitmap: Bitmap,

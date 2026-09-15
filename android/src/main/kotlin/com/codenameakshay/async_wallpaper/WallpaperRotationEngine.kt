@@ -4,7 +4,6 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import com.squareup.picasso.Picasso
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -16,6 +15,7 @@ import kotlin.concurrent.withLock
 internal class WallpaperRotationEngine(
   context: Context,
   private val store: WallpaperRotationStore,
+  private val sourceLoader: WallpaperSourceLoader = WallpaperSourceLoader(context.applicationContext),
 ) {
   private val appContext = context.applicationContext
   private val wallpaperManager = WallpaperManager.getInstance(appContext)
@@ -123,8 +123,14 @@ internal class WallpaperRotationEngine(
       }
       val targetFile = File(cacheDir, "wallpaper_$index.jpg")
       val success = when (sourceData?.sourceType) {
-        RotationSourceTypeData.URL -> cacheUrl(source, targetFile)
-        RotationSourceTypeData.FILE -> copyLocalFile(source, targetFile)
+        RotationSourceTypeData.URL -> cacheSource(
+          WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = source),
+          targetFile,
+        )
+        RotationSourceTypeData.FILE -> cacheSource(
+          WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = source),
+          targetFile,
+        )
         null -> false
       }
       if (success) {
@@ -134,46 +140,51 @@ internal class WallpaperRotationEngine(
     return prepared
   }
 
-  private fun cacheUrl(url: String, targetFile: File): Boolean {
-    val targetSize = getTargetSize()
+  /**
+   * Downloads or opens [source] through the shared bounded loader, so rotation obeys the same
+   * HTTPS-only, redirect, content-type, encoded-size, and decoded-pixel policy as every other
+   * wallpaper path.
+   */
+  private fun cacheSource(source: WallpaperSourceData, targetFile: File): Boolean {
     return runCatching {
-      val bitmap = Picasso.get()
-        .load(url)
-        .resize(targetSize.width, targetSize.height)
-        .centerCrop()
-        .onlyScaleDown()
-        .get()
-      FileOutputStream(targetFile).use { output ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)
+      val bitmap = sourceLoader.load(source)
+      try {
+        writeCachedJpeg(bitmap, targetFile)
+      } finally {
+        if (!bitmap.isRecycled) {
+          bitmap.recycle()
+        }
       }
       true
     }.getOrElse {
-      Log.e(TAG, "Failed to cache URL wallpaper: ${logSafeSourceLabel(url)}", it)
+      Log.e(TAG, "Failed to cache rotation wallpaper: ${logSafeSourceLabel(source)}", it)
       false
     }
   }
 
-  private fun copyLocalFile(sourcePath: String, targetFile: File): Boolean {
+  /** Scales down to the wallpaper target when needed, then persists a JPEG cache entry. */
+  private fun writeCachedJpeg(bitmap: Bitmap, targetFile: File) {
     val targetSize = getTargetSize()
-    return runCatching {
-      val sourceFile = File(sourcePath)
-      if (!sourceFile.exists() || !sourceFile.canRead()) {
-        false
-      } else {
-        val bitmap = Picasso.get()
-          .load(sourceFile)
-          .resize(targetSize.width, targetSize.height)
-          .centerCrop()
-          .onlyScaleDown()
-          .get()
-        FileOutputStream(targetFile).use { output ->
-          bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)
-        }
-        true
+    val needsDownscale = bitmap.width > targetSize.width || bitmap.height > targetSize.height
+    val output = if (needsDownscale) {
+      BitmapTransformer.transform(
+        bitmap = bitmap,
+        mode = WallpaperScaleModeData.CENTER_CROP,
+        targetWidth = targetSize.width,
+        targetHeight = targetSize.height,
+      )
+    } else {
+      bitmap
+    }
+
+    try {
+      FileOutputStream(targetFile).use { stream ->
+        output.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
       }
-    }.getOrElse {
-      Log.e(TAG, "Failed to copy local wallpaper: ${logSafeSourceLabel(sourcePath)}", it)
-      false
+    } finally {
+      if (output !== bitmap && !output.isRecycled) {
+        output.recycle()
+      }
     }
   }
 
@@ -234,19 +245,21 @@ internal class WallpaperRotationEngine(
    * Log-safe source label: scheme plus host for URLs, file name for local paths. Rotation sources
    * can carry signed query parameters or private paths, so never log the raw value.
    */
-  private fun logSafeSourceLabel(source: String): String {
-    val host = runCatching { URI(source).host }.getOrNull()
+  private fun logSafeSourceLabel(source: WallpaperSourceData): String {
+    val value = source.url ?: source.filePath ?: source.contentUri ?: return "<redacted>"
+    val host = runCatching { URI(value).host }.getOrNull()
     if (!host.isNullOrBlank()) {
-      val scheme = runCatching { URI(source).scheme }.getOrNull()
+      val scheme = runCatching { URI(value).scheme }.getOrNull()
       return "$scheme://$host"
     }
-    return File(source).name.takeIf { it.isNotBlank() } ?: "<redacted>"
+    return File(value).name.takeIf { it.isNotBlank() } ?: "<redacted>"
   }
 
   companion object {
     private const val TAG = "WallpaperRotation"
     private const val CACHE_DIR_NAME = "wallpaper_rotation"
     private const val MIN_INTERVAL_MINUTES = 15
+    private const val JPEG_QUALITY = 95
     private const val DEFAULT_WIDTH = 1080
     private const val DEFAULT_HEIGHT = 1920
     private const val TARGET_HOME = 0

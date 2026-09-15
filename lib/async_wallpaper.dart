@@ -349,6 +349,19 @@ class AsyncWallpaper {
         ),
       );
     }
+    final hasInvalidUrl = request.sources.any(
+      (source) =>
+          source.sourceType == WallpaperSourceType.url &&
+          !_isHttpsUrl(source.source),
+    );
+    if (hasInvalidUrl) {
+      return const WallpaperResult.failure(
+        WallpaperError(
+          code: WallpaperErrorCode.invalidInput,
+          message: 'Rotation URL sources must be valid HTTPS URLs.',
+        ),
+      );
+    }
     if (request.intervalMinutes < _minRotationIntervalMinutes) {
       return const WallpaperResult.failure(
         WallpaperError(

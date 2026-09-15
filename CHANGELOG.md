@@ -13,6 +13,7 @@
 - Results decided in Dart (unsupported platform, invalid input, transport exception) now fill `home`/`lock` for each requested target, the same way Android does, instead of leaving them null.
 - An unsupported video scale mode (`center`, `fill`, `stretch`) now returns `unsupported` with `video-scale-unsupported`, as documented and as Android reports it. The Dart pre-check returned `failed` with `invalid-input`.
 - OpenGL live wallpaper: an unexpected I/O error while reading a texture source during configuration is now reported as `texture-source-unavailable` instead of `configuration-store-failed`, matching what the renderer reports for the same failure.
+- Video and OpenGL live wallpapers now reload when the user sets the plugin's wallpaper again over itself. Android keeps the running engine for the same component and only sends it a reapply command, which the engines ignored, so the home screen kept the previous video or shader until the process restarted. On Android 10 and older the running engine picks up the new content only when its surface is recreated.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
 - Example (Android 12+): the example keeps one `FlutterEngine` for the process. A new wallpaper changes the dynamic colors, Android relaunches the Activity, and the default `FlutterActivity` destroyed its engine, so the example restarted and never showed the `applyWallpaper` result. The Android compatibility guide now explains this relaunch and how a host app can keep its result.
 

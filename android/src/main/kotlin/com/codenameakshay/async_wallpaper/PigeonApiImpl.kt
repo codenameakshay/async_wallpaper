@@ -686,7 +686,7 @@ class PigeonApiImpl(
   private fun currentActivity(): Activity? {
     val reference = activityReference
     val activity = reference?.get()
-    if (!isUsableActivity(activity)) {
+    if (!activity.isUsable()) {
       // Do not erase a newer Activity attached during a configuration change while a queued
       // operation was checking an older weak reference.
       if (activityReference === reference) {
@@ -695,21 +695,6 @@ class PigeonApiImpl(
       return null
     }
     return activity
-  }
-
-  private fun isUsableActivity(activity: Activity?): Boolean {
-    return activity != null && !activity.isFinishing &&
-      (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !activity.isDestroyed)
-  }
-
-  private fun WallpaperSourceData.hasValueForKind(): Boolean {
-    return when (kind) {
-      WallpaperSourceKindData.URL -> !url.isNullOrBlank()
-      WallpaperSourceKindData.FILE_PATH -> !filePath.isNullOrBlank()
-      WallpaperSourceKindData.CONTENT_URI -> !contentUri.isNullOrBlank()
-      WallpaperSourceKindData.BYTES -> bytes?.isNotEmpty() == true
-      null -> false
-    }
   }
 
   private fun videoValidationCode(error: VideoMetadataValidationException): String {

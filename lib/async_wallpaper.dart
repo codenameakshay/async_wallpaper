@@ -18,7 +18,7 @@ class AsyncWallpaper {
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
   static final WallpaperApi _api = WallpaperApi();
-  static final WallpaperClient _defaultClient = LegacyWallpaperClient(
+  static final WallpaperClient _defaultClient = PigeonWallpaperClient(
     api: _api,
   );
   static WallpaperClient _client = _defaultClient;

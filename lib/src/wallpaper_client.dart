@@ -467,9 +467,6 @@ OpenGlLiveWallpaperRequest openGlWallpaperRequestFromData(
 
 /// Internal seam between the public facade and platform transport.
 abstract interface class WallpaperClient {
-  /// Applies a legacy static wallpaper request through the structured API.
-  Future<WallpaperOperationResult> apply(WallpaperRequest request);
-
   /// Returns the platform's wallpaper capability snapshot.
   Future<WallpaperCapabilities> getCapabilities();
 
@@ -495,19 +492,10 @@ abstract interface class WallpaperClient {
 }
 
 /// Default Pigeon-backed client for structured wallpaper operations.
-///
-/// The [apply] member remains as a source-compatible adapter for callers that
-/// still construct [WallpaperRequest]. It deliberately uses the same
-/// structured host endpoint as [applyWallpaper], so it cannot discard truthful
-/// target-level outcomes.
-class LegacyWallpaperClient implements WallpaperClient {
-  LegacyWallpaperClient({WallpaperApi? api}) : _api = api ?? WallpaperApi();
+class PigeonWallpaperClient implements WallpaperClient {
+  PigeonWallpaperClient({WallpaperApi? api}) : _api = api ?? WallpaperApi();
 
   final WallpaperApi _api;
-
-  @override
-  Future<WallpaperOperationResult> apply(WallpaperRequest request) =>
-      applyWallpaper(_legacyRequestToStaticRequest(request));
 
   @override
   Future<WallpaperCapabilities> getCapabilities() async {
@@ -549,18 +537,6 @@ class LegacyWallpaperClient implements WallpaperClient {
       await _api.applyOpenGlWallpaper(openGlWallpaperRequestToData(request)),
     );
   }
-}
-
-StaticWallpaperRequest _legacyRequestToStaticRequest(WallpaperRequest request) {
-  final WallpaperSource source = switch (request.sourceType) {
-    WallpaperSourceType.url => WallpaperSource.url(request.source),
-    WallpaperSourceType.file => WallpaperSource.filePath(request.source),
-  };
-  return StaticWallpaperRequest(
-    source: source,
-    target: request.target,
-    goToHome: request.goToHome,
-  );
 }
 
 TargetStatusData _targetStatusToData(WallpaperTargetStatus status) {

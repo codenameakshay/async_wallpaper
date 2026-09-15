@@ -169,12 +169,8 @@ class PigeonApiImpl(
         Log.e(TAG, "rotateWallpaperNow failed", it)
         false
       }
-      postBoolean(callback, success)
+      postCallback(callback, Result.success(success))
     }
-  }
-
-  private fun postBoolean(callback: (Result<Boolean>) -> Unit, value: Boolean) {
-    mainHandler.post { callback(Result.success(value)) }
   }
 
   override fun applyWallpaper(
@@ -719,7 +715,7 @@ class PigeonApiImpl(
   private fun videoValidationCode(error: VideoMetadataValidationException): String {
     return when (error.failure) {
       VideoValidationFailure.MISSING_FILE -> BoundedSourceOpener.ERROR_SOURCE_UNAVAILABLE
-      VideoValidationFailure.INVALID_MIME_TYPE -> "invalid-content-type"
+      VideoValidationFailure.INVALID_MIME_TYPE -> WallpaperSourceLoader.ERROR_INVALID_CONTENT_TYPE
       VideoValidationFailure.NO_VIDEO_TRACK,
       VideoValidationFailure.INVALID_DIMENSIONS,
       VideoValidationFailure.INVALID_ROTATION,

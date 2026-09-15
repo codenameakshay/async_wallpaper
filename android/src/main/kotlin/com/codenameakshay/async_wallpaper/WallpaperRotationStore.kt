@@ -117,8 +117,6 @@ internal class WallpaperRotationStore(context: Context) {
 
   fun isTimeOfDayTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, false)
 
-  fun isIntervalTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_INTERVAL_TRIGGER, true)
-
   fun getActiveHoursStart(): Int = prefs.getInt(KEY_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)
 
   fun getActiveHoursEnd(): Int = prefs.getInt(KEY_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)

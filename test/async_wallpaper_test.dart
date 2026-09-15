@@ -156,6 +156,9 @@ void main() {
 
           expect(result.status, WallpaperOperationStatus.failed);
           expect(result.errorCode, 'invalid-input');
+          expect(result.home?.status, WallpaperTargetStatus.failed);
+          expect(result.home?.errorCode, 'invalid-input');
+          expect(result.lock, isNull);
         }
         expect(client.staticCalls, 0);
       },
@@ -439,8 +442,9 @@ void main() {
           );
 
           for (final result in <WallpaperOperationResult>[prepared, preview]) {
-            expect(result.status, WallpaperOperationStatus.failed);
-            expect(result.errorCode, 'invalid-input');
+            expect(result.status, WallpaperOperationStatus.unsupported);
+            expect(result.errorCode, 'video-scale-unsupported');
+            expect(result.home?.status, WallpaperTargetStatus.unsupported);
           }
         }
 
@@ -652,6 +656,8 @@ void main() {
 
     expect(structured.status, WallpaperOperationStatus.failed);
     expect(structured.errorCode, 'unknown');
+    expect(structured.home?.status, WallpaperTargetStatus.failed);
+    expect(structured.lock, isNull);
     expect(legacy.isSuccess, isFalse);
     expect(legacy.error?.code, WallpaperErrorCode.unknown);
   });
@@ -695,7 +701,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       const request = StaticWallpaperRequest(
         source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
-        target: WallpaperTarget.home,
+        target: WallpaperTarget.both,
       );
 
       final operation = await AsyncWallpaper.applyWallpaper(request);
@@ -709,6 +715,9 @@ void main() {
       );
 
       expect(operation.status, WallpaperOperationStatus.unsupported);
+      expect(operation.home?.status, WallpaperTargetStatus.unsupported);
+      expect(operation.lock?.status, WallpaperTargetStatus.unsupported);
+      expect(operation.lock?.errorCode, 'unsupported');
       expect(capabilities.supportsStaticWallpaper, isFalse);
       expect(legacy.error?.code, WallpaperErrorCode.unsupported);
       expect(client.staticCalls, 0);

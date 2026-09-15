@@ -71,10 +71,14 @@ internal class WallpaperRotationEngine(
         val path = config.localSources[sourceIndex]
         if (applyPathToWallpaper(path, config.target)) {
           val nextPosition = (position + 1) % sourceCount
-          store.setCurrentIndex(nextPosition)
-          if (config.orderType == WallpaperRotationStore.ORDER_TYPE_SHUFFLE && nextPosition == 0) {
-            store.setShuffleOrder(generateShuffleOrder(sourceCount))
+          val nextShuffleOrder = if (
+            config.orderType == WallpaperRotationStore.ORDER_TYPE_SHUFFLE && nextPosition == 0
+          ) {
+            generateShuffleOrder(sourceCount)
+          } else {
+            null
           }
+          store.setCurrentIndexAndShuffleOrder(nextPosition, nextShuffleOrder)
           store.setLastError(null)
           return@withLock true
         }
@@ -94,12 +98,20 @@ internal class WallpaperRotationEngine(
       return List(sourceCount) { it }
     }
     val savedOrder = store.getShuffleOrder()
-    if (savedOrder.size == sourceCount) {
+    if (savedOrder.isPermutationOf(sourceCount)) {
       return savedOrder
     }
     val newOrder = generateShuffleOrder(sourceCount)
     store.setShuffleOrder(newOrder)
     return newOrder
+  }
+
+  /** A stored order is only usable when it names every playlist position exactly once. */
+  private fun List<Int>.isPermutationOf(size: Int): Boolean {
+    if (this.size != size) {
+      return false
+    }
+    return toSet().size == size && all { index -> index in 0 until size }
   }
 
   private fun generateShuffleOrder(sourceCount: Int): List<Int> {

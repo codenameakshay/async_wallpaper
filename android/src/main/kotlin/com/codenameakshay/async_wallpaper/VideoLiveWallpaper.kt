@@ -177,10 +177,6 @@ class VideoLiveWallpaper : WallpaperService() {
       }
     }
 
-    fun configureScaleMode(scaleMode: VideoWallpaperScaleMode) {
-      requestedScalingMode = scaleMode
-    }
-
     fun setToWallpaper(context: Context) {
       val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

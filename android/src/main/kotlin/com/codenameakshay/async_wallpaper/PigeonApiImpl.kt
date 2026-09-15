@@ -266,7 +266,18 @@ class PigeonApiImpl(
         prepared
       } else {
         runOnMainBlocking {
-          openLiveWallpaperUi(target, VideoLiveWallpaper::class.java)
+          val scaleMode = request.scaleMode
+          if (scaleMode == null) {
+            OperationResultPolicy.failed(
+              target,
+              ERROR_INVALID_REQUEST,
+              "A video wallpaper scale mode is required.",
+            )
+          } else {
+            openLiveWallpaperUi(target, VideoLiveWallpaper::class.java) {
+              promoteVideoAsset(target, scaleMode)
+            }
+          }
         }
       }
     }
@@ -371,9 +382,8 @@ class PigeonApiImpl(
 
     return try {
       videoSourceOpener.open(source).use { input ->
-        videoRepository.prepare(input)
+        videoRepository.preparePending(input)
       }
-      VideoLiveWallpaper.configureScaleMode(scaleMode)
       // Preparing changes only an app-private candidate. The user has not selected it yet.
       OperationResultPolicy.awaitingUserConfirmation(target)
     } catch (error: BoundedSourceException) {
@@ -411,6 +421,7 @@ class PigeonApiImpl(
   private fun openLiveWallpaperUi(
     target: WallpaperTargetData,
     serviceClass: Class<*>,
+    beforeLaunch: (() -> OperationResultData?)? = null,
   ): OperationResultData {
     val activity = currentActivity() ?: return OperationResultPolicy.foregroundRequired(target)
     val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
@@ -427,6 +438,7 @@ class PigeonApiImpl(
           "This device has no system live wallpaper preview UI.",
         )
       } else {
+        beforeLaunch?.invoke()?.let { return it }
         activity.startActivity(intent)
         // Android owns target selection in this UI. Do not claim home or lock was applied.
         OperationResultPolicy.previewOpened(target)
@@ -449,6 +461,45 @@ class PigeonApiImpl(
         target,
         ERROR_SYSTEM_UI_FAILED,
         "Unable to open live wallpaper preview.",
+        error.message,
+      )
+    }
+  }
+
+  private fun promoteVideoAsset(
+    target: WallpaperTargetData,
+    scaleMode: WallpaperScaleModeData,
+  ): OperationResultData? {
+    val videoScaleMode = when (scaleMode) {
+      WallpaperScaleModeData.CENTER_CROP -> VideoWallpaperScaleMode.CENTER_CROP
+      WallpaperScaleModeData.FIT_CENTER -> VideoWallpaperScaleMode.FIT_CENTER
+      else -> return OperationResultPolicy.unsupported(
+        target,
+        ERROR_VIDEO_SCALE_UNSUPPORTED,
+        "Video live wallpapers support only centerCrop and fitCenter scaling.",
+      )
+    }
+    return try {
+      videoRepository.promotePending(videoScaleMode)
+      null
+    } catch (error: VideoMetadataValidationException) {
+      OperationResultPolicy.failed(
+        target,
+        videoValidationCode(error),
+        error.message ?: "The video source is not playable.",
+      )
+    } catch (error: IOException) {
+      OperationResultPolicy.failed(
+        target,
+        ERROR_VIDEO_PREPARATION_FAILED,
+        "Unable to prepare the video wallpaper.",
+        error.message,
+      )
+    } catch (error: Exception) {
+      OperationResultPolicy.failed(
+        target,
+        ERROR_VIDEO_PREPARATION_FAILED,
+        "Unable to prepare the video wallpaper.",
         error.message,
       )
     }

@@ -2,11 +2,13 @@ package com.codenameakshay.async_wallpaper
 
 import android.system.ErrnoException
 import android.system.Os
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -77,6 +79,9 @@ class VideoWallpaperRepository(
   val activeFile: File
     get() = File(storageDirectory, ACTIVE_VIDEO_FILE_NAME)
 
+  val pendingFile: File
+    get() = File(storageDirectory, PENDING_VIDEO_FILE_NAME)
+
   /**
    * Copies [source] into a unique temporary file, validates that exact file,
    * then atomically replaces [activeFile]. Passing the active file itself is a
@@ -108,6 +113,36 @@ class VideoWallpaperRepository(
     prepareLocked(source, activeFile)
   }
 
+  /** Writes a validated candidate without changing the active wallpaper. */
+  @Throws(IOException::class, VideoMetadataValidationException::class)
+  fun preparePending(source: InputStream): PreparedVideo = replacementLock.withLock {
+    ensureStorageDirectory()
+    cleanupTemporaryFilesLocked()
+    prepareLocked(source, pendingFile)
+  }
+
+  /** Promotes the validated pending candidate and records its active scale mode. */
+  @Throws(IOException::class, VideoMetadataValidationException::class)
+  fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo = replacementLock.withLock {
+    ensureStorageDirectory()
+    cleanupTemporaryFilesLocked()
+    val pending = pendingFile
+    val metadata = validator.validate(pending)
+    fileSystem.replaceAtomically(pending, activeFile)
+    persistScaleModeLocked(scaleMode)
+    PreparedVideo(activeFile, metadata)
+  }
+
+  /** Reads the active asset's scale mode, defaulting safely for old installs. */
+  fun activeScaleMode(): VideoWallpaperScaleMode = replacementLock.withLock {
+    runCatching {
+      if (!activeScaleModeFile.isFile) {
+        return@runCatching VideoWallpaperScaleMode.CENTER_CROP
+      }
+      VideoScaleModePersistence.decode(activeScaleModeFile.readText(StandardCharsets.UTF_8))
+    }.getOrDefault(VideoWallpaperScaleMode.CENTER_CROP)
+  }
+
   /** Removes abandoned temporary candidates left behind by a process interruption. */
   fun cleanupTemporaryFiles(): Int = replacementLock.withLock {
     ensureStorageDirectory()
@@ -122,6 +157,19 @@ class VideoWallpaperRepository(
       val metadata = validator.validate(temporaryFile)
       fileSystem.replaceAtomically(temporaryFile, destination)
       return PreparedVideo(destination, metadata)
+    } finally {
+      temporaryFile?.let(fileSystem::delete)
+    }
+  }
+
+  private fun persistScaleModeLocked(scaleMode: VideoWallpaperScaleMode) {
+    var temporaryFile: File? = null
+    try {
+      temporaryFile = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
+      ByteArrayInputStream(VideoScaleModePersistence.encode(scaleMode).toByteArray(StandardCharsets.UTF_8)).use {
+        fileSystem.copyAndSync(it, temporaryFile)
+      }
+      fileSystem.replaceAtomically(temporaryFile, activeScaleModeFile)
     } finally {
       temporaryFile?.let(fileSystem::delete)
     }
@@ -148,6 +196,9 @@ class VideoWallpaperRepository(
 
   private fun tempFilePrefix(): String = "$ACTIVE_VIDEO_FILE_NAME."
 
+  private val activeScaleModeFile: File
+    get() = File(storageDirectory, ACTIVE_SCALE_MODE_FILE_NAME)
+
   private fun File.isSameFileAs(other: File): Boolean {
     val sourcePath = runCatching { canonicalFile }.getOrElse { absoluteFile }
     val destinationPath = runCatching { other.canonicalFile }.getOrElse { other.absoluteFile }
@@ -156,11 +207,24 @@ class VideoWallpaperRepository(
 
   companion object {
     const val ACTIVE_VIDEO_FILE_NAME = "file.mp4"
+    const val PENDING_VIDEO_FILE_NAME = "pending.mp4"
 
+    private const val ACTIVE_SCALE_MODE_FILE_NAME = "file.mp4.scale-mode"
     private const val TEMP_FILE_SUFFIX = ".tmp"
 
     // One process-wide lock protects the one active-file hand-off protocol,
     // even when callers construct separate repository instances.
     private val replacementLock = ReentrantLock()
+  }
+}
+
+internal object VideoScaleModePersistence {
+  fun encode(scaleMode: VideoWallpaperScaleMode): String = scaleMode.name
+
+  fun decode(value: String?): VideoWallpaperScaleMode {
+    return when (value?.trim()) {
+      VideoWallpaperScaleMode.FIT_CENTER.name -> VideoWallpaperScaleMode.FIT_CENTER
+      else -> VideoWallpaperScaleMode.CENTER_CROP
+    }
   }
 }

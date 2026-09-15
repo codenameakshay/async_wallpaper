@@ -68,6 +68,14 @@ class StaticWallpaperEngine(
         code = ERROR_SYSTEM_CROPPER_REQUIRES_CONTENT_URI,
         message = "The system cropper requires a readable content URI source.",
       )
+    val mimeType = try {
+      appContext.contentResolver.getType(uri)
+    } catch (_: SecurityException) {
+      null
+    }
+    cropperSourceError(mimeType)?.let { (code, message) ->
+      return OperationResultPolicy.failed(validated.target, code = code, message = message)
+    }
 
     return try {
       val intent = wallpaperManagerProvider().getCropAndSetWallpaperIntent(uri)
@@ -349,6 +357,18 @@ class StaticWallpaperEngine(
     const val ERROR_SYSTEM_CROPPER_REQUIRES_CONTENT_URI = "system-cropper-requires-content-uri"
     const val ERROR_SYSTEM_UI_UNAVAILABLE = "system-ui-unavailable"
     const val ERROR_SYSTEM_UI_FAILED = "system-ui-failed"
+
+    /**
+     * Android resolves the crop intent by the URI's MIME type, so an unreadable URI or a non-image
+     * type would otherwise fail as a generic "unable to open the cropper".
+     */
+    internal fun cropperSourceError(mimeType: String?): Pair<String, String>? = when {
+      mimeType == null ->
+        WallpaperSourceLoader.ERROR_SOURCE_UNAVAILABLE to "The content URI could not be read."
+      !mimeType.startsWith("image/", ignoreCase = true) ->
+        WallpaperSourceLoader.ERROR_INVALID_CONTENT_TYPE to "The content URI does not identify an image."
+      else -> null
+    }
 
     private const val CONTENT_SCHEME = "content"
   }

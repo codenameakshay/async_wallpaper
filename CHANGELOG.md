@@ -1,4 +1,6 @@
-## Unreleased
+## 3.3.0
+
+Android reliability release. The public API is unchanged, but rotation now needs HTTPS URLs and no longer uses a foreground service. See [doc/migration.md](doc/migration.md#from-32-to-33).
 
 - Android 11+: the plugin manifest now declares `<queries>` for the live-wallpaper, chooser, set-wallpaper, and crop-and-set intents. Without them package visibility hid the system wallpaper apps, so `getCapabilities()` reported live, OpenGL, and picker support as unavailable, and the video, OpenGL, picker, cropper, and chooser flows failed with `unsupported` or `system-ui-unavailable` on devices that had them.
 - Wallpaper rotation no longer runs a foreground service. The interval and charging triggers use `WorkManager` and the time-of-day trigger uses one inexact alarm re-armed after each delivery, which removes the `FOREGROUND_SERVICE`, `POST_NOTIFICATIONS`, and `SCHEDULE_EXACT_ALARM` permissions and keeps charging/time-of-day rotation working on Android 14+ and Android 15+.
@@ -20,6 +22,8 @@
 - Video and OpenGL live wallpapers now reload when the user sets the plugin's wallpaper again over itself. Android keeps the running engine for the same component and only sends it a reapply command, which the engines ignored, so the home screen kept the previous video or shader until the process restarted. On Android 10 and older the running engine picks up the new content only when its surface is recreated.
 - Internal: removed unused legacy platform-channel endpoints and dead pre-Android 7 code paths.
 - Example (Android 12+): the example keeps one `FlutterEngine` for the process. A new wallpaper changes the dynamic colors, Android relaunches the Activity, and the default `FlutterActivity` destroyed its engine, so the example restarted and never showed the `applyWallpaper` result. The Android compatibility guide now explains this relaunch and how a host app can keep its result.
+- Example: the example exposes every public API (download, chooser, legacy set, Material You, platform version, rotation) and its default inputs work out of the box.
+- Docs: the README is shorter and shows current screenshots. Migration notes moved to [doc/migration.md](doc/migration.md).
 
 ## 3.2.0
 

@@ -1,6 +1,6 @@
 name: async_wallpaper_example
 description: Demonstrates how to use the async_wallpaper plugin.
-version: 3.2.0+1
+version: 3.3.0+1
 
 publish_to: "none"
 

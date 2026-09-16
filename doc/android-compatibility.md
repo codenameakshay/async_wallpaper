@@ -1,6 +1,6 @@
 # Android compatibility
 
-This page describes the Android contract for `async_wallpaper` 3.2. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
+This page describes the Android contract for `async_wallpaper` 3.3. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
 
 ## Baseline and capability check
 
@@ -113,7 +113,7 @@ final result = await AsyncWallpaper.applyWallpaper(
 );
 ```
 
-Do not call cropper/picker, `openLiveWallpaperPreview`, video activation, or OpenGL activation from a worker. They enter Android system UI and need a foreground user flow. In 3.2, `goToHome` remains only for source compatibility and is intentionally ignored; the plugin never performs automatic navigation. If foreground/UI requirements cannot be met, treat `foregroundRequired` as a normal final outcome and surface an in-app action later.
+Do not call cropper/picker, `openLiveWallpaperPreview`, video activation, or OpenGL activation from a worker. They enter Android system UI and need a foreground user flow. Since 3.2, `goToHome` remains only for source compatibility and is intentionally ignored; the plugin never performs automatic navigation. If foreground/UI requirements cannot be met, treat `foregroundRequired` as a normal final outcome and surface an in-app action later.
 
 > Migration: `goToHome` is retained on `StaticWallpaperRequest`/`VideoWallpaperRequest`/`OpenGlLiveWallpaperRequest`/`WallpaperRequest`/`LiveWallpaperRequest`/`MaterialYouWallpaperRequest` only so existing source still compiles; the engine intentionally ignores it and never navigates to Home. Inspect `WallpaperOperationResult` and own any foreground navigation in the app (e.g., `Navigator.pop`, home intent) after a verified result.
 

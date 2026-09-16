@@ -14,15 +14,15 @@ Flutter plugin to set wallpapers on Android and save them to Photos on iOS.
 
 | Static wallpaper | Capabilities | More APIs | iOS |
 |---|---|---|---|
-| <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-static.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-capabilities.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-more-apis.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/ios-download.png" width="200"> |
+| <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-static.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-capabilities.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-more-apis.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/ios-download.png" width="200"> |
 
 **Video live wallpaper:** home screen before, the system preview, and the applied video.
 
-<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/video-live-wallpaper.png" width="600">
+<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/video-live-wallpaper.png" width="600">
 
 **Scale modes:** `centerCrop`, `fitCenter`, `center`, `fill`, and `stretch` on a 1080x2400 phone.
 
-<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/scale-modes.png" width="600">
+<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/scale-modes.png" width="600">
 
 ## Requirements
 

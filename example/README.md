@@ -2,7 +2,7 @@
 
 A small app that calls every public `async_wallpaper` API. It has no extra dependencies: each source is a text field you can replace with a value from your own app.
 
-<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-static.png" width="220"> <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-capabilities.png" width="220"> <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/android-more-apis.png" width="220">
+<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-static.png" width="220"> <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-capabilities.png" width="220"> <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-more-apis.png" width="220">
 
 ## Run
 

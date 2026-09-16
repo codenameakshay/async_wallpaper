@@ -1,71 +1,61 @@
 # async_wallpaper
 
-Flutter wallpaper plugin with support for:
+[![pub package](https://img.shields.io/pub/v/async_wallpaper.svg)](https://pub.dev/packages/async_wallpaper)
 
-- static wallpaper from URL, file path, content URI, or bytes
-- home, lock, or both targets
-- live wallpaper from video or OpenGL shader
-- capability check and operation results that distinguish applied from preview-opened
-- download to Photos (iOS and Android)
+Flutter plugin to set wallpapers on Android and save them to Photos on iOS.
 
-## Demo
+- Static wallpaper from a URL, file path, content URI, or bytes
+- Home, lock, or both targets, with a separate result for each
+- Video and OpenGL live wallpapers
+- Scheduled wallpaper rotation
+- Capability checks before you show an action
 
-| Example Demo | Example App Screenshot |
-|---|---|
-| ![Example Demo](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/demo.gif) | ![Example App Screenshot](https://raw.githubusercontent.com/codenameakshay/async_wallpaper/main/screenshots/image.jpg) |
+## Screenshots
 
-## Version 3.2.0 highlights
+| Static wallpaper | Capabilities | More APIs | iOS |
+|---|---|---|---|
+| <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-static.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-capabilities.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/android-more-apis.png" width="200"> | <img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/ios-download.png" width="200"> |
 
-- New structured API: `applyWallpaper`, `setVideoWallpaper`, `openLiveWallpaperPreview`, `setOpenGlLiveWallpaper`.
-- New `WallpaperSource` (url, filePath, contentUri, bytes) with defensive copy for bytes.
-- New `getCapabilities()` and `WallpaperOperationResult` with per-target results.
-- Video needs prepare then preview. OpenGL needs GLSL ES 1.00 shader (1-60 FPS).
-- 3.1 API stays available for source compatibility. `goToHome` stays but does nothing.
+**Video live wallpaper:** home screen before, the system preview, and the applied video.
 
-## Version 3.1.0 highlights
+<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/video-live-wallpaper.png" width="600">
 
-- Flutter baseline: `3.41.4`
-- Android wallpaper rotation APIs: start, stop, status, and rotate now.
-- Mixed rotation playlist support for URL and file sources with local caching.
-- Rotation order modes: sequential and shuffle.
-- Rotation triggers for interval, charging connected, and time-of-day windows.
-- Minimum rotation interval of 15 minutes.
-- Active hours configuration for time-of-day trigger.
-- Basic iOS support with download-only capability (save wallpaper to Photos).
-- Cross-platform `downloadWallpaper(...)` API (iOS + Android).
+**Scale modes:** `centerCrop`, `fitCenter`, `center`, `fill`, and `stretch` on a 1080x2400 phone.
 
-## Version 3.0.0 highlights
-
-- Flutter baseline: `3.41.4`
-- Android tooling: AGP `8.11.1`, Gradle `8.14`, Kotlin plugin `2.2.20`, Java `17`
-- Android `minSdk` raised to `24`
-- Android host code migrated from Java to Kotlin
-- Breaking API redesign to typed enums, request objects, and result objects
+<img src="https://raw.githubusercontent.com/codenameakshay/async_wallpaper/728b374826493dfccb4f7cba1357e38e47b522b2/screenshots/scale-modes.png" width="600">
 
 ## Requirements
 
-- Flutter `>=3.41.4`
-- Dart `>=3.9.0 <4.0.0`
+- Flutter `>=3.41.4`, Dart `>=3.9.0`
 - Android `minSdk 24`
-- iOS `13.0+` (download support only)
+- iOS `13.0+` (download only)
 
 ## Installation
 
 ```yaml
 dependencies:
-  async_wallpaper: ^3.2.0
+  async_wallpaper: ^3.3.0
 ```
-
-## Usage
 
 ```dart
 import 'package:async_wallpaper/async_wallpaper.dart';
 ```
 
-### Apply static wallpaper
+## Usage
+
+### Check capabilities
 
 ```dart
-final WallpaperOperationResult result = await AsyncWallpaper.applyWallpaper(
+final c = await AsyncWallpaper.getCapabilities();
+if (c.supportsStaticWallpaper && c.canSetWallpaper) {
+  // Show the action.
+}
+```
+
+### Static wallpaper
+
+```dart
+final result = await AsyncWallpaper.applyWallpaper(
   const StaticWallpaperRequest(
     source: WallpaperSource.url('https://example.com/wallpaper.jpg'),
     target: WallpaperTarget.both,
@@ -74,22 +64,11 @@ final WallpaperOperationResult result = await AsyncWallpaper.applyWallpaper(
   ),
 );
 if (result.status == WallpaperOperationStatus.applied) {
-  // For `both`, make sure that you read `result.home` and `result.lock` separately.
+  // For `both`, read `result.home` and `result.lock`.
 }
 ```
 
-Sources: `WallpaperSource.url`, `filePath`, `contentUri`, `bytes`. No picker dependency is necessary. See `example/README.md` for editable samples.
-
-### Check capabilities first
-
-```dart
-final WallpaperCapabilities c = await AsyncWallpaper.getCapabilities();
-if (c.supportsStaticWallpaper && c.canSetWallpaper) {
-  // Show the action.
-}
-```
-
-`requiresForeground` means one flow needs system UI. `direct` static apply can still run in background.
+Sources: `WallpaperSource.url` (HTTPS), `filePath`, `contentUri`, `bytes`.
 
 ### Video live wallpaper
 
@@ -104,32 +83,20 @@ if (prepared.status == WallpaperOperationStatus.awaitingUserConfirmation) {
 }
 ```
 
-`previewOpened` means the system UI opened. It does not mean the user accepted.
+`previewOpened` means the system preview opened, not that the user applied it.
 
-### OpenGL live wallpaper (Android only)
+### OpenGL live wallpaper
 
-Check `supportsOpenGlLiveWallpaper` first. Use GLSL ES 1.00, `void main()`, 1-60 FPS.
+Check `supportsOpenGlLiveWallpaper` first, then call `setOpenGlLiveWallpaper` with a GLSL ES 1.00 fragment shader (1-60 FPS).
 
-### Download wallpaper (iOS + Android)
-
-```dart
-await AsyncWallpaper.downloadWallpaper(const DownloadWallpaperRequest(url: 'https://example.com/wallpaper.jpg'));
-```
-
-On Android 9 (API 28) and older, saving to the gallery needs `WRITE_EXTERNAL_STORAGE`, which the plugin does not declare. If your app supports those versions, add `<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />` and request it at runtime before calling `downloadWallpaper`; otherwise the call fails there.
-
-### Legacy 3.1 API
-
-`setWallpaper`, `setLiveWallpaper`, `openWallpaperChooser`, and Material You helpers stay available. New code must use the structured API.
-
-### Wallpaper rotation (Android only)
+### Wallpaper rotation
 
 ```dart
-final result = await AsyncWallpaper.startWallpaperRotation(
+await AsyncWallpaper.startWallpaperRotation(
   const WallpaperRotationRequest(
     sources: <WallpaperRotationSource>[
-      WallpaperRotationSource(sourceType: WallpaperSourceType.url, source: 'https://example.com/wallpaper1.jpg'),
-      WallpaperRotationSource(sourceType: WallpaperSourceType.file, source: '/storage/emulated/0/Download/wallpaper2.jpg'),
+      WallpaperRotationSource(sourceType: WallpaperSourceType.url, source: 'https://example.com/1.jpg'),
+      WallpaperRotationSource(sourceType: WallpaperSourceType.file, source: '/storage/emulated/0/Download/2.jpg'),
     ],
     target: WallpaperTarget.both,
     intervalMinutes: 60,
@@ -148,47 +115,39 @@ await AsyncWallpaper.rotateWallpaperNow();
 await AsyncWallpaper.stopWallpaperRotation();
 ```
 
-Minimum interval is 15 minutes. URL entries are cached locally before rotation starts. Rotation
-uses `WorkManager` for the interval and charging triggers and one inexact daily alarm for the
-time-of-day trigger, so it needs no foreground service and no exact-alarm permission. Rotation URL
-entries must be HTTPS and are fetched through the same bounded loader as static wallpapers.
+The minimum interval is 15 minutes. URLs must be HTTPS. Rotation uses `WorkManager` and needs no foreground service.
 
-### Platform behavior
+### Download
 
-- Android: apply, video, OpenGL, chooser, rotation, and download — when `getCapabilities()` allows.
-- iOS: download only. Other calls return `unsupported`.
-- Web/desktop: return `unsupported`.
-- The package shows no toast. Your app shows its own UI from the result.
-
-### Background work
-
-Use `WallpaperApplyStrategy.direct` for `WorkManager`. Do not use `systemCropper`, `systemPicker`, or preview from a worker. They need foreground and return `foregroundRequired`.
-
-### iOS permission
-
-Add to `Info.plist` for download:
-
-```xml
-<key>NSPhotoLibraryAddUsageDescription</key>
-<string>Allows saving downloaded wallpapers to your Photos library.</string>
+```dart
+await AsyncWallpaper.downloadWallpaper(
+  const DownloadWallpaperRequest(url: 'https://example.com/wallpaper.jpg'),
+);
 ```
 
-## Migration
+- iOS: add `NSPhotoLibraryAddUsageDescription` to `Info.plist`.
+- Android 9 and older: declare `WRITE_EXTERNAL_STORAGE` with `android:maxSdkVersion="28"` and request it before you call `downloadWallpaper`.
 
-- From 2.x: `HOME_SCREEN` etc. → `WallpaperTarget`. Boolean setters → typed requests. Toasts removed.
-- From 3.1: `WallpaperRequest(sourceType+source)` → `StaticWallpaperRequest(source: WallpaperSource...)`. Boolean success → `WallpaperOperationResult`. `goToHome` does nothing.
+## Platform support
 
-Details: `doc/android-compatibility.md`, `doc/issues-3.2.0.md`.
+| | Android | iOS | Web/desktop |
+|---|---|---|---|
+| Static, live, OpenGL, rotation | Yes | `unsupported` | `unsupported` |
+| Download | Yes | Yes | `unsupported` |
 
-## Bugs and Feature Requests
+- Background work (for example `WorkManager`): use `WallpaperApplyStrategy.direct`. The cropper, picker, and live previews need a foreground Activity and return `foregroundRequired` otherwise.
+- The plugin shows no toasts and does not navigate. Your app shows its own UI from the result.
 
-- Report bugs via: [Bug report template](https://github.com/codenameakshay/async_wallpaper/issues/new?template=bug_report.md)
-- Request features via: [Feature request template](https://github.com/codenameakshay/async_wallpaper/issues/new?template=feature_request.md)
-- Include device model, Android version, and steps to reproduce.
+## Docs
+
+- [Example app](example/README.md)
+- [Android compatibility](doc/android-compatibility.md)
+- [Migration guide](doc/migration.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](https://github.com/codenameakshay/async_wallpaper/blob/main/CONTRIBUTING.md) before you open a PR.
+Report bugs with the [bug report template](https://github.com/codenameakshay/async_wallpaper/issues/new?template=bug_report.md) and include the device model, Android version, and steps to reproduce. Request features with the [feature request template](https://github.com/codenameakshay/async_wallpaper/issues/new?template=feature_request.md). Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a PR.
 
 ## License
 

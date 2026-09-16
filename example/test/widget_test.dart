@@ -173,12 +173,12 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  testWidgets('renders 3.2 source, target, scale, and strategy controls', (
+  testWidgets('renders source, target, scale, and strategy controls', (
     WidgetTester tester,
   ) async {
     await _pumpExample(tester, _FakeWallpaperDemoApi());
 
-    expect(find.text('Async Wallpaper 3.2 example'), findsOneWidget);
+    expect(find.text('Async Wallpaper example'), findsOneWidget);
     expect(find.byKey(const Key('source-selector')), findsOneWidget);
     expect(find.byKey(const Key('target-selector')), findsOneWidget);
     expect(find.byKey(const Key('scale-selector')), findsOneWidget);

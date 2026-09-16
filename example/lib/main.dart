@@ -538,7 +538,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Async Wallpaper 3.2 example')),
+      appBar: AppBar(title: const Text('Async Wallpaper example')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

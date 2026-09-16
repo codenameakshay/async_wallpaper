@@ -76,7 +76,7 @@ build/
 
 # FVM Version Cache
 .fvm/
-# Exclude large demo assets from the published archive.
+# Keep screenshots out of the published archive.
 # README links to GitHub raw URLs, so the package does not need local copies.
-screenshots/demo.gif
+screenshots/
 **/*.gif

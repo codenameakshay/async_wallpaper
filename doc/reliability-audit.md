@@ -64,7 +64,7 @@ Local verification after integration:
 | Example tests (`flutter test --no-pub` in `example`) | 10 passed. |
 | Dart analysis and formatting | Passed. |
 | Pigeon binding freshness (`tool/check_pigeon.sh`) | Passed with the installed Flutter SDK. |
-| Swift transport (`sh tool/ios_download_tests/run.sh`) | 11 passed. |
+| Swift transport (`sh tool/ios_download_tests/run.sh`) | 15 passed. |
 | Android native tests (`:plugin:testDebugUnitTest`) | 96 passed across 17 suites. |
 | Android lint (`:plugin:lintDebug`) | Passed. |
 
@@ -73,6 +73,8 @@ The permanent Android stress tests cover 100,000 geometry calculations, 801 queu
 The first Sol review found three gaps: valid Unicode hosts, stale alarm generations, and alarms persisted by older app versions. The second review found that persisted legacy workers also needed generation zero. Each finding received a fix and regression coverage. The third fresh review reported no findings after checking the complete diff.
 
 The separate standards review found no documented-standard violations. The comment review corrected stale source-snapshot and lock descriptions. CI results are attached to the pull request.
+
+The first iOS CI build caught a deployment-target mismatch: the initial file writer required iOS 13.4, while the package supports iOS 13.0. The transport now uses `OutputStream` and handles partial writes and write errors without raising the deployment target. The Swift harness covers those write paths. A fresh focused Sol review of this correction reported no findings.
 
 ## Verification boundaries
 

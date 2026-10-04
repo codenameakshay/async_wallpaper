@@ -15,6 +15,26 @@ enum WallpaperDownloadTransportError: Error, Equatable {
   case transportFailure
 }
 
+enum WallpaperDownloadFileWriter {
+  static func writeAll(
+    _ data: Data,
+    write: (UnsafePointer<UInt8>, Int) throws -> Int
+  ) throws {
+    try data.withUnsafeBytes { buffer in
+      guard let baseAddress = buffer.bindMemory(to: UInt8.self).baseAddress else { return }
+      var written = 0
+      while written < buffer.count {
+        let remaining = buffer.count - written
+        let count = try write(baseAddress.advanced(by: written), remaining)
+        guard count > 0, count <= remaining else {
+          throw WallpaperDownloadTransportError.temporaryFileFailure
+        }
+        written += count
+      }
+    }
+  }
+}
+
 private func isSecureHttpsUrl(_ url: URL?) -> Bool {
   guard let url,
     let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -68,7 +88,7 @@ private final class WallpaperDownloadWorker: NSObject, URLSessionDataDelegate, @
   private let completion: (Result<URL, Error>) -> Void
   private var task: URLSessionDataTask?
   private var temporaryFile: URL?
-  private var fileHandle: FileHandle?
+  private var fileOutputStream: OutputStream?
   private var receivedBytes = 0
   private var receivedHttpResponse = false
   private var completed = false
@@ -144,11 +164,18 @@ private final class WallpaperDownloadWorker: NSObject, URLSessionDataDelegate, @
         throw WallpaperDownloadTransportError.temporaryFileFailure
       }
       temporaryFile = url
-      fileHandle = try FileHandle(forWritingTo: url)
+      guard let outputStream = OutputStream(toFileAtPath: url.path, append: false) else {
+        throw WallpaperDownloadTransportError.temporaryFileFailure
+      }
+      fileOutputStream = outputStream
+      outputStream.open()
+      guard outputStream.streamStatus == .open else {
+        throw outputStream.streamError ?? WallpaperDownloadTransportError.temporaryFileFailure
+      }
       receivedHttpResponse = true
       completionHandler(.allow)
     } catch {
-      finish(.failure(WallpaperDownloadTransportError.temporaryFileFailure))
+      finish(.failure(error))
       completionHandler(.cancel)
     }
   }
@@ -180,11 +207,22 @@ private final class WallpaperDownloadWorker: NSObject, URLSessionDataDelegate, @
       task?.cancel()
       return
     }
+    guard let outputStream = fileOutputStream else {
+      finish(.failure(WallpaperDownloadTransportError.temporaryFileFailure))
+      task?.cancel()
+      return
+    }
     do {
-      try fileHandle?.write(contentsOf: data)
+      try WallpaperDownloadFileWriter.writeAll(data) { buffer, length in
+        let count = outputStream.write(buffer, maxLength: length)
+        guard count > 0 else {
+          throw outputStream.streamError ?? WallpaperDownloadTransportError.temporaryFileFailure
+        }
+        return count
+      }
       receivedBytes += data.count
     } catch {
-      finish(.failure(WallpaperDownloadTransportError.temporaryFileFailure))
+      finish(.failure(error))
       task?.cancel()
     }
   }
@@ -207,8 +245,8 @@ private final class WallpaperDownloadWorker: NSObject, URLSessionDataDelegate, @
   private func finish(_ result: Result<URL, Error>) {
     guard !completed else { return }
     completed = true
-    try? fileHandle?.close()
-    fileHandle = nil
+    fileOutputStream?.close()
+    fileOutputStream = nil
 
     if case .failure = result, let temporaryFile {
       try? FileManager.default.removeItem(at: temporaryFile)

@@ -6,6 +6,78 @@ import XCTest
 #endif
 
 final class DownloadTransportTests: XCTestCase {
+  func testFileWriterRetriesPartialWrites() throws {
+    let expected = Data([1, 2, 3, 4, 5])
+    var actual = Data()
+    var writeCalls = 0
+
+    try WallpaperDownloadFileWriter.writeAll(expected) { buffer, length in
+      writeCalls += 1
+      let count = min(2, length)
+      actual.append(contentsOf: UnsafeBufferPointer(start: buffer, count: count))
+      return count
+    }
+
+    XCTAssertEqual(actual, expected)
+    XCTAssertEqual(writeCalls, 3)
+  }
+
+  func testFileWriterRejectsNonpositiveWriteCount() {
+    for count in [0, -1] {
+      XCTAssertThrowsError(
+        try WallpaperDownloadFileWriter.writeAll(Data([1])) { _, _ in count }
+      ) { error in
+        XCTAssertEqual(error as? WallpaperDownloadTransportError, .temporaryFileFailure)
+      }
+    }
+  }
+
+  func testFileWriterStopsAfterPartialWriteFailure() {
+    let expected = Data([1, 2, 3, 4])
+    var actual = Data()
+    var writeCalls = 0
+
+    XCTAssertThrowsError(
+      try WallpaperDownloadFileWriter.writeAll(expected) { buffer, length in
+        writeCalls += 1
+        if writeCalls == 1 {
+          actual.append(contentsOf: UnsafeBufferPointer(start: buffer, count: 2))
+          return 2
+        }
+        return -1
+      }
+    ) { error in
+      XCTAssertEqual(error as? WallpaperDownloadTransportError, .temporaryFileFailure)
+    }
+
+    XCTAssertEqual(actual, Data([1, 2]))
+    XCTAssertEqual(writeCalls, 2)
+  }
+
+  func testFileWriterPropagatesWriteErrors() {
+    let expected = NSError(domain: "test-output-stream", code: 7)
+    var actual = Data()
+    var writeCalls = 0
+
+    XCTAssertThrowsError(
+      try WallpaperDownloadFileWriter.writeAll(Data([1, 2, 3])) { buffer, length in
+        writeCalls += 1
+        if writeCalls == 1 {
+          actual.append(contentsOf: UnsafeBufferPointer(start: buffer, count: min(2, length)))
+          return min(2, length)
+        }
+        throw expected
+      }
+    ) { error in
+      let actual = error as NSError
+      XCTAssertEqual(actual.domain, expected.domain)
+      XCTAssertEqual(actual.code, expected.code)
+    }
+
+    XCTAssertEqual(actual, Data([1, 2]))
+    XCTAssertEqual(writeCalls, 2)
+  }
+
   func testDefaultLimitMatchesAndroidDownloadLimit() {
     XCTAssertEqual(WallpaperDownloadTransport.maximumDownloadBytes, 64 * 1024 * 1024)
   }
@@ -242,6 +314,22 @@ final class StubURLProtocol: URLProtocol {
 
 XCTMain([
   testCase([
+    (
+      "testFileWriterRetriesPartialWrites",
+      DownloadTransportTests.testFileWriterRetriesPartialWrites
+    ),
+    (
+      "testFileWriterRejectsNonpositiveWriteCount",
+      DownloadTransportTests.testFileWriterRejectsNonpositiveWriteCount
+    ),
+    (
+      "testFileWriterStopsAfterPartialWriteFailure",
+      DownloadTransportTests.testFileWriterStopsAfterPartialWriteFailure
+    ),
+    (
+      "testFileWriterPropagatesWriteErrors",
+      DownloadTransportTests.testFileWriterPropagatesWriteErrors
+    ),
     (
       "testDefaultLimitMatchesAndroidDownloadLimit",
       DownloadTransportTests.testDefaultLimitMatchesAndroidDownloadLimit

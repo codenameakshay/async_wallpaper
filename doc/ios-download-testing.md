@@ -6,6 +6,10 @@ Run the Foundation-only transport tests on Linux or macOS with:
 sh tool/ios_download_tests/run.sh
 ```
 
+On macOS, the runner uses the Xcode installation selected by `xcode-select`
+to locate the macOS SDK and XCTest framework. It runs the discovered XCTest
+suite and returns failure if no tests run or any test fails.
+
 The tests cover HTTPS redirect policy, HTTP status handling, streaming size
 limits, empty bodies, partial writes, write failures, temporary-file cleanup,
 and exactly-once completion. The

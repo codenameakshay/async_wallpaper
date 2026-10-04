@@ -1,10 +1,17 @@
 import Foundation
 import XCTest
 
+#if canImport(ObjectiveC)
+  import Darwin
+#endif
+
 #if canImport(FoundationNetworking)
   import FoundationNetworking
 #endif
 
+#if canImport(ObjectiveC)
+  @objcMembers
+#endif
 final class DownloadTransportTests: XCTestCase {
   func testFileWriterRetriesPartialWrites() throws {
     let expected = Data([1, 2, 3, 4, 5])
@@ -312,6 +319,23 @@ final class StubURLProtocol: URLProtocol {
   override func stopLoading() {}
 }
 
+#if canImport(ObjectiveC)
+let testSuite = DownloadTransportTests.defaultTestSuite
+let expectedExecutionCount = testSuite.testCaseCount
+guard expectedExecutionCount > 0 else {
+  fputs("XCTest discovered no download transport tests.\n", stderr)
+  exit(EXIT_FAILURE)
+}
+testSuite.run()
+guard let testRun = testSuite.testRun else {
+  fputs("XCTest did not produce a test run.\n", stderr)
+  exit(EXIT_FAILURE)
+}
+print("Executed \(testRun.executionCount) of \(expectedExecutionCount) XCTest cases.")
+let testsPassed = testRun.totalFailureCount == 0
+  && testRun.executionCount == expectedExecutionCount
+exit(testsPassed ? EXIT_SUCCESS : EXIT_FAILURE)
+#else
 XCTMain([
   testCase([
     (
@@ -376,3 +400,4 @@ XCTMain([
     ),
   ])
 ])
+#endif

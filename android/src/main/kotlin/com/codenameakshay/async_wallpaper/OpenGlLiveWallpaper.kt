@@ -22,6 +22,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -146,6 +147,41 @@ sealed class OpenGlConfigurationResult {
   data class Rejected(val error: ShaderProgramValidator.ValidationError) : OpenGlConfigurationResult()
 }
 
+internal sealed class OpenGlConfigurationStageResult {
+  data class Prepared(val configuration: OpenGlPreparedConfiguration) : OpenGlConfigurationStageResult()
+
+  data class Rejected(val error: ShaderProgramValidator.ValidationError) : OpenGlConfigurationStageResult()
+}
+
+internal class OpenGlPreparedConfiguration internal constructor(
+  internal val context: Context,
+  internal val configuration: OpenGlWallpaperConfiguration,
+  internal val rootDirectory: File?,
+  internal val generationDirectory: File?,
+  internal val texturePaths: List<String>,
+) : AutoCloseable {
+  internal val stateLock = Any()
+  internal var activated = false
+  internal var closed = false
+
+  override fun close() {
+    OpenGlWallpaperConfigurationStore.closePrepared(this)
+  }
+}
+
+internal class LoadedOpenGlConfiguration internal constructor(
+  val configuration: OpenGlWallpaperConfiguration,
+  private val generationDirectory: File?,
+) : AutoCloseable {
+  private val closed = AtomicBoolean(false)
+
+  override fun close() {
+    if (closed.compareAndSet(false, true)) {
+      generationDirectory?.let(OpenGlWallpaperConfigurationStore::releaseGeneration)
+    }
+  }
+}
+
 /**
  * A GLES2 WallpaperService whose EGL context, shader program, textures, and frame loop live on
  * one HandlerThread. It intentionally does not contact the network or invoke Flutter callbacks.
@@ -158,7 +194,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
   }
 
   private inner class OpenGlEngine(
-    configuration: OpenGlWallpaperConfiguration,
+    configuration: LoadedOpenGlConfiguration,
   ) : Engine() {
     private val renderThread = WallpaperRenderThread(applicationContext, configuration)
 
@@ -224,7 +260,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
 
   private class WallpaperRenderThread(
     context: Context,
-    initialConfiguration: OpenGlWallpaperConfiguration,
+    initialLoadedConfiguration: LoadedOpenGlConfiguration,
   ) {
     private val appContext = context.applicationContext
     private val thread = HandlerThread("AsyncWallpaper-OpenGL").apply { start() }
@@ -232,8 +268,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private val createdAtNanos = SystemClock.elapsedRealtimeNanos()
 
     // Everything below is accessed only from [handler].
-    private var configuration = initialConfiguration
-    private var frameIntervalMillis = frameIntervalFor(initialConfiguration)
+    private var loadedConfiguration = initialLoadedConfiguration
+    private val configuration: OpenGlWallpaperConfiguration
+      get() = loadedConfiguration.configuration
+    private var frameIntervalMillis = frameIntervalFor(initialLoadedConfiguration.configuration)
     private var destroyed = false
     private var visible = false
     private var surface: Surface? = null
@@ -338,19 +376,25 @@ class OpenGlLiveWallpaper : WallpaperService() {
     }
 
     /** Swaps in a newly confirmed configuration; the next frame builds a renderer for it. */
-    fun configurationChanged(newConfiguration: OpenGlWallpaperConfiguration) {
-      handler.post {
+    fun configurationChanged(newConfiguration: LoadedOpenGlConfiguration) {
+      val accepted = handler.post {
         if (destroyed) {
+          newConfiguration.close()
           return@post
         }
-        configuration = newConfiguration
-        frameIntervalMillis = frameIntervalFor(newConfiguration)
-        renderer?.release()
+        runCatching { renderer?.release() }
         renderer = null
+        val previousConfiguration = loadedConfiguration
+        loadedConfiguration = newConfiguration
+        frameIntervalMillis = frameIntervalFor(newConfiguration.configuration)
+        previousConfiguration.close()
         attachedGeneration = -1L
         fatalSurfaceGeneration = null
         invalidateScheduledFrame()
         scheduleFrame(immediate = true)
+      }
+      if (!accepted) {
+        newConfiguration.close()
       }
     }
 
@@ -370,6 +414,8 @@ class OpenGlLiveWallpaper : WallpaperService() {
         // Do not perform EGL cleanup from the service/UI thread. A bounded wait gives the queued
         // render task a chance to release resources without risking an indefinite lifecycle stall.
         runCatching { released.await(SHUTDOWN_WAIT_MILLIS, TimeUnit.MILLISECONDS) }
+      } else {
+        loadedConfiguration.close()
       }
     }
 
@@ -464,8 +510,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
       destroyed = true
       invalidateScheduledFrame()
-      renderer?.release()
+      runCatching { renderer?.release() }
       renderer = null
+      loadedConfiguration.close()
       surface = null
       attachedGeneration = -1L
     }
@@ -495,15 +542,11 @@ class OpenGlLiveWallpaper : WallpaperService() {
       } ?: false
     }
 
-    /**
-     * Validates and atomically switches the persisted configuration used by the next engine.
-     * Source data is copied into app-private files now, so the render thread never performs I/O
-     * beyond reading a bounded local texture file.
-     */
-    fun saveConfiguration(
+    /** Validates and stages bounded texture files without changing the active configuration. */
+    internal fun stageConfiguration(
       context: Context,
       configuration: OpenGlWallpaperConfiguration,
-    ): OpenGlConfigurationResult {
+    ): OpenGlConfigurationStageResult {
       val validation = ShaderProgramValidator.validate(
         fragmentShader = configuration.fragmentShader,
         textures = configuration.textures.map { source -> source.validationInput() },
@@ -511,18 +554,44 @@ class OpenGlLiveWallpaper : WallpaperService() {
         openGlEs2Available = isOpenGlEs2Supported(context),
       )
       if (validation is ShaderProgramValidator.Result.Invalid) {
-        return OpenGlConfigurationResult.Rejected(validation.error)
+        return OpenGlConfigurationStageResult.Rejected(validation.error)
       }
       return try {
-        OpenGlWallpaperConfigurationStore.save(context.applicationContext, configuration)
-        OpenGlConfigurationResult.Saved
+        OpenGlConfigurationStageResult.Prepared(
+          OpenGlWallpaperConfigurationStore.stage(context.applicationContext, configuration),
+        )
       } catch (error: TextureStorageException) {
-        OpenGlConfigurationResult.Rejected(
+        OpenGlConfigurationStageResult.Rejected(
           ShaderProgramValidator.ValidationError(
             ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_UNAVAILABLE,
             error.message ?: "Unable to read a texture source.",
           ),
         )
+      } catch (error: IOException) {
+        OpenGlConfigurationStageResult.Rejected(
+          ShaderProgramValidator.ValidationError(
+            ShaderProgramValidator.ErrorCode.CONFIGURATION_STORE_FAILED,
+            error.message ?: "Unable to persist the OpenGL wallpaper configuration.",
+          ),
+        )
+      } catch (error: SecurityException) {
+        OpenGlConfigurationStageResult.Rejected(
+          ShaderProgramValidator.ValidationError(
+            ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_UNAVAILABLE,
+            "Permission to read a texture source was denied.",
+          ),
+        )
+      }
+    }
+
+    /** Commits a staged configuration after its caller has passed the foreground/activity check. */
+    internal fun activatePreparedConfiguration(
+      context: Context,
+      prepared: OpenGlPreparedConfiguration,
+    ): OpenGlConfigurationResult {
+      return try {
+        OpenGlWallpaperConfigurationStore.activate(context.applicationContext, prepared)
+        OpenGlConfigurationResult.Saved
       } catch (error: IOException) {
         OpenGlConfigurationResult.Rejected(
           ShaderProgramValidator.ValidationError(
@@ -533,10 +602,23 @@ class OpenGlLiveWallpaper : WallpaperService() {
       } catch (error: SecurityException) {
         OpenGlConfigurationResult.Rejected(
           ShaderProgramValidator.ValidationError(
-            ShaderProgramValidator.ErrorCode.TEXTURE_SOURCE_UNAVAILABLE,
-            "Permission to read a texture source was denied.",
+            ShaderProgramValidator.ErrorCode.CONFIGURATION_STORE_FAILED,
+            "Permission to persist the OpenGL wallpaper configuration was denied.",
           ),
         )
+      }
+    }
+
+    /** Compatibility entry point for callers that do not need a separate Activity recheck. */
+    fun saveConfiguration(
+      context: Context,
+      configuration: OpenGlWallpaperConfiguration,
+    ): OpenGlConfigurationResult {
+      return when (val staged = stageConfiguration(context, configuration)) {
+        is OpenGlConfigurationStageResult.Rejected -> OpenGlConfigurationResult.Rejected(staged.error)
+        is OpenGlConfigurationStageResult.Prepared -> staged.configuration.use { prepared ->
+          activatePreparedConfiguration(context, prepared)
+        }
       }
     }
 
@@ -564,7 +646,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
 }
 
 /** Persists a renderable configuration in the application-private files directory. */
-private object OpenGlWallpaperConfigurationStore {
+internal object OpenGlWallpaperConfigurationStore {
   private const val PREFERENCES_NAME = "async_wallpaper.opengl"
   private const val KEY_SHADER = "fragment_shader"
   private const val KEY_FRAME_RATE = "frame_rate"
@@ -572,23 +654,26 @@ private object OpenGlWallpaperConfigurationStore {
   private const val KEY_TEXTURE_PATH_PREFIX = "texture_path_"
   private const val TEXTURE_DIRECTORY = "async_wallpaper_opengl"
   private const val TEXTURE_FILE_SUFFIX = ".texture"
-  // Separate Flutter engines have separate operation queues, so serialize configuration I/O process-wide.
+  // Staging reads are deliberately outside this lock; only preference snapshots and commits use it.
   private val configurationLock = ReentrantLock()
 
-  fun load(context: Context): OpenGlWallpaperConfiguration = configurationLock.withLock {
+  fun load(context: Context): LoadedOpenGlConfiguration = configurationLock.withLock {
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    val shader = preferences.getString(KEY_SHADER, null) ?: return@withLock defaultConfiguration()
+    val shader = preferences.getString(KEY_SHADER, null)
+      ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
     val frameRate = preferences.getInt(KEY_FRAME_RATE, OpenGlWallpaperConfiguration.DEFAULT_FRAME_RATE)
     val count = preferences.getInt(KEY_TEXTURE_COUNT, 0)
     if (count !in 0..ShaderProgramValidator.MAX_TEXTURE_COUNT) {
-      return@withLock defaultConfiguration()
+      return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
     }
     val textures = ArrayList<GlTextureSource>(count)
     repeat(count) { index ->
       val path = preferences.getString("$KEY_TEXTURE_PATH_PREFIX$index", null)
-        ?: return@withLock defaultConfiguration()
+        ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
       textures += GlTextureSource.FilePath(path)
     }
+    val generationDirectory = generationDirectoryFor(context, textures, count)
+      ?: if (count == 0) null else return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
     val configuration = OpenGlWallpaperConfiguration(shader, textures, frameRate)
     val validation = ShaderProgramValidator.validate(
       fragmentShader = configuration.fragmentShader,
@@ -596,13 +681,27 @@ private object OpenGlWallpaperConfigurationStore {
       frameRate = configuration.frameRate.toLong(),
       openGlEs2Available = true,
     )
-    if (validation.isValid) configuration else defaultConfiguration()
+    if (validation.isValid) {
+      generationDirectory?.let(OpenGlGenerationLeases::acquire)
+      LoadedOpenGlConfiguration(configuration, generationDirectory)
+    } else {
+      LoadedOpenGlConfiguration(defaultConfiguration(), null)
+    }
   }
 
   @Throws(IOException::class, TextureStorageException::class)
-  fun save(context: Context, configuration: OpenGlWallpaperConfiguration) = configurationLock.withLock {
+  fun stage(context: Context, configuration: OpenGlWallpaperConfiguration): OpenGlPreparedConfiguration {
+    if (configuration.textures.isEmpty()) {
+      return OpenGlPreparedConfiguration(
+        context,
+        configuration,
+        File(context.filesDir, TEXTURE_DIRECTORY),
+        null,
+        emptyList(),
+      )
+    }
     val rootDirectory = File(context.filesDir, TEXTURE_DIRECTORY)
-    if (!rootDirectory.exists() && !rootDirectory.mkdirs()) {
+    if (!rootDirectory.isDirectory && !rootDirectory.mkdirs() && !rootDirectory.isDirectory) {
       throw IOException("Unable to create the OpenGL texture directory.")
     }
     if (!rootDirectory.isDirectory) {
@@ -612,14 +711,11 @@ private object OpenGlWallpaperConfigurationStore {
       rootDirectory,
       "$OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX${UUID.randomUUID()}",
     )
-    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    val previousPreferences = preferences.all
-    var committed = false
+    OpenGlGenerationLeases.registerStaged(generationDirectory)
     try {
       if (!generationDirectory.mkdir()) {
         throw IOException("Unable to allocate OpenGL texture storage.")
       }
-
       val persistedTextures = configuration.textures.mapIndexed { index, source ->
         val bytes = readSource(context, source)
         val destination = File(generationDirectory, "$index$TEXTURE_FILE_SUFFIX")
@@ -630,42 +726,114 @@ private object OpenGlWallpaperConfigurationStore {
         }
         destination.absolutePath
       }
+      return OpenGlPreparedConfiguration(
+        context = context,
+        configuration = OpenGlWallpaperConfiguration(
+          configuration.fragmentShader,
+          persistedTextures.map(GlTextureSource::FilePath),
+          configuration.frameRate,
+        ),
+        rootDirectory = rootDirectory,
+        generationDirectory = generationDirectory,
+        texturePaths = persistedTextures,
+      )
+    } catch (error: Exception) {
+      OpenGlGenerationLeases.abandonStaged(generationDirectory)
+      deleteOpenGlGenerationDirectory(rootDirectory, generationDirectory)
+      throw error
+    }
+  }
 
-      val editor = preferences.edit()
-        .putString(KEY_SHADER, configuration.fragmentShader)
-        .putInt(KEY_FRAME_RATE, configuration.frameRate)
-        .putInt(KEY_TEXTURE_COUNT, persistedTextures.size)
-      repeat(ShaderProgramValidator.MAX_TEXTURE_COUNT) { index ->
-        val path = persistedTextures.getOrNull(index)
-        if (path == null) {
-          editor.remove("$KEY_TEXTURE_PATH_PREFIX$index")
-        } else {
-          editor.putString("$KEY_TEXTURE_PATH_PREFIX$index", path)
+  @Throws(IOException::class)
+  fun activate(context: Context, prepared: OpenGlPreparedConfiguration) {
+    synchronized(prepared.stateLock) {
+      if (prepared.closed || prepared.activated) {
+        throw IOException("The staged OpenGL configuration is no longer available.")
+      }
+      if (context.filesDir.canonicalFile != prepared.context.filesDir.canonicalFile) {
+        throw IOException("The staged OpenGL configuration belongs to another application.")
+      }
+      configurationLock.withLock {
+        val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        val previousPreferences = preferences.all
+        val editor = preferences.edit()
+          .putString(KEY_SHADER, prepared.configuration.fragmentShader)
+          .putInt(KEY_FRAME_RATE, prepared.configuration.frameRate)
+          .putInt(KEY_TEXTURE_COUNT, prepared.texturePaths.size)
+        repeat(ShaderProgramValidator.MAX_TEXTURE_COUNT) { index ->
+          val path = prepared.texturePaths.getOrNull(index)
+          if (path == null) {
+            editor.remove("$KEY_TEXTURE_PATH_PREFIX$index")
+          } else {
+            editor.putString("$KEY_TEXTURE_PATH_PREFIX$index", path)
+          }
         }
-      }
-      if (!editor.commit()) {
-        restoreConfigurationPreferences(preferences, previousPreferences)
-        throw IOException("Unable to persist the OpenGL wallpaper configuration.")
-      }
-      committed = true
-    } finally {
-      if (!committed) {
-        deleteOpenGlGenerationDirectory(rootDirectory, generationDirectory)
+        if (!editor.commit()) {
+          restoreConfigurationPreferences(preferences, previousPreferences)
+          throw IOException("Unable to persist the OpenGL wallpaper configuration.")
+        }
+        prepared.activated = true
       }
     }
+  }
 
-    // The just-committed preferences point at [generationDirectory]. Until commit succeeds, old
-    // generations remain untouched so a failed configuration cannot strand the active wallpaper.
-    rootDirectory.listFiles()
-      ?.asSequence()
-      ?.filter { directory ->
-        directory.isDirectory &&
-          directory.name.startsWith(OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX) &&
-          directory != generationDirectory
+  fun closePrepared(prepared: OpenGlPreparedConfiguration) {
+    val shouldCleanup = synchronized(prepared.stateLock) {
+      if (prepared.closed) {
+        return
       }
-      ?.forEach { directory ->
-        deleteOpenGlGenerationDirectory(rootDirectory, directory)
+      prepared.closed = true
+      prepared.generationDirectory?.let(OpenGlGenerationLeases::abandonStaged)
+      prepared.activated
+    }
+    val root = prepared.rootDirectory ?: return
+    if (shouldCleanup) {
+      cleanupObsoleteGenerations(prepared.context, root)
+    } else {
+      prepared.generationDirectory?.let { directory -> deleteOpenGlGenerationDirectory(root, directory) }
+    }
+  }
+
+  fun releaseGeneration(directory: File) {
+    OpenGlGenerationLeases.release(directory)
+  }
+
+  private fun cleanupObsoleteGenerations(context: Context, rootDirectory: File) {
+    val candidates = configurationLock.withLock {
+      val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+      val count = preferences.getInt(KEY_TEXTURE_COUNT, 0)
+      val activeDirectory = if (count in 1..ShaderProgramValidator.MAX_TEXTURE_COUNT) {
+        preferences.getString("${KEY_TEXTURE_PATH_PREFIX}0", null)?.let { File(it).parentFile?.canonicalFile }
+      } else {
+        null
       }
+      val protected = OpenGlGenerationLeases.protectedDirectories()
+      obsoleteOpenGlGenerationDirectories(rootDirectory, activeDirectory, protected)
+    }
+    candidates.forEach { directory -> deleteOpenGlGenerationDirectory(rootDirectory, directory) }
+  }
+
+  private fun generationDirectoryFor(
+    context: Context,
+    textures: List<GlTextureSource>,
+    count: Int,
+  ): File? {
+    if (count == 0) {
+      return null
+    }
+    val root = File(context.filesDir, TEXTURE_DIRECTORY).canonicalFile
+    val paths = textures.map { source -> (source as? GlTextureSource.FilePath)?.path ?: return null }
+    val directory = File(paths.first()).parentFile?.canonicalFile ?: return null
+    if (directory.parentFile != root || !directory.name.startsWith(OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX)) {
+      return null
+    }
+    if (paths.withIndex().any { (index, path) -> File(path).canonicalFile != File(directory, "$index$TEXTURE_FILE_SUFFIX").canonicalFile }) {
+      return null
+    }
+    if (paths.any { path -> !File(path).isFile || !File(path).canRead() }) {
+      return null
+    }
+    return directory
   }
 
   private fun restoreConfigurationPreferences(
@@ -731,6 +899,23 @@ private object OpenGlWallpaperConfigurationStore {
 private class TextureStorageException(message: String) : IOException(message)
 
 private const val OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX = "configuration-"
+
+internal fun obsoleteOpenGlGenerationDirectories(
+  rootDirectory: File,
+  activeDirectory: File?,
+  protectedDirectories: Set<File>,
+): List<File> {
+  val active = activeDirectory?.canonicalFile
+  val protected = protectedDirectories.mapTo(HashSet()) { directory -> directory.canonicalFile }
+  return rootDirectory.listFiles()
+    ?.filter { directory ->
+      directory.isDirectory &&
+        directory.name.startsWith(OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX) &&
+        directory.canonicalFile != active &&
+        directory.canonicalFile !in protected
+    }
+    .orEmpty()
+}
 
 /**
  * Deletes one generated configuration directory only when it is a direct child of [rootDirectory].

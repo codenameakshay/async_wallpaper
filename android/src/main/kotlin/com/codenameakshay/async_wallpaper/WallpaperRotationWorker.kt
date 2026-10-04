@@ -9,7 +9,20 @@ internal class WallpaperRotationWorker(
   params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
   override suspend fun doWork(): Result {
-    return if (WallpaperRotationRunner.runNext(applicationContext)) {
+    val storedGeneration = inputData.getLong(WallpaperRotationScheduler.INPUT_GENERATION_KEY, NO_GENERATION)
+      .takeUnless { it == NO_GENERATION }
+    val generation = expectedRotationGeneration(storedGeneration)
+    val reason = inputData.getString(WallpaperRotationScheduler.INPUT_REASON_KEY)
+    val succeeded = if (reason == null) {
+      WallpaperRotationRunner.runNext(applicationContext, generation) { !isStopped }
+    } else {
+      WallpaperRotationRunner.reconcile(
+        applicationContext,
+        reason,
+        generation,
+      ) { !isStopped }
+    }
+    return if (succeeded) {
       Result.success()
     } else {
       // The configured interval, charging, and time-of-day triggers already own the retry cadence.
@@ -18,4 +31,13 @@ internal class WallpaperRotationWorker(
       Result.failure()
     }
   }
+
+  private companion object {
+    private const val NO_GENERATION = Long.MIN_VALUE
+  }
+}
+
+/** Jobs persisted by pre-generation versions belong to the store's legacy generation zero. */
+internal fun expectedRotationGeneration(inputGeneration: Long?): Long {
+  return inputGeneration ?: WallpaperRotationScheduler.LEGACY_ALARM_GENERATION
 }

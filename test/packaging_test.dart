@@ -135,6 +135,7 @@ void main() {
     for (final sourceName in <String>[
       'AsyncWallpaperPlugin.swift',
       'PigeonApi.g.swift',
+      'WallpaperDownloadTransport.swift',
     ]) {
       final spmSource = File(
         'ios/async_wallpaper/Sources/async_wallpaper/$sourceName',

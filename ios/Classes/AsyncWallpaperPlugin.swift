@@ -1,5 +1,6 @@
 import Flutter
 import Foundation
+import ImageIO
 import Photos
 import UIKit
 
@@ -100,20 +101,41 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
         return
       }
 
-      URLSession.shared.dataTask(with: remoteUrl) { data, _, error in
-        guard error == nil, let data, !data.isEmpty else {
+      WallpaperDownloadTransport().download(from: remoteUrl) { result in
+        guard case .success(let imageUrl) = result else {
+          self.completeOnMain(.success(false), completion)
+          return
+        }
+        guard self.isValidImage(at: imageUrl) else {
+          try? FileManager.default.removeItem(at: imageUrl)
           self.completeOnMain(.success(false), completion)
           return
         }
 
         PHPhotoLibrary.shared().performChanges({
           let creationRequest = PHAssetCreationRequest.forAsset()
-          creationRequest.addResource(with: .photo, data: data, options: nil)
+          creationRequest.addResource(with: .photo, fileURL: imageUrl, options: nil)
         }) { saved, _ in
+          try? FileManager.default.removeItem(at: imageUrl)
           self.completeOnMain(.success(saved), completion)
         }
-      }.resume()
+      }
     }
+  }
+
+  private func isValidImage(at url: URL) -> Bool {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+      CGImageSourceGetCount(source) > 0
+    else {
+      return false
+    }
+    let thumbnailOptions =
+      [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceThumbnailMaxPixelSize: 2048,
+        kCGImageSourceShouldCacheImmediately: true,
+      ] as CFDictionary
+    return CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) != nil
   }
 
   func startWallpaperRotation(

@@ -41,10 +41,90 @@ class RotationStartTest {
 
   @Test
   fun `scheduled rotation waits one interval because start already applied a wallpaper`() {
-    val request = WallpaperRotationScheduler.rotationRequest(intervalMinutes = 30, requiresCharging = true)
+    val request = WallpaperRotationScheduler.rotationRequest(
+      intervalMinutes = 30,
+      requiresCharging = true,
+      generation = 42L,
+    )
 
     assertEquals(TimeUnit.MINUTES.toMillis(30), request.workSpec.initialDelay)
     assertEquals(TimeUnit.MINUTES.toMillis(30), request.workSpec.intervalDuration)
     assertTrue(request.workSpec.constraints.requiresCharging())
+    assertEquals(42L, request.workSpec.input.getLong(WallpaperRotationScheduler.INPUT_GENERATION_KEY, -1L))
+  }
+
+  @Test
+  fun `cancelled old rotation work cannot advance a replacement playlist`() {
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = 41L,
+        currentGeneration = 42L,
+        isStillRequested = false,
+      ),
+    )
+    assertTrue(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = 42L,
+        currentGeneration = 42L,
+        isStillRequested = true,
+      ),
+    )
+  }
+
+  @Test
+  fun `already dispatched alarm from previous configuration cannot advance replacement playlist`() {
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = 41L,
+        currentGeneration = 42L,
+        isStillRequested = true,
+      ),
+    )
+  }
+
+  @Test
+  fun `legacy unstamped alarm belongs to generation zero only`() {
+    val legacyGeneration = WallpaperRotationScheduler.LEGACY_ALARM_GENERATION
+    assertTrue(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = legacyGeneration,
+        currentGeneration = 0L,
+        isStillRequested = true,
+      ),
+    )
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = legacyGeneration,
+        currentGeneration = 1L,
+        isStillRequested = true,
+      ),
+    )
+  }
+
+  @Test
+  fun `legacy worker without stored generation belongs to generation zero only`() {
+    val expectedGeneration = expectedRotationGeneration(null)
+    assertEquals(0L, expectedGeneration)
+    assertTrue(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = expectedGeneration,
+        currentGeneration = 0L,
+        isStillRequested = true,
+      ),
+    )
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = expectedGeneration,
+        currentGeneration = 1L,
+        isStillRequested = true,
+      ),
+    )
   }
 }

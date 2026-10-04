@@ -3,6 +3,8 @@ package com.codenameakshay.async_wallpaper
 import android.content.Context
 import androidx.core.content.edit
 import org.json.JSONArray
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 internal data class StoredWallpaperRotationConfig(
   val localSources: List<String>,
@@ -23,6 +25,8 @@ internal class WallpaperRotationStore(context: Context) {
   private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   fun saveConfig(config: StoredWallpaperRotationConfig) {
+    val currentGeneration = getGeneration()
+    val nextGeneration = if (currentGeneration == Long.MAX_VALUE) 1L else currentGeneration + 1L
     prefs.edit {
       putBoolean(KEY_IS_RUNNING, true)
       putString(KEY_LOCAL_SOURCES, JSONArray(config.localSources).toString())
@@ -38,6 +42,7 @@ internal class WallpaperRotationStore(context: Context) {
       putInt(KEY_CURRENT_INDEX, 0)
       putString(KEY_SHUFFLE_ORDER, null)
       putString(KEY_LAST_ERROR, null)
+      putLong(KEY_GENERATION, nextGeneration)
     }
   }
 
@@ -76,10 +81,6 @@ internal class WallpaperRotationStore(context: Context) {
 
   fun getCurrentIndex(): Int = prefs.getInt(KEY_CURRENT_INDEX, 0)
 
-  fun setCurrentIndex(index: Int) {
-    prefs.edit { putInt(KEY_CURRENT_INDEX, index) }
-  }
-
   /**
    * Persists the cursor and (optionally) the next shuffle order in one edit.
    *
@@ -106,6 +107,8 @@ internal class WallpaperRotationStore(context: Context) {
   }
 
   fun getNextRunEpochMs(): Long = prefs.getLong(KEY_NEXT_RUN_EPOCH_MS, 0L)
+
+  fun getGeneration(): Long = prefs.getLong(KEY_GENERATION, 0L)
 
   fun setLastError(error: String?) {
     prefs.edit { putString(KEY_LAST_ERROR, error) }
@@ -169,6 +172,14 @@ internal class WallpaperRotationStore(context: Context) {
     private const val KEY_CURRENT_INDEX = "current_index"
     private const val KEY_SHUFFLE_ORDER = "shuffle_order"
     private const val KEY_NEXT_RUN_EPOCH_MS = "next_run_epoch_ms"
+    private const val KEY_GENERATION = "generation"
     private const val KEY_LAST_ERROR = "last_error"
   }
+}
+
+/** Serializes configuration changes, cache replacement, and scheduled applies across entry points. */
+internal object WallpaperRotationCoordinator {
+  private val transactionLock = ReentrantLock()
+
+  fun <T> withLock(action: () -> T): T = transactionLock.withLock(action)
 }

@@ -10,7 +10,11 @@ internal object DownloadImageFormat {
     if (httpMimeType != null && !httpMimeType.startsWith("image/")) {
       return null
     }
-    return selectionFor(decodedMimeType) ?: selectionFor(httpContentType)
+    return if (normalize(decodedMimeType) != null) {
+      selectionFor(decodedMimeType)
+    } else {
+      selectionFor(httpContentType)
+    }
   }
 
   private fun selectionFor(value: String?): Selection? {

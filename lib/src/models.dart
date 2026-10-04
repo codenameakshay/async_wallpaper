@@ -62,6 +62,9 @@ class WallpaperSource {
     final value = _bytes;
     return value == null ? null : Uint8List.fromList(value);
   }
+
+  /// The byte source length without copying the underlying data.
+  int? get byteLength => _bytes?.length;
 }
 
 /// How a static wallpaper image should fill a display.

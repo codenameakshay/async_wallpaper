@@ -143,3 +143,6 @@ jobs:
       - name: Build example for an iOS simulator
         working-directory: example
         run: flutter build ios --simulator --debug
+
+      - name: Test bounded iOS download transport
+        run: sh tool/ios_download_tests/run.sh

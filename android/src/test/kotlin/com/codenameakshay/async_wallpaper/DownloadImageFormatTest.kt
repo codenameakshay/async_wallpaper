@@ -24,6 +24,7 @@ class DownloadImageFormatTest {
   @Test
   fun `unknown or non-image types are rejected`() {
     assertNull(DownloadImageFormat.choose("image/tiff", "image/tiff"))
+    assertNull(DownloadImageFormat.choose("image/tiff", "image/jpeg"))
     assertNull(DownloadImageFormat.choose("image/png", "text/html"))
   }
 }

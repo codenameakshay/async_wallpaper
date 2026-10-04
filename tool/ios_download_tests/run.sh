@@ -11,10 +11,14 @@ case $(uname -s) in
     MACOS_SDK_PATH=$(xcrun --sdk macosx --show-sdk-path)
     MACOS_PLATFORM_PATH=$(xcrun --sdk macosx --show-sdk-platform-path)
     XCTEST_FRAMEWORKS="$MACOS_PLATFORM_PATH/Developer/Library/Frameworks"
+    XCTEST_SWIFT_PATH="$MACOS_PLATFORM_PATH/Developer/usr/lib"
     xcrun --sdk macosx swiftc -sdk "$MACOS_SDK_PATH" \
       -F "$XCTEST_FRAMEWORKS" \
+      -I "$XCTEST_SWIFT_PATH" \
+      -L "$XCTEST_SWIFT_PATH" \
       -framework XCTest \
       -Xlinker -rpath -Xlinker "$XCTEST_FRAMEWORKS" \
+      -Xlinker -rpath -Xlinker "$XCTEST_SWIFT_PATH" \
       -swift-version 5 -o "$TEST_BINARY" \
       "$REPO_ROOT/ios/async_wallpaper/Sources/async_wallpaper/WallpaperDownloadTransport.swift" \
       "$SCRIPT_DIR/main.swift"

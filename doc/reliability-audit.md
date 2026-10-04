@@ -76,7 +76,7 @@ The separate standards review found no documented-standard violations. The comme
 
 The first iOS CI build caught a deployment-target mismatch: the initial file writer required iOS 13.4, while the package supports iOS 13.0. The transport now uses `OutputStream` and handles partial writes and write errors without raising the deployment target. The Swift harness covers those write paths. A fresh focused Sol review of this correction reported no findings.
 
-The corrected iOS simulator app built successfully in CI. The macOS transport-test launcher then needed explicit XCTest framework paths and Darwin test discovery. The runner now uses the selected Xcode SDK and checks that the discovered suite executes completely without failures.
+The corrected iOS simulator app built successfully in CI. The macOS transport-test launcher then needed explicit XCTest framework and Swift module paths, plus Darwin test discovery. The runner now uses the selected Xcode SDK and checks that the discovered suite executes completely without failures.
 
 ## Verification boundaries
 

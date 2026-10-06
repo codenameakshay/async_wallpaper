@@ -198,17 +198,11 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
         completion(false)
       }
     } else {
-      let status = PHPhotoLibrary.authorizationStatus()
-      switch status {
-      case .authorized:
-        completion(true)
-      case .notDetermined:
-        PHPhotoLibrary.requestAuthorization { newStatus in
-          completion(newStatus == .authorized)
-        }
-      default:
-        completion(false)
-      }
+      // The legacy authorization API requests read/write access and requires
+      // NSPhotoLibraryUsageDescription. This plugin only adds assets, so let
+      // performChanges trigger the add-only prompt described by
+      // NSPhotoLibraryAddUsageDescription on iOS 13.
+      completion(true)
     }
   }
 

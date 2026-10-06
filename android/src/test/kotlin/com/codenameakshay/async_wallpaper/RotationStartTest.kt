@@ -12,31 +12,78 @@ class RotationStartTest {
   @Test
   fun `a rejected playlist keeps the cache a running rotation reads`() {
     val root = Files.createTempDirectory("rotation").toFile()
-    val cache = File(root, "wallpaper_rotation").apply { mkdirs() }
-    File(cache, "wallpaper_0.jpg").writeText("running")
+    val cache = File(root, "wallpaper_rotation")
+    val oldGeneration = File(cache, "generation-old").apply { mkdirs() }
+    File(oldGeneration, "wallpaper_0.jpg").writeText("running")
 
-    val paths = replaceDirectoryContents(cache) { emptyList() }
+    val prepared = prepareRotationGeneration(cache, "rejected") { emptyList() }
 
-    assertTrue(paths.isEmpty())
-    assertEquals("running", File(cache, "wallpaper_0.jpg").readText())
-    assertEquals(listOf("wallpaper_rotation"), root.list()!!.toList())
+    assertEquals(null, prepared)
+    assertEquals("running", File(oldGeneration, "wallpaper_0.jpg").readText())
+    assertEquals(listOf("generation-old"), cache.list()!!.toList())
   }
 
   @Test
-  fun `an accepted playlist replaces the cache and returns paths inside it`() {
+  fun `a process restart before pointer commit keeps the prior generation usable`() {
     val root = Files.createTempDirectory("rotation").toFile()
-    val cache = File(root, "wallpaper_rotation").apply { mkdirs() }
-    File(cache, "wallpaper_0.jpg").writeText("old")
+    val cache = File(root, "wallpaper_rotation")
+    val old = prepareRotationGeneration(cache, "old") { staging ->
+      File(staging, "wallpaper_0.jpg").writeText("old")
+      listOf("wallpaper_0.jpg")
+    }!!
+    val pointer = File(root, "persisted-config").apply { writeText(old.paths.single()) }
 
-    val paths = replaceDirectoryContents(cache) { staging ->
+    val replacement = prepareRotationGeneration(cache, "new") { staging ->
       File(staging, "wallpaper_1.jpg").writeText("new")
       listOf("wallpaper_1.jpg")
-    }
+    }!!
 
-    assertEquals(listOf(File(cache, "wallpaper_1.jpg").absolutePath), paths)
-    assertFalse(File(cache, "wallpaper_0.jpg").exists())
-    assertEquals("new", File(cache, "wallpaper_1.jpg").readText())
-    assertEquals(listOf("wallpaper_rotation"), root.list()!!.toList())
+    // Model process death here: the new files are durable, but the pointer was never committed.
+    val reopenedPath = pointer.readText()
+    assertEquals(old.paths.single(), reopenedPath)
+    assertEquals("old", File(reopenedPath).readText())
+    assertEquals("new", File(replacement.paths.single()).readText())
+  }
+
+  @Test
+  fun `a failed pointer commit keeps old and new generations for fresh state recovery`() {
+    val root = Files.createTempDirectory("rotation").toFile()
+    val cache = File(root, "wallpaper_rotation")
+    val old = prepareRotationGeneration(cache, "old") { staging ->
+      File(staging, "wallpaper_0.jpg").writeText("old")
+      listOf("wallpaper_0.jpg")
+    }!!
+    val pointer = File(root, "persisted-config").apply { writeText(old.paths.single()) }
+    val replacement = prepareRotationGeneration(cache, "new") { staging ->
+      File(staging, "wallpaper_1.jpg").writeText("new")
+      listOf("wallpaper_1.jpg")
+    }!!
+
+    val committed = commitRotationGeneration(cache, replacement) { false }
+
+    val reopenedPath = pointer.readText()
+    assertFalse(committed)
+    assertEquals(old.paths.single(), reopenedPath)
+    assertEquals("old", File(reopenedPath).readText())
+    assertEquals("new", File(replacement.paths.single()).readText())
+  }
+
+  @Test
+  fun `a successful pointer commit prunes old generations and keeps legacy files`() {
+    val cache = Files.createTempDirectory("rotation").resolve("wallpaper_rotation").toFile()
+    val legacy = File(cache, "wallpaper_0.jpg").apply { parentFile!!.mkdirs(); writeText("legacy") }
+    val old = File(cache, "generation-old").apply { mkdirs() }
+    val replacement = prepareRotationGeneration(cache, "new") { staging ->
+      File(staging, "wallpaper_1.jpg").writeText("new")
+      listOf("wallpaper_1.jpg")
+    }!!
+
+    val committed = commitRotationGeneration(cache, replacement) { true }
+
+    assertTrue(committed)
+    assertFalse(old.exists())
+    assertEquals("legacy", legacy.readText())
+    assertEquals("new", File(replacement.paths.single()).readText())
   }
 
   @Test
@@ -127,4 +174,51 @@ class RotationStartTest {
       ),
     )
   }
+
+  @Test
+  fun `pending schedule recovery blocks matching stale and stopped worker actions`() {
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = 42L,
+        currentGeneration = 42L,
+        isStillRequested = true,
+        schedulesPending = true,
+      ),
+    )
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = true,
+        expectedGeneration = 41L,
+        currentGeneration = 42L,
+        isStillRequested = true,
+        schedulesPending = true,
+      ),
+    )
+    assertFalse(
+      WallpaperRotationRunner.shouldApply(
+        isRunning = false,
+        expectedGeneration = null,
+        currentGeneration = 42L,
+        isStillRequested = true,
+        schedulesPending = true,
+      ),
+    )
+  }
+
+  @Test
+  fun `failed scheduler operation never clears pending recovery marker`() {
+    var markerCleared = false
+
+    val error = runCatching {
+      completeScheduleReconciliation(
+        awaitOperations = { error("WorkManager operation failed") },
+        clearPending = { markerCleared = true; true },
+      )
+    }.exceptionOrNull()
+
+    assertTrue(error is IllegalStateException)
+    assertFalse(markerCleared)
+  }
+
 }

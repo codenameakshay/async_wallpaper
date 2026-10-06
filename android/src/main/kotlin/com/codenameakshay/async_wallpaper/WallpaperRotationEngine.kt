@@ -7,9 +7,10 @@ import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.URI
 import java.util.Collections
-import java.io.IOException
+import java.util.UUID
 import kotlin.concurrent.withLock
 
 /** Why a rotation start did or did not take effect, so callers can roll back only when needed. */
@@ -24,32 +25,76 @@ internal enum class RotationStartResult {
   FAILED_AFTER_SAVE,
 }
 
-/**
- * Fills a sibling staging directory and swaps it in only when [fill] produced at least one file, so
- * a rejected playlist never deletes the cache a running rotation still reads. Returns the absolute
- * paths inside [target], or an empty list when nothing was produced or the swap failed; in both
- * cases [target] keeps its previous contents.
- */
-internal fun replaceDirectoryContents(target: File, fill: (File) -> List<String>): List<String> {
-  val parent = target.absoluteFile.parentFile
-  val staging = File(parent, "${target.name}.staging").apply { deleteRecursively(); mkdirs() }
+/** A fully-written immutable playlist directory and the paths that will be persisted for it. */
+internal data class PreparedRotationGeneration(val directory: File, val paths: List<String>)
+
+/** Writes each replacement into a new directory without mutating the currently referenced cache. */
+internal fun prepareRotationGeneration(
+  cacheRoot: File,
+  generationId: String = UUID.randomUUID().toString(),
+  fill: (File) -> List<String>,
+): PreparedRotationGeneration? {
+  if (!cacheRoot.exists() && !cacheRoot.mkdirs()) {
+    return null
+  }
+  val generation = File(cacheRoot, "generation-$generationId")
+  if (generation.exists()) {
+    return null
+  }
+  val staging = File(cacheRoot, ".staging-$generationId")
+  if (!staging.mkdirs()) {
+    return null
+  }
   val names = fill(staging)
   if (names.isEmpty()) {
     staging.deleteRecursively()
-    return emptyList()
+    return null
   }
-  val previous = File(parent, "${target.name}.previous").apply { deleteRecursively() }
-  if (target.exists() && !target.renameTo(previous)) {
+  if (!staging.renameTo(generation)) {
     staging.deleteRecursively()
-    return emptyList()
+    return null
   }
-  if (!staging.renameTo(target)) {
-    previous.renameTo(target)
-    staging.deleteRecursively()
-    return emptyList()
+  return PreparedRotationGeneration(generation, names.map { File(generation, it).absolutePath })
+}
+
+/** Remove only unreferenced generation directories after the preference pointer has committed. */
+internal fun cleanupUnusedRotationGenerations(cacheRoot: File, current: File) {
+  try {
+    val currentPath = current.canonicalFile
+    cacheRoot.listFiles().orEmpty().forEach { candidate ->
+      try {
+        if (candidate.name.startsWith(GENERATION_PREFIX) && candidate.canonicalFile != currentPath) {
+          candidate.deleteRecursively()
+        } else if (candidate.name.startsWith(STAGING_PREFIX)) {
+          candidate.deleteRecursively()
+        }
+      } catch (_: IOException) {
+        // Cache cleanup is best-effort; the committed config already points at a complete folder.
+      } catch (_: SecurityException) {
+        // Cache cleanup must not turn a successful preference commit into a failed start.
+      }
+    }
+  } catch (_: IOException) {
+    // Cache cleanup is best-effort; the committed config already points at a complete folder.
+  } catch (_: SecurityException) {
+    // Cache cleanup must not turn a successful preference commit into a failed start.
   }
-  previous.deleteRecursively()
-  return names.map { File(target, it).absolutePath }
+}
+
+private const val GENERATION_PREFIX = "generation-"
+private const val STAGING_PREFIX = ".staging-"
+
+/** Persist the playlist pointer before pruning any old or abandoned generation. */
+internal fun commitRotationGeneration(
+  cacheRoot: File,
+  prepared: PreparedRotationGeneration,
+  persistConfig: (List<String>) -> Boolean,
+): Boolean {
+  if (!persistConfig(prepared.paths)) {
+    return false
+  }
+  cleanupUnusedRotationGenerations(cacheRoot, prepared.directory)
+  return true
 }
 
 internal fun requireSuccessfulBitmapCompression(compressed: Boolean) {
@@ -80,14 +125,14 @@ internal class WallpaperRotationEngine(
     }
 
     val sources = config.sources.orEmpty()
-    val preparedFiles = prepareLocalFiles(sources)
-    if (preparedFiles.isEmpty()) {
+    val prepared = prepareLocalFiles(sources)
+    if (prepared == null) {
       store.setLastError("No valid wallpapers available for rotation.")
       return@withLock RotationStartResult.REJECTED
     }
 
     val storedConfig = StoredWallpaperRotationConfig(
-      localSources = preparedFiles,
+      localSources = prepared.paths,
       requestedSourceCount = sources.size,
       target = targetToStored(config.target),
       intervalMinutes = intervalMinutes,
@@ -98,7 +143,13 @@ internal class WallpaperRotationEngine(
       activeHoursEnd = config.activeHoursEnd?.toInt() ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_END,
       orderType = orderTypeToStored(config.orderType),
     )
-    store.saveConfig(storedConfig)
+    val saved = commitRotationGeneration(getRotationCacheDirectory(), prepared) { paths ->
+      store.saveConfig(storedConfig.copy(localSources = paths))
+    }
+    if (!saved) {
+      store.setLastError("Unable to save rotation configuration.")
+      return@withLock RotationStartResult.REJECTED
+    }
 
     val firstApplySuccess = applyNextWallpaper()
     if (!firstApplySuccess) {
@@ -184,8 +235,8 @@ internal class WallpaperRotationEngine(
     return list
   }
 
-  private fun prepareLocalFiles(sources: List<RotationSourceData?>): List<String> =
-    replaceDirectoryContents(getRotationCacheDirectory()) { stagingDir -> cacheSources(sources, stagingDir) }
+  private fun prepareLocalFiles(sources: List<RotationSourceData?>): PreparedRotationGeneration? =
+    prepareRotationGeneration(getRotationCacheDirectory()) { stagingDir -> cacheSources(sources, stagingDir) }
 
   /** Caches every loadable source into [cacheDir] and returns the cached file names. */
   private fun cacheSources(sources: List<RotationSourceData?>, cacheDir: File): List<String> {

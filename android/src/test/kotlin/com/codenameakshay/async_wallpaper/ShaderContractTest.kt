@@ -166,6 +166,76 @@ class ShaderContractTest {
   }
 
   @Test
+  fun rejectsLoopCountersThatCanStopProgressingOrOverflow() {
+    val unsafeLoops = listOf(
+      "for (float i = 16777216; i < 16777218; i++) { gl_FragColor = vec4(i); }",
+      "for (int i = 2147483647; i <= 2147483647; i++) { gl_FragColor = vec4(1.0); }",
+      "for (int i = 2147483640; i < 2147483647; i += 100) { gl_FragColor = vec4(1.0); }",
+      "for (int i = -9223372036854775808; i < 9223372036854775807; i++) { gl_FragColor = vec4(1.0); }",
+      "for (int i = 32760; i <= 32767; i++) { gl_FragColor = vec4(1.0); }",
+      "for (int i = 0; i < 1; i += 256) { gl_FragColor = vec4(1.0); }",
+      "for (int i = 2; i < 1; i += 65536) { gl_FragColor = vec4(1.0); }",
+      "for (int i = 0; i > 1; i -= 65536) { gl_FragColor = vec4(1.0); }",
+    )
+
+    unsafeLoops.forEach { loop ->
+      assertEquals(
+        loop,
+        ShaderProgramValidator.ErrorCode.SHADER_DYNAMIC_LOOP.wireCode,
+        invalidCode(
+          ShaderProgramValidator.Request(
+            fragmentShader = "precision highp float; precision highp int; void main() { $loop }",
+            frameRate = 30L,
+          ),
+        ),
+      )
+    }
+  }
+
+  @Test
+  fun acceptsSmallBoundedIntegerLoops() {
+    val source = """
+      precision mediump float;
+      precision mediump int;
+      void main() {
+        for (int i = 0; i < 4; i++) {
+          gl_FragColor = vec4(float(i));
+        }
+        for (int i = 0; i < 6; i += 2) {
+          gl_FragColor = vec4(float(i));
+        }
+        for (int i = 6; i > 0; i -= 2) {
+          gl_FragColor = vec4(float(i));
+        }
+      }
+    """.trimIndent()
+
+    assertTrue(
+      ShaderProgramValidator.validate(
+        ShaderProgramValidator.Request(fragmentShader = source, frameRate = 30L),
+    ) is ShaderProgramValidator.Result.Valid,
+    )
+  }
+
+  @Test
+  fun rejectsMediumpLoopThatCanWrapTheCounter() {
+    val source = """
+      precision mediump float;
+      precision mediump int;
+      void main() {
+        for (int i = 32760; i <= 32767; i++) {
+          gl_FragColor = vec4(1.0);
+        }
+      }
+    """.trimIndent()
+
+    assertEquals(
+      ShaderProgramValidator.ErrorCode.SHADER_DYNAMIC_LOOP.wireCode,
+      invalidCode(ShaderProgramValidator.Request(fragmentShader = source, frameRate = 30L)),
+    )
+  }
+
+  @Test
   fun deletesOnlyDirectOpenGlGenerationDirectories() {
     val root = Files.createTempDirectory("async-wallpaper-opengl-root").toFile()
     val outside = Files.createTempDirectory("async-wallpaper-opengl-outside").toFile()

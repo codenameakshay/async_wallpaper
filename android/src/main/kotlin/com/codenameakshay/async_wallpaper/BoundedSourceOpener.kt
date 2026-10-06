@@ -155,15 +155,11 @@ class BoundedSourceOpener(
   }
 
   private fun parseHttpsUri(value: String): URI {
-    val uri = try {
-      URI(value.trim())
+    return try {
+      HttpsSourceUrlParser.parse(value.trim(), allowUserInfo = true)
     } catch (error: Exception) {
       throw BoundedSourceException(ERROR_INVALID_URL, "The source URL is invalid.", error)
     }
-    if (!uri.scheme.equals(HTTPS_SCHEME, ignoreCase = true) || uri.host.isNullOrBlank()) {
-      throw BoundedSourceException(ERROR_INVALID_URL, "The source URL must be an absolute HTTPS URL.")
-    }
-    return uri
   }
 
   private fun requiredText(value: String?, name: String): String {
@@ -211,7 +207,6 @@ class BoundedSourceOpener(
     const val DEFAULT_READ_TIMEOUT_MILLIS = 20_000
     const val DEFAULT_MAX_REDIRECTS = 3
 
-    private const val HTTPS_SCHEME = "https"
     private const val CONTENT_SCHEME = "content"
     private const val HTTP_GET = "GET"
     private const val HTTP_LOCATION_HEADER = "Location"

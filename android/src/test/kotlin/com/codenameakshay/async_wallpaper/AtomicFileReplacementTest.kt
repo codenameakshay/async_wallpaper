@@ -5,6 +5,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -142,6 +143,167 @@ class AtomicFileReplacementTest {
   }
 
   @Test
+  fun `player setup must read the video and scale mode from one replacement snapshot`() {
+    val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+
+    val snapshot = repository.openActiveSnapshot()
+    try {
+      repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+      val selectedVideo = snapshot.input.readBytes().decodeToString()
+
+      assertEquals("previous-video:${VideoWallpaperScaleMode.FIT_CENTER}", "$selectedVideo:${snapshot.scaleMode}")
+    } finally {
+      snapshot.close()
+    }
+  }
+
+  @Test
+  fun `fresh repository recovers the prior mode after death between sidecar and video renames`() {
+    val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val crashSnapshot = File(directory.parentFile, "${directory.name}-crash-snapshot")
+    val repository = VideoWallpaperRepository(
+      directory,
+      acceptingValidator(),
+      SnapshotAndCrashFileSystem(directory, crashSnapshot) { destination ->
+        destination.name == "file.mp4.scale-mode"
+      },
+    )
+
+    try {
+      repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+      fail("Expected simulated process death after the sidecar rename")
+    } catch (_: SimulatedProcessDeath) {
+    }
+
+    try {
+      val restartedRepository = VideoWallpaperRepository(crashSnapshot, acceptingValidator(), HostFileSystem)
+
+      assertEquals(VideoWallpaperScaleMode.FIT_CENTER, restartedRepository.activeScaleMode())
+      assertEquals("previous-video", File(crashSnapshot, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+      assertEquals("new-video", File(crashSnapshot, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+    } finally {
+      crashSnapshot.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `committed promotion journal keeps the new mode after pending video rename`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.CENTER_CROP.name)
+    writeFile("file.mp4.promotion-journal", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+
+    assertEquals(VideoWallpaperScaleMode.CENTER_CROP, repository.activeScaleMode())
+    assertFalse(File(directory, "file.mp4.promotion-journal").exists())
+  }
+
+  @Test
+  fun `journal cleanup failure after promotion preserves committed result and blocks mutation`() {
+    val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val repository = VideoWallpaperRepository(
+      directory,
+      acceptingValidator(),
+      FailingCommittedJournalCleanupFileSystem,
+    )
+
+    val prepared = repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+
+    assertEquals(active.absolutePath, prepared.file.absolutePath)
+    assertEquals("new-video", active.readText())
+    assertEquals(VideoWallpaperScaleMode.CENTER_CROP, repository.activeScaleMode())
+    val snapshot = repository.openActiveSnapshot()
+    try {
+      assertEquals("new-video", snapshot.input.readBytes().decodeToString())
+      assertEquals(VideoWallpaperScaleMode.CENTER_CROP, snapshot.scaleMode)
+    } finally {
+      snapshot.close()
+    }
+    assertTrue(File(directory, "file.mp4.promotion-journal").exists())
+
+    try {
+      repository.preparePending("blocked-video".byteInputStream())
+      fail("Expected a retained committed journal to block mutation")
+    } catch (_: IOException) {
+    }
+    assertFalse(File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).exists())
+
+    val recoveredRepository = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+    recoveredRepository.preparePending("replacement-video".byteInputStream())
+    assertFalse(File(directory, "file.mp4.promotion-journal").exists())
+    assertEquals("replacement-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+
+    val throwingCleanupRepository = VideoWallpaperRepository(
+      directory,
+      acceptingValidator(),
+      ThrowingCommittedJournalCleanupFileSystem,
+    )
+    throwingCleanupRepository.promotePending(VideoWallpaperScaleMode.FIT_CENTER)
+    assertEquals("replacement-video", active.readText())
+    assertEquals(VideoWallpaperScaleMode.FIT_CENTER, throwingCleanupRepository.activeScaleMode())
+    assertTrue(File(directory, "file.mp4.promotion-journal").exists())
+    try {
+      throwingCleanupRepository.preparePending("still-blocked".byteInputStream())
+      fail("Expected a thrown journal cleanup failure to block mutation")
+    } catch (_: IOException) {
+    }
+  }
+
+  @Test
+  fun `failed journal recovery retains journal and prevents temporary cleanup`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.CENTER_CROP.name)
+    writeFile("file.mp4.promotion-journal", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val stale = writeFile("file.mp4.abandoned.tmp", "partial")
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), FailingRecoveryFileSystem)
+
+    try {
+      repository.cleanupTemporaryFiles()
+      fail("Expected journal restoration to fail")
+    } catch (_: IOException) {
+    }
+
+    assertTrue(File(directory, "file.mp4.promotion-journal").exists())
+    assertTrue(stale.exists())
+    assertEquals("new-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+
+    val recovered = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+    assertEquals(VideoWallpaperScaleMode.FIT_CENTER, recovered.activeScaleMode())
+    assertFalse(File(directory, "file.mp4.promotion-journal").exists())
+    assertEquals(1, recovered.cleanupTemporaryFiles())
+    assertFalse(stale.exists())
+  }
+
+  @Test
+  fun `failed journal deletion blocks the next repository mutation`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "new-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.CENTER_CROP.name)
+    writeFile("file.mp4.promotion-journal", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), FailingJournalDeletionFileSystem)
+
+    try {
+      repository.preparePending("replacement".byteInputStream())
+      fail("Expected recovery journal deletion to fail")
+    } catch (_: IOException) {
+    }
+
+    assertEquals("new-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+    assertEquals(VideoWallpaperScaleMode.FIT_CENTER, VideoScaleModePersistence.decode(
+      File(directory, "file.mp4.scale-mode").readText(),
+    ))
+    assertTrue(File(directory, "file.mp4.promotion-journal").exists())
+    assertNoTemporaryFiles()
+  }
+
+  @Test
   fun `a rejected JPEG compression is surfaced as an IO failure`() {
     try {
       requireSuccessfulBitmapCompression(false)
@@ -246,6 +408,46 @@ class AtomicFileReplacementTest {
     }
   }
 
+  private class SnapshotAndCrashFileSystem(
+    private val sourceDirectory: File,
+    private val crashSnapshot: File,
+    private val shouldCrash: (File) -> Boolean,
+  ) : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      HostFileSystem.replaceAtomically(source, destination)
+      if (shouldCrash(destination)) {
+        copyDirectory(sourceDirectory, crashSnapshot)
+        throw SimulatedProcessDeath()
+      }
+    }
+
+    override fun delete(file: File): Boolean = HostFileSystem.delete(file)
+
+    private fun copyDirectory(source: File, destination: File) {
+      destination.deleteRecursively()
+      source.walkTopDown().forEach { entry ->
+        val relativePath = entry.relativeTo(source).path
+        val copy = if (relativePath.isEmpty()) destination else File(destination, relativePath)
+        if (entry.isDirectory) {
+          check(copy.mkdirs() || copy.isDirectory)
+        } else {
+          copy.parentFile?.mkdirs()
+          Files.copy(entry.toPath(), copy.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+      }
+    }
+  }
+
+  private class SimulatedProcessDeath : Error()
+
   private class RecordingFileSystem : VideoFileSystem {
     var createTempFileCalls = 0
     var copyCalls = 0
@@ -321,6 +523,84 @@ class AtomicFileReplacementTest {
     }
 
     override fun delete(file: File): Boolean = HostFileSystem.delete(file)
+  }
+
+  private object FailingRecoveryFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      if (destination.name == "file.mp4.scale-mode") {
+        throw IOException("simulated prior mode restoration failure")
+      }
+      HostFileSystem.replaceAtomically(source, destination)
+    }
+
+    override fun delete(file: File): Boolean = HostFileSystem.delete(file)
+  }
+
+  private object FailingJournalDeletionFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      HostFileSystem.replaceAtomically(source, destination)
+    }
+
+    override fun delete(file: File): Boolean {
+      if (file.name == "file.mp4.promotion-journal") return false
+      return HostFileSystem.delete(file)
+    }
+  }
+
+  private object FailingCommittedJournalCleanupFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      HostFileSystem.replaceAtomically(source, destination)
+    }
+
+    override fun delete(file: File): Boolean {
+      if (file.name == "file.mp4.promotion-journal") return false
+      return HostFileSystem.delete(file)
+    }
+  }
+
+  private object ThrowingCommittedJournalCleanupFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      HostFileSystem.replaceAtomically(source, destination)
+    }
+
+    override fun delete(file: File): Boolean {
+      if (file.name == "file.mp4.promotion-journal") {
+        throw IOException("simulated postcommit journal cleanup failure")
+      }
+      return HostFileSystem.delete(file)
+    }
   }
 
   private class BlockingFileSystem : VideoFileSystem {

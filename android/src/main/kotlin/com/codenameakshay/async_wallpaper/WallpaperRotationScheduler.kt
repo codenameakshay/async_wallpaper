@@ -9,6 +9,7 @@ import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Operation
 import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -35,8 +36,8 @@ internal object WallpaperRotationScheduler {
   internal const val REASON_TIME_OF_DAY = "time_of_day"
   internal const val LEGACY_ALARM_GENERATION = 0L
 
-  fun schedulePeriodic(context: Context, intervalMinutes: Int) {
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+  fun schedulePeriodic(context: Context, intervalMinutes: Int): Operation {
+    return WorkManager.getInstance(context).enqueueUniquePeriodicWork(
       PERIODIC_WORK_NAME,
       ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
       rotationRequest(
@@ -47,16 +48,16 @@ internal object WallpaperRotationScheduler {
     )
   }
 
-  fun cancelPeriodic(context: Context) {
-    WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
+  fun cancelPeriodic(context: Context): Operation {
+    return WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
   }
 
   /**
    * Rotates while the device is charging. Replaces the previous always-registered
    * `ACTION_POWER_CONNECTED` receiver, which required a persistent foreground service.
    */
-  fun scheduleCharging(context: Context, intervalMinutes: Int) {
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+  fun scheduleCharging(context: Context, intervalMinutes: Int): Operation {
+    return WorkManager.getInstance(context).enqueueUniquePeriodicWork(
       CHARGING_WORK_NAME,
       ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
       rotationRequest(
@@ -83,8 +84,46 @@ internal object WallpaperRotationScheduler {
       .build()
   }
 
-  fun cancelCharging(context: Context) {
-    WorkManager.getInstance(context).cancelUniqueWork(CHARGING_WORK_NAME)
+  fun cancelCharging(context: Context): Operation {
+    return WorkManager.getInstance(context).cancelUniqueWork(CHARGING_WORK_NAME)
+  }
+
+  /** Reconciles every trigger from the current persisted config and returns durable WorkManager ops. */
+  internal fun reconcile(
+    context: Context,
+    store: WallpaperRotationStore,
+    currentConfig: StoredWallpaperRotationConfig? = store.getConfig(),
+  ): List<Operation> {
+    val config = currentConfig?.takeIf { store.isRunning() }
+    if (config == null) {
+      store.setNextRunEpochMs(0L)
+      cancelTimeOfDay(context)
+      return listOf(cancelPeriodic(context), cancelCharging(context))
+    }
+
+    val operations = mutableListOf<Operation>()
+    if (config.enableIntervalTrigger) {
+      operations += schedulePeriodic(context, config.intervalMinutes)
+      store.setNextRunEpochMs(System.currentTimeMillis() + config.intervalMinutes.toLong() * 60_000L)
+    } else {
+      operations += cancelPeriodic(context)
+      store.setNextRunEpochMs(0L)
+    }
+    if (config.enableChargingTrigger) {
+      operations += scheduleCharging(context, config.intervalMinutes)
+    } else {
+      operations += cancelCharging(context)
+    }
+    if (config.enableTimeOfDayTrigger) {
+      scheduleTimeOfDay(context, config.activeHoursStart)
+    } else {
+      cancelTimeOfDay(context)
+    }
+    return operations
+  }
+
+  internal fun await(operations: List<Operation>) {
+    operations.forEach { it.result.get() }
   }
 
   /** Enqueues receiver work with enough identity to discard it after a config replacement. */

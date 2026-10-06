@@ -1,6 +1,7 @@
 package com.codenameakshay.async_wallpaper
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.json.JSONArray
 import java.util.concurrent.locks.ReentrantLock
@@ -20,14 +21,16 @@ internal data class StoredWallpaperRotationConfig(
   val orderType: Int,
 )
 
-internal class WallpaperRotationStore(context: Context) {
-  private val appContext = context.applicationContext
-  private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+internal class WallpaperRotationStore(private val prefs: SharedPreferences) {
+  constructor(context: Context) : this(
+    context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+  )
 
-  fun saveConfig(config: StoredWallpaperRotationConfig) {
+  fun saveConfig(config: StoredWallpaperRotationConfig): Boolean {
     val currentGeneration = getGeneration()
     val nextGeneration = if (currentGeneration == Long.MAX_VALUE) 1L else currentGeneration + 1L
-    prefs.edit {
+    val editor = prefs.edit()
+    editor.apply {
       putBoolean(KEY_IS_RUNNING, true)
       putString(KEY_LOCAL_SOURCES, JSONArray(config.localSources).toString())
       putInt(KEY_REQUESTED_SOURCE_COUNT, config.requestedSourceCount)
@@ -43,7 +46,9 @@ internal class WallpaperRotationStore(context: Context) {
       putString(KEY_SHUFFLE_ORDER, null)
       putString(KEY_LAST_ERROR, null)
       putLong(KEY_GENERATION, nextGeneration)
+      putBoolean(KEY_SCHEDULES_PENDING, true)
     }
+    return commitWithRollback(editor, CONFIG_KEYS)
   }
 
   fun getConfig(): StoredWallpaperRotationConfig? {
@@ -71,12 +76,21 @@ internal class WallpaperRotationStore(context: Context) {
 
   fun isRunning(): Boolean = prefs.getBoolean(KEY_IS_RUNNING, false)
 
-  fun stopRotation() {
-    prefs.edit {
+  fun stopRotation(): Boolean {
+    val editor = prefs.edit().apply {
       putBoolean(KEY_IS_RUNNING, false)
       putLong(KEY_NEXT_RUN_EPOCH_MS, 0L)
       putString(KEY_LAST_ERROR, null)
+      putBoolean(KEY_SCHEDULES_PENDING, true)
     }
+    return commitWithRollback(editor, listOf(KEY_IS_RUNNING, KEY_NEXT_RUN_EPOCH_MS, KEY_LAST_ERROR, KEY_SCHEDULES_PENDING))
+  }
+
+  fun areSchedulesPending(): Boolean = prefs.getBoolean(KEY_SCHEDULES_PENDING, false)
+
+  fun clearSchedulesPending(): Boolean {
+    val editor = prefs.edit().putBoolean(KEY_SCHEDULES_PENDING, false)
+    return commitWithRollback(editor, listOf(KEY_SCHEDULES_PENDING))
   }
 
   fun getCurrentIndex(): Int = prefs.getInt(KEY_CURRENT_INDEX, 0)
@@ -127,12 +141,6 @@ internal class WallpaperRotationStore(context: Context) {
     )
   }
 
-  fun isTimeOfDayTriggerEnabled(): Boolean = prefs.getBoolean(KEY_ENABLE_TIME_OF_DAY_TRIGGER, false)
-
-  fun getActiveHoursStart(): Int = prefs.getInt(KEY_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_START)
-
-  fun getActiveHoursEnd(): Int = prefs.getInt(KEY_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_END)
-
   private fun jsonArrayToStringList(raw: String): List<String> {
     val jsonArray = JSONArray(raw)
     val output = ArrayList<String>(jsonArray.length())
@@ -149,6 +157,35 @@ internal class WallpaperRotationStore(context: Context) {
       output.add(jsonArray.optInt(i))
     }
     return output
+  }
+
+  private fun restoreValue(editor: android.content.SharedPreferences.Editor, key: String, value: Any?) {
+    when (value) {
+      null -> editor.remove(key)
+      is Boolean -> editor.putBoolean(key, value)
+      is Int -> editor.putInt(key, value)
+      is Long -> editor.putLong(key, value)
+      is String -> editor.putString(key, value)
+      is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+      else -> editor.remove(key)
+    }
+  }
+
+  private fun commitWithRollback(
+    editor: SharedPreferences.Editor,
+    keys: List<String>,
+  ): Boolean {
+    val previousValues = keys.associateWith { prefs.all[it] }
+    if (editor.commit()) {
+      return true
+    }
+
+    // SharedPreferences changes its in-memory map before writing to disk. Restore it immediately;
+    // keep both cache generations until a commit succeeds, since disk may hold either config.
+    val rollback = prefs.edit()
+    previousValues.forEach { (key, value) -> restoreValue(rollback, key, value) }
+    rollback.apply()
+    return false
   }
 
   companion object {
@@ -174,6 +211,25 @@ internal class WallpaperRotationStore(context: Context) {
     private const val KEY_NEXT_RUN_EPOCH_MS = "next_run_epoch_ms"
     private const val KEY_GENERATION = "generation"
     private const val KEY_LAST_ERROR = "last_error"
+    private const val KEY_SCHEDULES_PENDING = "schedules_pending"
+    private val CONFIG_KEYS = listOf(
+      KEY_IS_RUNNING,
+      KEY_LOCAL_SOURCES,
+      KEY_REQUESTED_SOURCE_COUNT,
+      KEY_TARGET,
+      KEY_INTERVAL_MINUTES,
+      KEY_ENABLE_INTERVAL_TRIGGER,
+      KEY_ENABLE_CHARGING_TRIGGER,
+      KEY_ENABLE_TIME_OF_DAY_TRIGGER,
+      KEY_ACTIVE_HOURS_START,
+      KEY_ACTIVE_HOURS_END,
+      KEY_ORDER_TYPE,
+      KEY_CURRENT_INDEX,
+      KEY_SHUFFLE_ORDER,
+      KEY_GENERATION,
+      KEY_LAST_ERROR,
+      KEY_SCHEDULES_PENDING,
+    )
   }
 }
 

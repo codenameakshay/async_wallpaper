@@ -236,34 +236,17 @@ class GlRenderer(
       return failure
     }
 
-    val configurations = arrayOfNulls<EGLConfig>(1)
-    val count = IntArray(1)
-    val attributes = intArrayOf(
-      EGL14.EGL_RENDERABLE_TYPE,
-      EGL14.EGL_OPENGL_ES2_BIT,
-      EGL14.EGL_SURFACE_TYPE,
-      EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT,
-      EGL14.EGL_RED_SIZE,
-      8,
-      EGL14.EGL_GREEN_SIZE,
-      8,
-      EGL14.EGL_BLUE_SIZE,
-      8,
-      EGL14.EGL_ALPHA_SIZE,
-      8,
-      EGL14.EGL_NONE,
-    )
-    if (!EGL14.eglChooseConfig(eglDisplay, attributes, 0, configurations, 0, configurations.size, count, 0) ||
-      count[0] <= 0 || configurations[0] == null
-    ) {
+    val config = chooseEglConfig(EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT)
+      ?: chooseEglConfig(EGL14.EGL_WINDOW_BIT)
+    if (config == null) {
       val failure = eglFailure("choose EGL config")
       release()
       return failure
     }
-    eglConfig = configurations[0]
+    eglConfig = config
     eglContext = EGL14.eglCreateContext(
       eglDisplay,
-      eglConfig,
+      config,
       EGL14.EGL_NO_CONTEXT,
       intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE),
       0,
@@ -279,11 +262,36 @@ class GlRenderer(
     // the safe fallback on those devices.
     cleanupSurface = EGL14.eglCreatePbufferSurface(
       eglDisplay,
-      eglConfig,
+      config,
       intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE),
       0,
     )
     return null
+  }
+
+  /** Prefer configs usable for both surfaces, then accept window-only configs. */
+  private fun chooseEglConfig(surfaceType: Int): EGLConfig? {
+    val configurations = arrayOfNulls<EGLConfig>(1)
+    val count = IntArray(1)
+    val attributes = intArrayOf(
+      EGL14.EGL_RENDERABLE_TYPE,
+      EGL14.EGL_OPENGL_ES2_BIT,
+      EGL14.EGL_SURFACE_TYPE,
+      surfaceType,
+      EGL14.EGL_RED_SIZE,
+      8,
+      EGL14.EGL_GREEN_SIZE,
+      8,
+      EGL14.EGL_BLUE_SIZE,
+      8,
+      EGL14.EGL_ALPHA_SIZE,
+      8,
+      EGL14.EGL_NONE,
+    )
+    if (!EGL14.eglChooseConfig(eglDisplay, attributes, 0, configurations, 0, 1, count, 0) || count[0] <= 0) {
+      return null
+    }
+    return configurations[0]
   }
 
   private fun ensureGlResources(): Result {

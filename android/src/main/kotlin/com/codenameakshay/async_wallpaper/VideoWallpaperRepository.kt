@@ -128,8 +128,36 @@ class VideoWallpaperRepository(
     cleanupTemporaryFilesLocked()
     val pending = pendingFile
     val metadata = validator.validate(pending)
-    fileSystem.replaceAtomically(pending, activeFile)
-    persistScaleModeLocked(scaleMode)
+    var scaleModeCandidate: File? = null
+    var scaleModeBackup: File? = null
+    var scaleModeInstalled = false
+    try {
+      val candidate = stageScaleModeLocked(scaleMode)
+      scaleModeCandidate = candidate
+      scaleModeBackup = backupFileIfPresent(activeScaleModeFile)
+      fileSystem.replaceAtomically(candidate, activeScaleModeFile)
+      scaleModeCandidate = null
+      scaleModeInstalled = true
+      // Keep the active video at its canonical path until this final atomic replacement.
+      fileSystem.replaceAtomically(pending, activeFile)
+    } catch (error: Exception) {
+      if (scaleModeInstalled) {
+        val backup = scaleModeBackup
+        val rollback = runCatching {
+          if (backup != null) {
+            fileSystem.replaceAtomically(backup, activeScaleModeFile)
+            scaleModeBackup = null
+          } else {
+            fileSystem.delete(activeScaleModeFile)
+          }
+        }
+        rollback.onFailure(error::addSuppressed)
+      }
+      throw error
+    } finally {
+      scaleModeCandidate?.let(fileSystem::delete)
+      scaleModeBackup?.let(fileSystem::delete)
+    }
     PreparedVideo(activeFile, metadata)
   }
 
@@ -162,16 +190,33 @@ class VideoWallpaperRepository(
     }
   }
 
-  private fun persistScaleModeLocked(scaleMode: VideoWallpaperScaleMode) {
-    var temporaryFile: File? = null
+  private fun stageScaleModeLocked(scaleMode: VideoWallpaperScaleMode): File {
+    val temporaryFile = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
     try {
-      temporaryFile = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
       ByteArrayInputStream(VideoScaleModePersistence.encode(scaleMode).toByteArray(StandardCharsets.UTF_8)).use {
         fileSystem.copyAndSync(it, temporaryFile)
       }
-      fileSystem.replaceAtomically(temporaryFile, activeScaleModeFile)
-    } finally {
-      temporaryFile?.let(fileSystem::delete)
+      return temporaryFile
+    } catch (error: IOException) {
+      fileSystem.delete(temporaryFile)
+      throw error
+    }
+  }
+
+  private fun backupFileIfPresent(file: File): File? {
+    if (!file.exists()) {
+      return null
+    }
+    val backup = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
+    try {
+      if (!fileSystem.delete(backup)) {
+        throw IOException("Unable to allocate a video promotion backup.")
+      }
+      FileInputStream(file).use { input -> fileSystem.copyAndSync(input, backup) }
+      return backup
+    } catch (error: IOException) {
+      fileSystem.delete(backup)
+      throw error
     }
   }
 

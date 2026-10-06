@@ -6,7 +6,6 @@ import java.io.ByteArrayInputStream
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
-import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.URI
@@ -67,7 +66,7 @@ class BoundedSourceOpener(
     if (file.length() > maxBytes) {
       throw tooLarge()
     }
-    return SizeLimitedInputStream(FileInputStream(file), maxBytes)
+    return bounded(FileInputStream(file))
   }
 
   private fun openContentUri(value: String): InputStream {
@@ -87,7 +86,7 @@ class BoundedSourceOpener(
       ERROR_SOURCE_UNAVAILABLE,
       "The content URI could not be opened.",
     )
-    return SizeLimitedInputStream(stream, maxBytes)
+    return bounded(stream)
   }
 
   private fun openBytes(bytes: ByteArray): InputStream {
@@ -97,7 +96,7 @@ class BoundedSourceOpener(
     if (bytes.size.toLong() > maxBytes) {
       throw tooLarge()
     }
-    return SizeLimitedInputStream(ByteArrayInputStream(bytes), maxBytes)
+    return bounded(ByteArrayInputStream(bytes))
   }
 
   private fun openHttps(value: String): OpenedSource {
@@ -140,7 +139,7 @@ class BoundedSourceOpener(
         }
         return OpenedSource(
           DisconnectingInputStream(
-            SizeLimitedInputStream(connection.inputStream, maxBytes),
+            bounded(connection.inputStream),
             connection,
           ),
           connection.contentType,
@@ -180,30 +179,8 @@ class BoundedSourceOpener(
     return BoundedSourceException(ERROR_SOURCE_TOO_LARGE, "The source exceeds the configured byte limit.")
   }
 
-  private class SizeLimitedInputStream(
-    input: InputStream,
-    private val limit: Long,
-  ) : FilterInputStream(input) {
-    private var bytesRead = 0L
-
-    override fun read(): Int {
-      val result = super.read()
-      if (result >= 0) track(1)
-      return result
-    }
-
-    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-      val count = super.read(buffer, offset, length)
-      if (count > 0) track(count.toLong())
-      return count
-    }
-
-    private fun track(count: Long) {
-      bytesRead += count
-      if (bytesRead > limit) {
-        throw BoundedSourceException(ERROR_SOURCE_TOO_LARGE, "The source exceeds the configured byte limit.")
-      }
-    }
+  private fun bounded(input: InputStream) = SourceByteLimitInputStream(input, maxBytes) {
+    BoundedSourceException(ERROR_SOURCE_TOO_LARGE, "The source exceeds the configured byte limit.")
   }
 
   private fun InputStream.readFullyBounded(limit: Long): ByteArray {

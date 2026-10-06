@@ -23,7 +23,9 @@ class AsyncWallpaper {
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
   static const int _minRotationIntervalMinutes = 15;
+  static const int _maxRotationIntervalMinutes = 0x7fffffff;
   static const int _maxRotationSources = 100;
+  static final RegExp _malformedPercentEscape = RegExp(r'%(?![0-9A-Fa-f]{2})');
 
   static final WallpaperApi _api = WallpaperApi();
   static final WallpaperClient _defaultClient = PigeonWallpaperClient(
@@ -375,12 +377,13 @@ class AsyncWallpaper {
         ),
       );
     }
-    if (request.intervalMinutes < _minRotationIntervalMinutes) {
+    if (request.intervalMinutes < _minRotationIntervalMinutes ||
+        request.intervalMinutes > _maxRotationIntervalMinutes) {
       return const WallpaperResult.failure(
         WallpaperError(
           code: WallpaperErrorCode.invalidInput,
           message:
-              'Rotation interval must be at least $_minRotationIntervalMinutes minutes.',
+              'Rotation interval must be between $_minRotationIntervalMinutes and $_maxRotationIntervalMinutes minutes.',
         ),
       );
     }
@@ -672,8 +675,10 @@ class AsyncWallpaper {
     final url = source.url;
     final filePath = source.filePath;
     final contentUri = source.contentUri;
-    final bytes = source.bytes;
-    final valueCount = [url, filePath, contentUri, bytes].nonNulls.length;
+    final byteLength = source.byteLength;
+    final valueCount =
+        [url, filePath, contentUri].nonNulls.length +
+        (byteLength == null ? 0 : 1);
     if (valueCount != 1) {
       return '$label source must contain exactly one value.';
     }
@@ -691,10 +696,10 @@ class AsyncWallpaper {
           ? null
           : '$label content URI must be a valid content:// URI.';
     }
-    if (bytes == null || bytes.isEmpty) {
+    if (byteLength == null || byteLength == 0) {
       return '$label bytes cannot be empty.';
     }
-    if (bytes.length > maxBytes) {
+    if (byteLength > maxBytes) {
       return '$label bytes must not exceed $maxBytes bytes.';
     }
     return null;
@@ -702,15 +707,38 @@ class AsyncWallpaper {
 
   static bool _isHttpsUrl(String value) {
     final trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed != value) {
+    if (trimmed.isEmpty ||
+        trimmed != value ||
+        value.codeUnits.any((unit) => unit <= 0x20 || unit == 0x7f) ||
+        value.contains('\\') ||
+        _malformedPercentEscape.hasMatch(value)) {
       return false;
     }
-    final uri = Uri.tryParse(value);
-    return uri != null &&
-        uri.isAbsolute &&
-        uri.scheme.toLowerCase() == 'https' &&
-        uri.host.isNotEmpty &&
-        uri.userInfo.isEmpty;
+    try {
+      final uri = Uri.parse(value);
+      return uri.isAbsolute &&
+          uri.scheme.toLowerCase() == 'https' &&
+          uri.host.isNotEmpty &&
+          !_authorityHostContainsPercentEscape(value) &&
+          uri.userInfo.isEmpty &&
+          (!uri.hasPort || (uri.port > 0 && uri.port <= 65535));
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static bool _authorityHostContainsPercentEscape(String value) {
+    final authorityStart = value.indexOf('://') + 3;
+    final authorityEnd = value.indexOf(RegExp(r'[/\?#]'), authorityStart);
+    final authority = authorityEnd < 0
+        ? value.substring(authorityStart)
+        : value.substring(authorityStart, authorityEnd);
+    final hostEnd = authority.startsWith('[')
+        ? authority.indexOf(']') + 1
+        : !authority.contains(':')
+        ? authority.length
+        : authority.indexOf(':');
+    return hostEnd > 0 && authority.substring(0, hostEnd).contains('%');
   }
 
   static bool _isContentUri(String value) {

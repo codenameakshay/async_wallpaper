@@ -19,6 +19,8 @@ void main() {
       expect(filePath.filePath, '/data/local/tmp/wallpaper.jpg');
       expect(contentUri.contentUri, 'content://media/external/images/media/42');
       expect(bytes.bytes, Uint8List.fromList(<int>[1, 2, 3]));
+      expect(bytes.byteLength, 3);
+      expect(url.byteLength, isNull);
     });
 
     test('defensively copies byte sources', () {

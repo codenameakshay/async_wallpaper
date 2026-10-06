@@ -13,6 +13,10 @@ import java.util.TimeZone
 internal object WallpaperRotationScheduleMath {
   const val HOURS_PER_DAY = 24
 
+  fun isClockChangeAction(action: String?): Boolean {
+    return action == ACTION_TIMEZONE_CHANGED || action == ACTION_TIME_SET
+  }
+
   /** Clamps any caller-supplied hour into `0..23`. */
   fun normalizeHour(hour: Int): Int = hour.coerceIn(0, HOURS_PER_DAY - 1)
 
@@ -39,16 +43,27 @@ internal object WallpaperRotationScheduleMath {
     nowMillis: Long,
     timeZone: TimeZone = TimeZone.getDefault(),
     locale: Locale = Locale.getDefault(),
+    strictlyAfterNow: Boolean = false,
   ): Long {
-    return Calendar.getInstance(timeZone, locale).apply {
+    val calendar = Calendar.getInstance(timeZone, locale).apply {
       timeInMillis = nowMillis
       set(Calendar.HOUR_OF_DAY, normalizeHour(startHour))
       set(Calendar.MINUTE, 0)
       set(Calendar.SECOND, 0)
       set(Calendar.MILLISECOND, 0)
-      if (timeInMillis < nowMillis) {
+      if (timeInMillis < nowMillis || (strictlyAfterNow && timeInMillis == nowMillis)) {
         add(Calendar.DAY_OF_YEAR, 1)
+        // Adding a day preserves a DST-normalized hour. Reapply the requested hour so a
+        // nonexistent spring-forward time (for example 02:00) does not shift tomorrow to 03:00.
+        set(Calendar.HOUR_OF_DAY, normalizeHour(startHour))
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
       }
-    }.timeInMillis
+    }
+    return calendar.timeInMillis
   }
+
+  private const val ACTION_TIMEZONE_CHANGED = "android.intent.action.TIMEZONE_CHANGED"
+  private const val ACTION_TIME_SET = "android.intent.action.TIME_SET"
 }

@@ -86,6 +86,72 @@ class AtomicFileReplacementTest {
   }
 
   @Test
+  fun `failed scale mode persistence preserves prior active video and mode`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile("pending.mp4", "new-video")
+    writeFile("file.mp4.scale-mode", "FIT_CENTER")
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), FailingScaleModeFileSystem)
+
+    try {
+      repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+      fail("Expected scale mode persistence to fail")
+    } catch (_: IOException) {
+    }
+
+    assertEquals("previous-video", File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+    assertEquals("FIT_CENTER", File(directory, "file.mp4.scale-mode").readText())
+  }
+
+  @Test
+  fun `failed final video replacement rolls back mode and preserves active and pending videos`() {
+    val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    val pending = writeFile("pending.mp4", "new-video")
+    val scaleMode = writeFile("file.mp4.scale-mode", "FIT_CENTER")
+    val repository = VideoWallpaperRepository(
+      directory,
+      acceptingValidator(),
+      FailingFinalVideoReplacementFileSystem,
+    )
+
+    try {
+      repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+      fail("Expected final video replacement to fail")
+    } catch (_: IOException) {
+    }
+
+    assertEquals("previous-video", active.readText())
+    assertEquals("new-video", pending.readText())
+    assertEquals("FIT_CENTER", scaleMode.readText())
+    assertNoTemporaryFiles()
+  }
+
+  @Test
+  fun `successful pending promotion atomically installs video and mode`() {
+    val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "previous-video")
+    writeFile("pending.mp4", "new-video")
+    writeFile("file.mp4.scale-mode", "FIT_CENTER")
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+
+    val prepared = repository.promotePending(VideoWallpaperScaleMode.CENTER_CROP)
+
+    assertEquals(active.absolutePath, prepared.file.absolutePath)
+    assertEquals("new-video", active.readText())
+    assertEquals(VideoWallpaperScaleMode.CENTER_CROP, repository.activeScaleMode())
+    assertFalse(File(directory, "pending.mp4").exists())
+    assertNoTemporaryFiles()
+  }
+
+  @Test
+  fun `a rejected JPEG compression is surfaced as an IO failure`() {
+    try {
+      requireSuccessfulBitmapCompression(false)
+      fail("Expected failed compression to be rejected")
+    } catch (error: IOException) {
+      assertTrue(error.message.orEmpty().contains("compress"))
+    }
+  }
+
+  @Test
   fun `source equal to active file validates without copying or replacing itself`() {
     val active = writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "existing-video")
     val fileSystem = RecordingFileSystem()
@@ -165,7 +231,9 @@ class AtomicFileReplacementTest {
 
   private fun assertNoTemporaryFiles() {
     val leftovers = directory.listFiles()
-      ?.filter { it.name.startsWith("${VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME}.") }
+      ?.filter {
+        it.name.startsWith("${VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME}.") && it.name.endsWith(".tmp")
+      }
       .orEmpty()
     assertTrue("Unexpected temporary files: $leftovers", leftovers.isEmpty())
   }
@@ -212,6 +280,44 @@ class AtomicFileReplacementTest {
 
     override fun replaceAtomically(source: File, destination: File) {
       throw IOException("simulated atomic move failure")
+    }
+
+    override fun delete(file: File): Boolean = HostFileSystem.delete(file)
+  }
+
+  private object FailingScaleModeFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      if (destination.name == "file.mp4.scale-mode") {
+        throw IOException("simulated scale mode replacement failure")
+      }
+      HostFileSystem.replaceAtomically(source, destination)
+    }
+
+    override fun delete(file: File): Boolean = HostFileSystem.delete(file)
+  }
+
+  private object FailingFinalVideoReplacementFileSystem : VideoFileSystem {
+    override fun createTempFile(directory: File, prefix: String, suffix: String): File {
+      return HostFileSystem.createTempFile(directory, prefix, suffix)
+    }
+
+    override fun copyAndSync(source: InputStream, destination: File) {
+      HostFileSystem.copyAndSync(source, destination)
+    }
+
+    override fun replaceAtomically(source: File, destination: File) {
+      if (destination.name == VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME) {
+        throw IOException("simulated final video replacement failure")
+      }
+      HostFileSystem.replaceAtomically(source, destination)
     }
 
     override fun delete(file: File): Boolean = HostFileSystem.delete(file)

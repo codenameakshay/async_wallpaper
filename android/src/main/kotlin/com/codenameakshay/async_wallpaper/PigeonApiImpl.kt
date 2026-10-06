@@ -23,8 +23,6 @@ import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -55,7 +53,6 @@ class PigeonApiImpl(
   ),
 ) : WallpaperApi {
   private val appContext = context.applicationContext
-  private val ioExecutor: ExecutorService = Executors.newCachedThreadPool()
   private val rotationStore = WallpaperRotationStore(appContext)
   private val rotationEngine = WallpaperRotationEngine(appContext, rotationStore)
 
@@ -105,52 +102,55 @@ class PigeonApiImpl(
     config: WallpaperRotationConfigData,
     callback: (Result<Boolean>) -> Unit,
   ) {
-    ioExecutor.execute {
-      val success = runCatching {
-        val intervalMinutes = config.intervalMinutes?.toInt() ?: 0
-        when (rotationEngine.startRotation(config)) {
-          RotationStartResult.STARTED -> {
-            try {
-              reconcileRotationTriggers(config, intervalMinutes)
-              true
-            } catch (error: Exception) {
-              // The wallpaper is already applied but the schedules are unknown; report failure and
-              // tear the rotation down rather than leaving a half-armed trigger set.
-              Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
+    enqueueBoolean(callback) {
+      val validated = WallpaperRotationRequestValidator.validate(config)
+        ?: return@enqueueBoolean false
+      WallpaperRotationCoordinator.withLock {
+        runCatching {
+          when (rotationEngine.startRotation(config)) {
+            RotationStartResult.STARTED -> {
+              try {
+                reconcileRotationTriggers(config, validated.intervalMinutes)
+                true
+              } catch (error: Exception) {
+                // The wallpaper is already applied but the schedules are unknown; report failure and
+                // tear the rotation down rather than leaving a half-armed trigger set.
+                Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
+                rollbackFailedRotationStart()
+                false
+              }
+            }
+            // Only a start that already persisted a new configuration may roll back, so a rejected
+            // request cannot stop a rotation that is still running.
+            RotationStartResult.FAILED_AFTER_SAVE -> {
               rollbackFailedRotationStart()
               false
             }
+            RotationStartResult.REJECTED -> false
           }
-          // Only a start that already persisted a new configuration may roll back, so a rejected
-          // request cannot stop a rotation that is still running.
-          RotationStartResult.FAILED_AFTER_SAVE -> {
-            rollbackFailedRotationStart()
-            false
-          }
-          RotationStartResult.REJECTED -> false
+        }.getOrElse {
+          Log.e(TAG, "startWallpaperRotation failed", it)
+          false
         }
-      }.getOrElse {
-        Log.e(TAG, "startWallpaperRotation failed", it)
-        false
       }
-      postCallback(callback, Result.success(success))
     }
   }
 
   override fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit) {
-    ioExecutor.execute {
-      val success = runCatching {
-        WallpaperRotationScheduler.cancelPeriodic(appContext)
-        WallpaperRotationScheduler.cancelCharging(appContext)
-        WallpaperRotationScheduler.cancelTimeOfDay(appContext)
-        rotationStore.stopRotation()
-        rotationEngine.clearRotationCache()
-        true
-      }.getOrElse {
-        Log.e(TAG, "stopWallpaperRotation failed", it)
-        false
+    enqueueBoolean(callback) {
+      WallpaperRotationCoordinator.withLock {
+        runCatching {
+          WallpaperRotationScheduler.cancelPeriodic(appContext)
+          WallpaperRotationScheduler.cancelCharging(appContext)
+          WallpaperRotationScheduler.cancelTimeOfDay(appContext)
+          rotationStore.stopRotation()
+          rotationEngine.clearRotationCache()
+          true
+        }.getOrElse {
+          Log.e(TAG, "stopWallpaperRotation failed", it)
+          false
+        }
       }
-      postCallback(callback, Result.success(success))
     }
   }
 
@@ -223,14 +223,15 @@ class PigeonApiImpl(
   }
 
   override fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit) {
-    ioExecutor.execute {
-      val success = runCatching {
-        rotationEngine.applyNextWallpaper()
-      }.getOrElse {
-        Log.e(TAG, "rotateWallpaperNow failed", it)
-        false
+    enqueueBoolean(callback) {
+      WallpaperRotationCoordinator.withLock {
+        runCatching {
+          rotationEngine.applyNextWallpaper()
+        }.getOrElse {
+          Log.e(TAG, "rotateWallpaperNow failed", it)
+          false
+        }
       }
-      postCallback(callback, Result.success(success))
     }
   }
 
@@ -581,19 +582,29 @@ class PigeonApiImpl(
       textures = textureSources,
       frameRate = frameRate.toInt(),
     )
-    when (val saved = OpenGlLiveWallpaper.saveConfiguration(appContext, configuration)) {
-      OpenGlConfigurationResult.Saved -> Unit
-      is OpenGlConfigurationResult.Rejected -> {
-        return OperationResultPolicy.failed(
-          target,
-          saved.error.wireCode,
-          saved.error.message,
-        )
+    val prepared = when (val staged = OpenGlLiveWallpaper.stageConfiguration(appContext, configuration)) {
+      is OpenGlConfigurationStageResult.Prepared -> staged.configuration
+      is OpenGlConfigurationStageResult.Rejected -> {
+        return OperationResultPolicy.failed(target, staged.error.wireCode, staged.error.message)
       }
     }
 
-    return runOnMainBlocking {
-      openLiveWallpaperUi(target, OpenGlLiveWallpaper::class.java)
+    return prepared.use { stagedConfiguration ->
+      runOnMainBlocking {
+        openLiveWallpaperUi(target, OpenGlLiveWallpaper::class.java) {
+          when (val activated = OpenGlLiveWallpaper.activatePreparedConfiguration(
+            appContext,
+            stagedConfiguration,
+          )) {
+            OpenGlConfigurationResult.Saved -> null
+            is OpenGlConfigurationResult.Rejected -> OperationResultPolicy.failed(
+              target,
+              activated.error.wireCode,
+              activated.error.message,
+            )
+          }
+        }
+      }
     }
   }
 
@@ -656,13 +667,10 @@ class PigeonApiImpl(
       val source = WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = url)
       val openedSource = downloadSourceOpener.openWithMetadata(source)
       val contentType = openedSource.contentType
-      val downloadedFile = File.createTempFile("async-wallpaper-", ".download", appContext.cacheDir)
-      temporaryFile = downloadedFile
-      openedSource.use { opened ->
-        downloadedFile.outputStream().use { output ->
-          opened.input.copyTo(output)
-        }
+      val downloadedFile = DownloadSourceMaterializer.materialize(openedSource) {
+        File.createTempFile("async-wallpaper-", ".download", appContext.cacheDir)
       }
+      temporaryFile = downloadedFile
       val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
       BitmapFactory.decodeFile(downloadedFile.absolutePath, options)
       val imageFormat = if (options.outWidth > 0 && options.outHeight > 0) {

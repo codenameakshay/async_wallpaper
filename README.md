@@ -126,6 +126,7 @@ await AsyncWallpaper.downloadWallpaper(
 ```
 
 - iOS: add `NSPhotoLibraryAddUsageDescription` to `Info.plist`.
+- Downloads require HTTPS, a valid image response, and a payload no larger than 64 MiB.
 - Android 9 and older: declare `WRITE_EXTERNAL_STORAGE` with `android:maxSdkVersion="28"` and request it before you call `downloadWallpaper`.
 
 ## Platform support
@@ -142,6 +143,7 @@ await AsyncWallpaper.downloadWallpaper(
 
 - [Example app](example/README.md)
 - [Android compatibility](doc/android-compatibility.md)
+- [iOS download tests](doc/ios-download-testing.md)
 - [Migration guide](doc/migration.md)
 - [Changelog](CHANGELOG.md)
 

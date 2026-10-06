@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:async_wallpaper/pigeon_impl_api.dart';
 
 import 'models.dart';
@@ -31,7 +29,7 @@ WallpaperSourceData wallpaperSourceToData(WallpaperSource source) {
   if (bytes != null) {
     return WallpaperSourceData(
       kind: WallpaperSourceKindData.bytes,
-      bytes: Uint8List.fromList(bytes),
+      bytes: bytes,
     );
   }
 
@@ -138,7 +136,10 @@ WallpaperTargetResult targetResultFromData(TargetResultData data) {
 
 /// Converts a complete Pigeon operation result without allowing malformed
 /// transport data to become a successful domain outcome.
-WallpaperOperationResult operationResultFromData(OperationResultData data) {
+WallpaperOperationResult operationResultFromData(
+  OperationResultData data, {
+  WallpaperTarget? expectedTarget,
+}) {
   WallpaperTarget? target;
   WallpaperTargetResult? home;
   WallpaperTargetResult? lock;
@@ -151,6 +152,16 @@ WallpaperOperationResult operationResultFromData(OperationResultData data) {
     final fallbackStrategy = data.fallbackStrategy == null
         ? null
         : wallpaperApplyStrategyFromData(data.fallbackStrategy);
+
+    if (expectedTarget != null && target != expectedTarget) {
+      return _malformedOperationResult(
+        data,
+        target: expectedTarget,
+        home: home,
+        lock: lock,
+        reason: 'The platform returned a result for a different target.',
+      );
+    }
 
     if (status == WallpaperOperationStatus.applied &&
         !hasAppliedEveryRequestedTarget(target, home, lock)) {
@@ -177,7 +188,7 @@ WallpaperOperationResult operationResultFromData(OperationResultData data) {
   } on FormatException catch (error) {
     return _malformedOperationResult(
       data,
-      target: target,
+      target: expectedTarget ?? target,
       home: home,
       lock: lock,
       reason: error.message,
@@ -284,6 +295,7 @@ class PigeonWallpaperClient implements WallpaperClient {
   ) async {
     return operationResultFromData(
       await _api.applyWallpaper(staticWallpaperRequestToData(request)),
+      expectedTarget: request.target,
     );
   }
 
@@ -293,6 +305,7 @@ class PigeonWallpaperClient implements WallpaperClient {
   ) async {
     return operationResultFromData(
       await _api.prepareVideoWallpaper(videoWallpaperRequestToData(request)),
+      expectedTarget: request.target,
     );
   }
 
@@ -302,6 +315,7 @@ class PigeonWallpaperClient implements WallpaperClient {
   ) async {
     return operationResultFromData(
       await _api.openLiveWallpaperPreview(videoWallpaperRequestToData(request)),
+      expectedTarget: request.target,
     );
   }
 
@@ -311,6 +325,7 @@ class PigeonWallpaperClient implements WallpaperClient {
   ) async {
     return operationResultFromData(
       await _api.applyOpenGlWallpaper(openGlWallpaperRequestToData(request)),
+      expectedTarget: request.target,
     );
   }
 }
@@ -364,7 +379,7 @@ WallpaperOperationResult _malformedOperationResult(
     home: home,
     lock: lock,
     errorCode: 'malformed-transport',
-    errorMessage: 'The platform returned an incomplete wallpaper result.',
+    errorMessage: 'The platform returned an invalid wallpaper result.',
     errorDetails: details.isEmpty ? null : details,
   );
 }

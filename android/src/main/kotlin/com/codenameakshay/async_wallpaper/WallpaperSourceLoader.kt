@@ -9,7 +9,6 @@ import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.URI
@@ -29,11 +28,11 @@ class WallpaperSourceException(
 ) : IOException(message, cause)
 
 /**
- * Opens and decodes static wallpaper sources without buffering an entire remote response.
+ * Opens and decodes static wallpaper sources without buffering a remote response in memory.
  *
- * The decoder opens a source independently for bounds, EXIF, and sampled bitmap reads. This
- * deliberately trades a small number of sequential reads for bounded memory use: network,
- * file, and content-URI sources are never copied into a byte array before decoding.
+ * External sources are copied once, under the encoded-byte limit, to a private snapshot before
+ * bounds, EXIF, and sampled bitmap reads. Reusing that snapshot keeps metadata and pixels consistent
+ * when a URL, file, or content provider changes between decoder passes.
  */
 class WallpaperSourceLoader(
   context: Context,
@@ -65,27 +64,51 @@ class WallpaperSourceLoader(
   @Throws(WallpaperSourceException::class)
   fun load(source: WallpaperSourceData): Bitmap {
     val inputSource = inputSourceFor(source)
-    val bounds = decodeBounds(inputSource)
-    val sampleSize = calculateInSampleSize(
-      width = bounds.width,
-      height = bounds.height,
-      maxPixels = limits.maxDecodedPixels,
-    )
-    val decoded = decodeBitmap(inputSource, sampleSize)
-    val exifOrientation = readExifOrientation(inputSource)
-    val normalized = applyExifOrientation(decoded, exifOrientation)
-
-    if (pixelCount(normalized.width, normalized.height) > limits.maxDecodedPixels) {
-      if (!normalized.isRecycled) {
-        normalized.recycle()
+    val snapshotFile = if (source.kind == WallpaperSourceKindData.BYTES) {
+      null
+    } else {
+      try {
+        BoundedSourceSnapshot.materialize(
+          openSource = inputSource.open,
+          cacheDirectory = appContext.cacheDir,
+          maxBytes = limits.maxEncodedBytes,
+        )
+      } catch (error: WallpaperSourceException) {
+        throw error
+      } catch (error: IOException) {
+        throw sourceUnavailable(error)
+      } catch (error: SecurityException) {
+        throw sourceUnavailable(error)
       }
-      throw WallpaperSourceException(
-        code = ERROR_IMAGE_TOO_LARGE,
-        message = "The decoded image exceeds the configured pixel limit.",
-      )
     }
+    try {
+      val stableInputSource = snapshotFile?.let { file ->
+        InputSource { FileInputStream(file) }
+      } ?: inputSource
+      val bounds = decodeBounds(stableInputSource)
+      val sampleSize = calculateInSampleSize(
+        width = bounds.width,
+        height = bounds.height,
+        maxPixels = limits.maxDecodedPixels,
+      )
+      val decoded = decodeBitmap(stableInputSource, sampleSize)
+      val exifOrientation = readExifOrientation(stableInputSource)
+      val normalized = applyExifOrientation(decoded, exifOrientation)
 
-    return normalized
+      if (pixelCount(normalized.width, normalized.height) > limits.maxDecodedPixels) {
+        if (!normalized.isRecycled) {
+          normalized.recycle()
+        }
+        throw WallpaperSourceException(
+          code = ERROR_IMAGE_TOO_LARGE,
+          message = "The decoded image exceeds the configured pixel limit.",
+        )
+      }
+
+      return normalized
+    } finally {
+      snapshotFile?.delete()
+    }
   }
 
   private fun inputSourceFor(source: WallpaperSourceData): InputSource {
@@ -118,7 +141,7 @@ class WallpaperSourceLoader(
       throw encodedImageTooLarge()
     }
     return InputSource {
-      SizeLimitedInputStream(FileInputStream(file), limits.maxEncodedBytes)
+      bounded(FileInputStream(file))
     }
   }
 
@@ -149,7 +172,7 @@ class WallpaperSourceLoader(
         code = ERROR_SOURCE_UNAVAILABLE,
         message = "The content URI could not be opened.",
       )
-      SizeLimitedInputStream(stream, limits.maxEncodedBytes)
+      bounded(stream)
     }
   }
 
@@ -161,7 +184,7 @@ class WallpaperSourceLoader(
       throw encodedImageTooLarge()
     }
     return InputSource {
-      SizeLimitedInputStream(ByteArrayInputStream(value), limits.maxEncodedBytes)
+      bounded(ByteArrayInputStream(value))
     }
   }
 
@@ -347,9 +370,8 @@ class WallpaperSourceLoader(
         }
 
         val input = connection.inputStream
-        return SizeLimitedInputStream(
+        return bounded(
           DisconnectingInputStream(input, connection),
-          limits.maxEncodedBytes,
         )
       } catch (error: WallpaperSourceException) {
         throw error
@@ -453,46 +475,14 @@ class WallpaperSourceLoader(
     val height: Int,
   )
 
-  /** Enforces an encoded-byte limit even when a source has no reliable content length. */
-  private class SizeLimitedInputStream(
-    input: InputStream,
-    private val maxBytes: Long,
-  ) : FilterInputStream(input) {
-    private var bytesRead = 0L
-
-    override fun read(): Int {
-      val value = super.read()
-      if (value != -1) {
-        track(1)
-      }
-      return value
-    }
-
-    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-      val read = super.read(buffer, offset, length)
-      if (read > 0) {
-        track(read.toLong())
-      }
-      return read
-    }
-
-    override fun skip(byteCount: Long): Long {
-      val skipped = super.skip(byteCount)
-      if (skipped > 0) {
-        track(skipped)
-      }
-      return skipped
-    }
-
-    private fun track(count: Long) {
-      bytesRead += count
-      if (bytesRead > maxBytes) {
-        throw WallpaperSourceException(
-          code = ERROR_IMAGE_TOO_LARGE,
-          message = "The encoded image exceeds the configured size limit.",
-        )
-      }
-    }
+  private fun bounded(input: InputStream) = SourceByteLimitInputStream(
+    input,
+    limits.maxEncodedBytes,
+  ) {
+    WallpaperSourceException(
+      code = ERROR_IMAGE_TOO_LARGE,
+      message = "The encoded image exceeds the configured size limit.",
+    )
   }
 
   companion object {

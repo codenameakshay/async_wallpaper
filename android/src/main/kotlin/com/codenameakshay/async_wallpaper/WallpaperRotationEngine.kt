@@ -9,7 +9,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.URI
 import java.util.Collections
-import java.util.concurrent.locks.ReentrantLock
+import java.io.IOException
 import kotlin.concurrent.withLock
 
 /** Why a rotation start did or did not take effect, so callers can roll back only when needed. */
@@ -52,6 +52,12 @@ internal fun replaceDirectoryContents(target: File, fill: (File) -> List<String>
   return names.map { File(target, it).absolutePath }
 }
 
+internal fun requireSuccessfulBitmapCompression(compressed: Boolean) {
+  if (!compressed) {
+    throw IOException("Unable to compress the cached rotation wallpaper.")
+  }
+}
+
 internal class WallpaperRotationEngine(
   context: Context,
   private val store: WallpaperRotationStore,
@@ -63,10 +69,10 @@ internal class WallpaperRotationEngine(
   /**
    * Replaces the cached playlist and starts rotation.
    *
-   * Holds [rotationLock] for the whole swap so the cache directory cannot be deleted while a
+   * Holds the coordinator lock for the whole swap so the cache directory cannot be deleted while a
    * worker or alarm receiver is reading a file out of it.
    */
-  fun startRotation(config: WallpaperRotationConfigData): RotationStartResult = rotationLock.withLock {
+  fun startRotation(config: WallpaperRotationConfigData): RotationStartResult = WallpaperRotationCoordinator.withLock {
     val intervalMinutes = config.intervalMinutes?.toInt() ?: return@withLock RotationStartResult.REJECTED
     if (intervalMinutes < MIN_INTERVAL_MINUTES) {
       store.setLastError("Rotation interval must be at least 15 minutes.")
@@ -109,7 +115,7 @@ internal class WallpaperRotationEngine(
   }
 
   fun applyNextWallpaper(): Boolean {
-    return rotationLock.withLock {
+    return WallpaperRotationCoordinator.withLock {
       val config = store.getConfig()
       if (config == null || config.localSources.isEmpty()) {
         store.setLastError("Rotation is not configured.")
@@ -145,7 +151,7 @@ internal class WallpaperRotationEngine(
   }
 
   fun clearRotationCache() {
-    rotationLock.withLock {
+    WallpaperRotationCoordinator.withLock {
       getRotationCacheDirectory().deleteRecursively()
     }
   }
@@ -242,7 +248,7 @@ internal class WallpaperRotationEngine(
 
     try {
       FileOutputStream(targetFile).use { stream ->
-        output.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
+        requireSuccessfulBitmapCompression(output.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream))
       }
     } finally {
       if (output !== bitmap && !output.isRecycled) {
@@ -320,6 +326,5 @@ internal class WallpaperRotationEngine(
     private const val TARGET_HOME = 0
     private const val TARGET_LOCK = 1
     private const val TARGET_BOTH = 2
-    private val rotationLock = ReentrantLock()
   }
 }

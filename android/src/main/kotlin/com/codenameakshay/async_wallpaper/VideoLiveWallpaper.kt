@@ -9,7 +9,7 @@ import android.os.Bundle
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
-import java.io.File
+import java.io.IOException
 
 /**
  * `WallpaperManager.COMMAND_REAPPLY` (hidden API). On API 30+ Android does not rebind a live
@@ -90,9 +90,19 @@ class VideoLiveWallpaper : WallpaperService() {
     }
 
     private fun preparePlayerLocked(holder: SurfaceHolder) {
-      val file = File(filesDir, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME)
-      if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-        Log.w(TAG, "No readable live wallpaper video at ${file.absolutePath}")
+      val snapshot = try {
+        VideoWallpaperRepository(filesDir).openActiveSnapshot().also { opened ->
+          try {
+            if (opened.input.channel.size() <= 0L) {
+              throw IOException("The active wallpaper video is empty.")
+            }
+          } catch (error: Exception) {
+            opened.close()
+            throw error
+          }
+        }
+      } catch (error: Exception) {
+        Log.w(TAG, "No readable live wallpaper video at ${VideoWallpaperRepository(filesDir).activeFile}", error)
         stateMachine.onPlayerError()
         return
       }
@@ -100,6 +110,7 @@ class VideoLiveWallpaper : WallpaperService() {
       val player = try {
         MediaPlayer()
       } catch (error: Exception) {
+        snapshot.close()
         Log.e(TAG, "Unable to create live wallpaper player", error)
         stateMachine.onPlayerError()
         return
@@ -108,7 +119,6 @@ class VideoLiveWallpaper : WallpaperService() {
       val generation = ++playerGeneration
       mediaPlayer = player
       try {
-        val scaleMode = VideoWallpaperRepository(filesDir).activeScaleMode()
         player.setOnPreparedListener { preparedPlayer ->
           synchronized(lifecycleLock) {
             if (!isCurrentPlayer(preparedPlayer, generation)) {
@@ -127,13 +137,15 @@ class VideoLiveWallpaper : WallpaperService() {
           true
         }
         player.setSurface(holder.surface)
-        player.setDataSource(file.absolutePath)
+        player.setDataSource(snapshot.input.fd)
+        snapshot.close()
         player.isLooping = true
         // Live wallpaper should never take over the user's audio by default.
         player.setVolume(0f, 0f)
-        player.setVideoScalingMode(scaleMode.mediaPlayerMode())
+        player.setVideoScalingMode(snapshot.scaleMode.mediaPlayerMode())
         player.prepareAsync()
       } catch (error: Exception) {
+        runCatching { snapshot.close() }
         Log.e(TAG, "Failed to prepare live wallpaper player", error)
         handlePlayerFailureLocked()
       }
@@ -176,11 +188,13 @@ class VideoLiveWallpaper : WallpaperService() {
 
     /** The only release path. Clearing the reference first makes it idempotent. */
     private fun releasePlayerLocked() {
-      val player = mediaPlayer ?: return
+      val player = mediaPlayer
       mediaPlayer = null
       playerGeneration += 1L
-      runCatching { player.release() }
-        .onFailure { error -> Log.w(TAG, "Failed to release live wallpaper player", error) }
+      if (player != null) {
+        runCatching { player.release() }
+          .onFailure { error -> Log.w(TAG, "Failed to release live wallpaper player", error) }
+      }
     }
 
     private fun isCurrentPlayer(candidate: MediaPlayer, generation: Long): Boolean {

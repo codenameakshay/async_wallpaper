@@ -56,6 +56,15 @@ class PigeonApiImpl(
   private val rotationStore = WallpaperRotationStore(appContext)
   private val rotationEngine = WallpaperRotationEngine(appContext, rotationStore)
 
+  init {
+    operationQueue.submit(
+      operation = { WallpaperRotationRunner.recoverPendingSchedules(appContext) },
+      callback = { result ->
+        result.exceptionOrNull()?.let { Log.e(TAG, "Rotation schedule recovery failed on plugin attach", it) }
+      },
+    )
+  }
+
   @Volatile
   private var activityReference: WeakReference<Activity>? = null
 
@@ -103,14 +112,15 @@ class PigeonApiImpl(
     callback: (Result<Boolean>) -> Unit,
   ) {
     enqueueBoolean(callback) {
-      val validated = WallpaperRotationRequestValidator.validate(config)
-        ?: return@enqueueBoolean false
+      if (WallpaperRotationRequestValidator.validate(config) == null) {
+        return@enqueueBoolean false
+      }
       WallpaperRotationCoordinator.withLock {
         runCatching {
           when (rotationEngine.startRotation(config)) {
             RotationStartResult.STARTED -> {
               try {
-                reconcileRotationTriggers(config, validated.intervalMinutes)
+                reconcileRotationTriggers()
                 true
               } catch (error: Exception) {
                 // The wallpaper is already applied but the schedules are unknown; report failure and
@@ -140,10 +150,15 @@ class PigeonApiImpl(
     enqueueBoolean(callback) {
       WallpaperRotationCoordinator.withLock {
         runCatching {
-          WallpaperRotationScheduler.cancelPeriodic(appContext)
-          WallpaperRotationScheduler.cancelCharging(appContext)
-          WallpaperRotationScheduler.cancelTimeOfDay(appContext)
-          rotationStore.stopRotation()
+          if (!rotationStore.stopRotation()) {
+            return@runCatching false
+          }
+          completeScheduleReconciliation(
+            awaitOperations = {
+              WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(appContext, rotationStore))
+            },
+            clearPending = { rotationStore.clearSchedulesPending() },
+          )
           rotationEngine.clearRotationCache()
           true
         }.getOrElse {
@@ -159,33 +174,13 @@ class PigeonApiImpl(
    * is scheduled or cancelled independently so changing one setting never leaves a stale schedule
    * for another.
    */
-  private fun reconcileRotationTriggers(
-    config: WallpaperRotationConfigData,
-    intervalMinutes: Int,
-  ) {
-    if (config.enableIntervalTrigger == true) {
-      WallpaperRotationScheduler.schedulePeriodic(appContext, intervalMinutes)
-      rotationStore.setNextRunEpochMs(
-        System.currentTimeMillis() + intervalMinutes.toLong() * 60_000L,
-      )
-    } else {
-      WallpaperRotationScheduler.cancelPeriodic(appContext)
-      rotationStore.setNextRunEpochMs(0L)
-    }
-
-    if (config.enableChargingTrigger == true) {
-      WallpaperRotationScheduler.scheduleCharging(appContext, intervalMinutes)
-    } else {
-      WallpaperRotationScheduler.cancelCharging(appContext)
-    }
-
-    val startHour = config.activeHoursStart?.toInt()
-      ?: WallpaperRotationStore.DEFAULT_ACTIVE_HOURS_START
-    if (config.enableTimeOfDayTrigger == true) {
-      WallpaperRotationScheduler.scheduleTimeOfDay(appContext, startHour)
-    } else {
-      WallpaperRotationScheduler.cancelTimeOfDay(appContext)
-    }
+  private fun reconcileRotationTriggers() {
+    completeScheduleReconciliation(
+      awaitOperations = {
+        WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(appContext, rotationStore))
+      },
+      clearPending = { rotationStore.clearSchedulesPending() },
+    )
   }
 
   /**
@@ -194,11 +189,19 @@ class PigeonApiImpl(
    */
   private fun rollbackFailedRotationStart() {
     val failureReason = rotationStore.getStatusData().lastError
-    WallpaperRotationScheduler.cancelPeriodic(appContext)
-    WallpaperRotationScheduler.cancelCharging(appContext)
-    WallpaperRotationScheduler.cancelTimeOfDay(appContext)
-    rotationStore.stopRotation()
-    rotationEngine.clearRotationCache()
+    if (rotationStore.stopRotation()) {
+      runCatching {
+        completeScheduleReconciliation(
+          awaitOperations = {
+            WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(appContext, rotationStore))
+          },
+          clearPending = { rotationStore.clearSchedulesPending() },
+        )
+        rotationEngine.clearRotationCache()
+      }.onFailure {
+        Log.e(TAG, "Failed to finish rotation rollback", it)
+      }
+    }
     rotationStore.setLastError(failureReason)
   }
 

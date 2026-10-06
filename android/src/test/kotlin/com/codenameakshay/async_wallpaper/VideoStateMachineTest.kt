@@ -11,6 +11,91 @@ import org.junit.Test
 
 class VideoStateMachineTest {
   @Test
+  fun `all six event lifecycle sequences preserve player and state invariants`() {
+    val events = LifecycleEvent.entries
+    val sequenceCount = events.size.toLong().pow(MAX_SEQUENCE_LENGTH)
+
+    repeat(sequenceCount.toInt()) { encodedSequence ->
+      val machine = VideoPlaybackStateMachine()
+      var activePlayer = PlayerState.NONE
+      var surfaceExists = false
+      var visible = false
+      var engineDestroyed = false
+      var sequence = encodedSequence
+
+      repeat(MAX_SEQUENCE_LENGTH) {
+        val event = events[sequence % events.size]
+        sequence /= events.size
+        val previousPlayer = activePlayer
+        val action = when (event) {
+          LifecycleEvent.SURFACE_CREATED -> machine.onSurfaceCreated()
+          LifecycleEvent.SURFACE_DESTROYED -> machine.onSurfaceDestroyed()
+          LifecycleEvent.VISIBLE -> machine.onVisibilityChanged(true)
+          LifecycleEvent.HIDDEN -> machine.onVisibilityChanged(false)
+          LifecycleEvent.PREPARED -> machine.onPrepared()
+          LifecycleEvent.REAPPLIED -> machine.onAssetReapplied()
+          LifecycleEvent.ERROR -> machine.onPlayerError()
+          LifecycleEvent.ENGINE_DESTROYED -> machine.onEngineDestroyed()
+        }
+
+        when (event) {
+          LifecycleEvent.SURFACE_CREATED -> if (!engineDestroyed) surfaceExists = true
+          LifecycleEvent.SURFACE_DESTROYED -> surfaceExists = false
+          LifecycleEvent.VISIBLE -> if (!engineDestroyed) visible = true
+          LifecycleEvent.HIDDEN -> if (!engineDestroyed) visible = false
+          LifecycleEvent.ENGINE_DESTROYED -> {
+            engineDestroyed = true
+            surfaceExists = false
+          }
+          else -> Unit
+        }
+
+        when (action) {
+          VideoPlaybackAction.PREPARE -> {
+            assertTrue("prepare without a live surface in sequence $encodedSequence", surfaceExists)
+            assertFalse("prepare after engine destruction in sequence $encodedSequence", engineDestroyed)
+            // Reapply replaces the old MediaPlayer before the caller creates the new one.
+            activePlayer = PlayerState.PREPARING
+          }
+          VideoPlaybackAction.START -> {
+            assertTrue("start while hidden in sequence $encodedSequence", visible)
+            assertTrue(
+              "start without a prepared player in sequence $encodedSequence",
+              previousPlayer == PlayerState.READY || previousPlayer == PlayerState.PAUSED ||
+                (event == LifecycleEvent.PREPARED && previousPlayer == PlayerState.PREPARING),
+            )
+            activePlayer = PlayerState.PLAYING
+          }
+          VideoPlaybackAction.PAUSE -> {
+            assertEquals(PlayerState.PLAYING, previousPlayer)
+            assertFalse("pause while visible in sequence $encodedSequence", visible)
+            activePlayer = PlayerState.PAUSED
+          }
+          VideoPlaybackAction.RELEASE -> activePlayer = PlayerState.NONE
+          VideoPlaybackAction.NONE -> {
+            if (event == LifecycleEvent.PREPARED && previousPlayer == PlayerState.PREPARING && surfaceExists) {
+              activePlayer = if (visible) PlayerState.PLAYING else PlayerState.PAUSED
+            }
+          }
+        }
+
+        assertEquals(
+          "surface mismatch after $event in sequence $encodedSequence",
+          surfaceExists,
+          machine.hasSurface,
+        )
+        assertEquals(
+          "visibility mismatch after $event in sequence $encodedSequence",
+          visible,
+          machine.isVisible,
+        )
+        assertEquals(engineDestroyed, machine.state == VideoPlaybackState.RELEASED)
+        assertPlayerState(machine, activePlayer, encodedSequence, event)
+      }
+    }
+  }
+
+  @Test
   fun `prepared visible player starts once then follows visibility`() {
     val stateMachine = VideoPlaybackStateMachine()
 
@@ -217,6 +302,86 @@ class VideoStateMachineTest {
 
     override fun release() {
       released = true
+    }
+  }
+
+  private fun assertPlayerState(
+    machine: VideoPlaybackStateMachine,
+    player: PlayerState,
+    sequence: Int,
+    event: LifecycleEvent,
+  ) {
+    when (machine.state) {
+      VideoPlaybackState.IDLE -> assertEquals(
+        "idle state retained a player after $event in sequence $sequence",
+        PlayerState.NONE,
+        player,
+      )
+      VideoPlaybackState.PREPARING -> assertEquals(
+        "preparing state has no player after $event in sequence $sequence",
+        PlayerState.PREPARING,
+        player,
+      )
+      VideoPlaybackState.PAUSED -> assertEquals(
+        "paused state has no prepared player after $event in sequence $sequence",
+        PlayerState.PAUSED,
+        player,
+      )
+      VideoPlaybackState.PLAYING -> assertEquals(
+        "playing state has no playing player after $event in sequence $sequence",
+        PlayerState.PLAYING,
+        player,
+      )
+      VideoPlaybackState.RELEASED -> assertEquals(
+        "released state retained a player after $event in sequence $sequence",
+        PlayerState.NONE,
+        player,
+      )
+    }
+    if (machine.state == VideoPlaybackState.PLAYING) {
+      assertTrue(
+        "playing state has no surface after $event in sequence $sequence",
+        machine.hasSurface,
+      )
+      assertTrue(
+        "playing state is hidden after $event in sequence $sequence",
+        machine.isVisible,
+      )
+    }
+    if (machine.state == VideoPlaybackState.PAUSED || machine.state == VideoPlaybackState.PREPARING) {
+      assertTrue(
+        "active preparation/player has no surface after $event in sequence $sequence",
+        machine.hasSurface,
+      )
+    }
+  }
+
+  private enum class LifecycleEvent {
+    SURFACE_CREATED,
+    SURFACE_DESTROYED,
+    VISIBLE,
+    HIDDEN,
+    PREPARED,
+    REAPPLIED,
+    ERROR,
+    ENGINE_DESTROYED,
+  }
+
+  private enum class PlayerState {
+    NONE,
+    PREPARING,
+    READY,
+    PLAYING,
+    PAUSED,
+  }
+
+  private companion object {
+    const val MAX_SEQUENCE_LENGTH = 6
+
+    fun Long.pow(exponent: Int): Long {
+      var result = 1L
+      repeat(exponent) { result *= this }
+      return result
     }
   }
 }

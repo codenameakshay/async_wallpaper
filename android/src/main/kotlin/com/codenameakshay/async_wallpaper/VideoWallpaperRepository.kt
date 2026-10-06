@@ -18,6 +18,14 @@ data class PreparedVideo(
   val metadata: VideoMetadata,
 )
 
+/** A stable active-video descriptor and its matching scale mode. */
+internal data class ActiveVideoSnapshot(
+  val input: FileInputStream,
+  val scaleMode: VideoWallpaperScaleMode,
+) : AutoCloseable {
+  override fun close() = input.close()
+}
+
 /**
  * Filesystem seam for deterministic replacement tests. The production
  * implementation writes a temporary file in the same directory as the active
@@ -90,6 +98,7 @@ class VideoWallpaperRepository(
   @Throws(IOException::class, VideoMetadataValidationException::class)
   fun prepare(source: File): PreparedVideo = replacementLock.withLock {
     ensureStorageDirectory()
+    recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
 
     val destination = activeFile
@@ -109,6 +118,7 @@ class VideoWallpaperRepository(
   @Throws(IOException::class, VideoMetadataValidationException::class)
   fun prepare(source: InputStream): PreparedVideo = replacementLock.withLock {
     ensureStorageDirectory()
+    recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
     prepareLocked(source, activeFile)
   }
@@ -117,6 +127,7 @@ class VideoWallpaperRepository(
   @Throws(IOException::class, VideoMetadataValidationException::class)
   fun preparePending(source: InputStream): PreparedVideo = replacementLock.withLock {
     ensureStorageDirectory()
+    recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
     prepareLocked(source, pendingFile)
   }
@@ -125,55 +136,56 @@ class VideoWallpaperRepository(
   @Throws(IOException::class, VideoMetadataValidationException::class)
   fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo = replacementLock.withLock {
     ensureStorageDirectory()
+    recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
     val pending = pendingFile
     val metadata = validator.validate(pending)
     var scaleModeCandidate: File? = null
-    var scaleModeBackup: File? = null
-    var scaleModeInstalled = false
     try {
+      writePromotionJournalLocked()
       val candidate = stageScaleModeLocked(scaleMode)
       scaleModeCandidate = candidate
-      scaleModeBackup = backupFileIfPresent(activeScaleModeFile)
       fileSystem.replaceAtomically(candidate, activeScaleModeFile)
       scaleModeCandidate = null
-      scaleModeInstalled = true
       // Keep the active video at its canonical path until this final atomic replacement.
       fileSystem.replaceAtomically(pending, activeFile)
     } catch (error: Exception) {
-      if (scaleModeInstalled) {
-        val backup = scaleModeBackup
-        val rollback = runCatching {
-          if (backup != null) {
-            fileSystem.replaceAtomically(backup, activeScaleModeFile)
-            scaleModeBackup = null
-          } else {
-            fileSystem.delete(activeScaleModeFile)
-          }
-        }
-        rollback.onFailure(error::addSuppressed)
-      }
+      runCatching { recoverPromotionLocked() }.onFailure(error::addSuppressed)
       throw error
     } finally {
       scaleModeCandidate?.let(fileSystem::delete)
-      scaleModeBackup?.let(fileSystem::delete)
     }
+    // Journal cleanup cannot undo the committed rename. A later read can use the committed
+    // mode while mutations keep the marker as a witness until a repository entry clears it.
+    runCatching { fileSystem.delete(promotionJournalFile) }
     PreparedVideo(activeFile, metadata)
   }
 
   /** Reads the active asset's scale mode, defaulting safely for old installs. */
   fun activeScaleMode(): VideoWallpaperScaleMode = replacementLock.withLock {
-    runCatching {
-      if (!activeScaleModeFile.isFile) {
-        return@runCatching VideoWallpaperScaleMode.CENTER_CROP
-      }
-      VideoScaleModePersistence.decode(activeScaleModeFile.readText(StandardCharsets.UTF_8))
-    }.getOrDefault(VideoWallpaperScaleMode.CENTER_CROP)
+    ensureStorageDirectory()
+    recoverPromotionLocked(allowCommittedJournalRead = true)
+    readActiveScaleModeLocked()
+  }
+
+  /** Opens the active video and reads its mode while promotion is excluded by the shared lock. */
+  internal fun openActiveSnapshot(): ActiveVideoSnapshot = replacementLock.withLock {
+    ensureStorageDirectory()
+    recoverPromotionLocked(allowCommittedJournalRead = true)
+    val input = FileInputStream(activeFile)
+    try {
+      val scaleMode = readActiveScaleModeLocked()
+      ActiveVideoSnapshot(input, scaleMode)
+    } catch (error: Exception) {
+      input.close()
+      throw error
+    }
   }
 
   /** Removes abandoned temporary candidates left behind by a process interruption. */
   fun cleanupTemporaryFiles(): Int = replacementLock.withLock {
     ensureStorageDirectory()
+    recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
   }
 
@@ -197,27 +209,70 @@ class VideoWallpaperRepository(
         fileSystem.copyAndSync(it, temporaryFile)
       }
       return temporaryFile
-    } catch (error: IOException) {
+    } catch (error: Exception) {
       fileSystem.delete(temporaryFile)
       throw error
     }
   }
 
-  private fun backupFileIfPresent(file: File): File? {
-    if (!file.exists()) {
-      return null
+  private fun writePromotionJournalLocked() {
+    val previousMode = if (activeScaleModeFile.isFile) {
+      VideoScaleModePersistence.decode(activeScaleModeFile.readText(StandardCharsets.UTF_8)).name
+    } else {
+      SCALE_MODE_ABSENT
     }
-    val backup = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
+    val candidate = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
     try {
-      if (!fileSystem.delete(backup)) {
-        throw IOException("Unable to allocate a video promotion backup.")
+      ByteArrayInputStream(previousMode.toByteArray(StandardCharsets.UTF_8)).use {
+        fileSystem.copyAndSync(it, candidate)
       }
-      FileInputStream(file).use { input -> fileSystem.copyAndSync(input, backup) }
-      return backup
-    } catch (error: IOException) {
-      fileSystem.delete(backup)
-      throw error
+      fileSystem.replaceAtomically(candidate, promotionJournalFile)
+    } finally {
+      fileSystem.delete(candidate)
     }
+  }
+
+  /** Restores the old generation while pending exists, or keeps the committed mode after rename. */
+  private fun recoverPromotionLocked(allowCommittedJournalRead: Boolean = false) {
+    if (!promotionJournalFile.isFile) return
+
+    if (!pendingFile.exists()) {
+      val journalCleared = runCatching { fileSystem.delete(promotionJournalFile) }.getOrDefault(false)
+      if (!journalCleared && !allowCommittedJournalRead) {
+        throw IOException("Unable to clear the committed video promotion journal.")
+      }
+      return
+    }
+
+    val previousMode = promotionJournalFile.readText(StandardCharsets.UTF_8).trim()
+    if (previousMode == SCALE_MODE_ABSENT) {
+      if (!fileSystem.delete(activeScaleModeFile)) {
+        throw IOException("Unable to restore the previous video scale mode.")
+      }
+    } else {
+      val candidate = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
+      try {
+        ByteArrayInputStream(previousMode.toByteArray(StandardCharsets.UTF_8)).use {
+          fileSystem.copyAndSync(it, candidate)
+        }
+        fileSystem.replaceAtomically(candidate, activeScaleModeFile)
+      } finally {
+        fileSystem.delete(candidate)
+      }
+    }
+
+    if (!fileSystem.delete(promotionJournalFile)) {
+      throw IOException("Unable to clear the video promotion journal.")
+    }
+  }
+
+  private fun readActiveScaleModeLocked(): VideoWallpaperScaleMode {
+    return runCatching {
+      if (!activeScaleModeFile.isFile) {
+        return@runCatching VideoWallpaperScaleMode.CENTER_CROP
+      }
+      VideoScaleModePersistence.decode(activeScaleModeFile.readText(StandardCharsets.UTF_8))
+    }.getOrDefault(VideoWallpaperScaleMode.CENTER_CROP)
   }
 
   private fun ensureStorageDirectory() {
@@ -244,6 +299,9 @@ class VideoWallpaperRepository(
   private val activeScaleModeFile: File
     get() = File(storageDirectory, ACTIVE_SCALE_MODE_FILE_NAME)
 
+  private val promotionJournalFile: File
+    get() = File(storageDirectory, PROMOTION_JOURNAL_FILE_NAME)
+
   private fun File.isSameFileAs(other: File): Boolean {
     val sourcePath = runCatching { canonicalFile }.getOrElse { absoluteFile }
     val destinationPath = runCatching { other.canonicalFile }.getOrElse { other.absoluteFile }
@@ -255,6 +313,8 @@ class VideoWallpaperRepository(
     const val PENDING_VIDEO_FILE_NAME = "pending.mp4"
 
     private const val ACTIVE_SCALE_MODE_FILE_NAME = "file.mp4.scale-mode"
+    private const val PROMOTION_JOURNAL_FILE_NAME = "file.mp4.promotion-journal"
+    private const val SCALE_MODE_ABSENT = "ABSENT"
     private const val TEMP_FILE_SUFFIX = ".tmp"
 
     // One process-wide lock protects the one active-file hand-off protocol,

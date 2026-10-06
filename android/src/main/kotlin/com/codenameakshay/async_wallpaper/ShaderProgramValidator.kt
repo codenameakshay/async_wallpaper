@@ -255,13 +255,22 @@ object ShaderProgramValidator {
         )
 
       val initial = parsed.groupValues[2].toLongOrNull()
-        ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop initial value is not an integer.")
+        ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop initial value must be an integer literal.")
       val comparison = parsed.groupValues[3]
       val bound = parsed.groupValues[4].toLongOrNull()
-        ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop bound is not an integer.")
+        ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop bound must be an integer literal.")
       val update = parsed.groupValues[5]
       val step = loopStep(update)
         ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop update is not statically bounded.")
+      if (initial !in PORTABLE_LOOP_INT_MIN..PORTABLE_LOOP_INT_MAX ||
+        bound !in PORTABLE_LOOP_INT_MIN..PORTABLE_LOOP_INT_MAX ||
+        step !in PORTABLE_LOOP_INT_MIN..PORTABLE_LOOP_INT_MAX
+      ) {
+        return error(
+          ErrorCode.SHADER_DYNAMIC_LOOP,
+          "For-loop values and step operands must stay within -255..255 for portable integer precision.",
+        )
+      }
       val iterations = loopIterations(initial, comparison, bound, step)
         ?: return error(ErrorCode.SHADER_DYNAMIC_LOOP, "For-loop does not make progress toward its bound.")
       if (iterations > MAX_STATIC_LOOP_ITERATIONS) {
@@ -269,6 +278,18 @@ object ShaderProgramValidator {
           ErrorCode.SHADER_LOOP_LIMIT_EXCEEDED,
           "For loops may execute at most $MAX_STATIC_LOOP_ITERATIONS iterations.",
         )
+      }
+      if (iterations > 0L) {
+        val lastValue = initial + (iterations - 1L) * step
+        val valueAfterUpdate = lastValue + step
+        if (lastValue !in PORTABLE_LOOP_INT_MIN..PORTABLE_LOOP_INT_MAX ||
+          valueAfterUpdate !in PORTABLE_LOOP_INT_MIN..PORTABLE_LOOP_INT_MAX
+        ) {
+          return error(
+            ErrorCode.SHADER_DYNAMIC_LOOP,
+            "For-loop updates must stay within -255..255 for portable integer precision.",
+          )
+        }
       }
     }
     return null
@@ -469,7 +490,7 @@ object ShaderProgramValidator {
   private val UNBOUNDED_LOOP = Regex("""\b(?:while|do)\b""")
   private val FOR_LOOP_START = Regex("""\bfor\s*\(""")
   private val STATIC_FOR_LOOP = Regex(
-    """(?:int|float)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?\d+)\s*;\s*\1\s*(<=|<|>=|>)\s*(-?\d+)\s*;\s*((?:\1\s*(?:\+\+|--|\+=\s*\d+|-=\s*\d+))|(?:(?:\+\+|--)\s*\1))""",
+    """int\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?\d+)\s*;\s*\1\s*(<=|<|>=|>)\s*(-?\d+)\s*;\s*((?:\1\s*(?:\+\+|--|\+=\s*\d+|-=\s*\d+))|(?:(?:\+\+|--)\s*\1))""",
   )
   private val UNIFORM_STATEMENT = Regex("""\buniform\b([^;]*);""")
   private val UNIFORM_DECLARATION = Regex(
@@ -502,4 +523,7 @@ object ShaderProgramValidator {
     "u_touch" to "vec2",
     "u_offset" to "vec2",
   )
+
+  private const val PORTABLE_LOOP_INT_MIN = -255L
+  private const val PORTABLE_LOOP_INT_MAX = 255L
 }

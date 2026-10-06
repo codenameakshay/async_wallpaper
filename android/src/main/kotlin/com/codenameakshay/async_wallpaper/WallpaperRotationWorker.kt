@@ -9,8 +9,19 @@ internal class WallpaperRotationWorker(
   params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
   override suspend fun doWork(): Result {
-    val storedGeneration = inputData.getLong(WallpaperRotationScheduler.INPUT_GENERATION_KEY, NO_GENERATION)
-      .takeUnless { it == NO_GENERATION }
+    try {
+      if (WallpaperRotationRunner.recoverPendingSchedules(applicationContext)) {
+        return Result.success()
+      }
+    } catch (_: Exception) {
+      // Keep the durable pending marker and retry recovery without advancing the playlist.
+      return Result.retry()
+    }
+
+    val storedGeneration = inputData.getLong(
+      WallpaperRotationScheduler.INPUT_GENERATION_KEY,
+      NO_GENERATION,
+    ).takeUnless { it == NO_GENERATION }
     val generation = expectedRotationGeneration(storedGeneration)
     val reason = inputData.getString(WallpaperRotationScheduler.INPUT_REASON_KEY)
     val succeeded = if (reason == null) {

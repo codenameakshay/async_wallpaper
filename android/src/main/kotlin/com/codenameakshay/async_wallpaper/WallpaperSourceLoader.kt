@@ -421,8 +421,8 @@ class WallpaperSourceLoader(
   }
 
   private fun parseHttpsUri(value: String): URI {
-    val uri = try {
-      URI(value)
+    return try {
+      HttpsSourceUrlParser.parse(value, allowUserInfo = false)
     } catch (error: Exception) {
       throw WallpaperSourceException(
         code = ERROR_INVALID_URL,
@@ -430,18 +430,6 @@ class WallpaperSourceLoader(
         cause = error,
       )
     }
-    if (
-      !uri.isAbsolute ||
-      !uri.scheme.equals(HTTPS_SCHEME, ignoreCase = true) ||
-      uri.host.isNullOrBlank() ||
-      uri.userInfo != null
-    ) {
-      throw WallpaperSourceException(
-        code = ERROR_INVALID_URL,
-        message = "Wallpaper network sources must be absolute HTTPS URLs.",
-      )
-    }
-    return uri
   }
 
   private fun requiredValue(value: String?, name: String): String {
@@ -533,7 +521,6 @@ class WallpaperSourceLoader(
       return mimeType?.startsWith("image/") == true
     }
 
-    private const val HTTPS_SCHEME = "https"
     private const val CONTENT_SCHEME = "content"
     private const val HTTP_GET = "GET"
     private const val HTTP_ACCEPT_HEADER = "Accept"

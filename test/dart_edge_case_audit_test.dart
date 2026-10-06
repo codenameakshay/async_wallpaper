@@ -223,8 +223,39 @@ void main() {
         for (final control in <int>[0, 9, 10, 13, 31, 127])
           'https://example.com/${String.fromCharCode(control)}image.jpg',
       ];
+      final exhaustiveMalformedUrls = <String>{...malformedUrls};
+      for (var controlCode = 0; controlCode <= 0x20; controlCode++) {
+        final control = String.fromCharCode(controlCode);
+        exhaustiveMalformedUrls
+          ..add('https://exa${control}mple.com/image.jpg')
+          ..add(
+            'https://example.com/$control'
+            'image.jpg',
+          )
+          ..add(
+            'https://example.com/image.jpg?x=$control'
+            'y',
+          );
+      }
+      exhaustiveMalformedUrls
+        ..add('https://example.com/%')
+        ..addAll(<String>[
+          for (final hex in '0123456789abcdefABCDEF'.split(''))
+            'https://example.com/%$hex',
+          for (final invalidHex
+              in 'GHIJKLMNOPQRSTUVWXYZghijklmnopqrstuvwxyz'.split(''))
+            'https://example.com/%${invalidHex}0',
+          for (final port in <String>[
+            '-1',
+            '0',
+            '65536',
+            '99999',
+            '999999999999',
+          ])
+            'https://example.com:$port/image.jpg',
+        ]);
 
-      for (final url in malformedUrls) {
+      for (final url in exhaustiveMalformedUrls) {
         final staticResult = await AsyncWallpaper.applyWallpaper(
           StaticWallpaperRequest(
             source: WallpaperSource.url(url),

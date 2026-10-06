@@ -16,6 +16,7 @@ internal object WallpaperRotationRunner {
         expectedGeneration = expectedGeneration,
         currentGeneration = store.getGeneration(),
         isStillRequested = isStillRequested(),
+        schedulesPending = store.areSchedulesPending(),
       )
     ) {
       return@withLock true
@@ -84,6 +85,7 @@ internal object WallpaperRotationRunner {
         expectedGeneration = expectedGeneration,
         currentGeneration = store.getGeneration(),
         isStillRequested = isStillRequested(),
+        schedulesPending = store.areSchedulesPending(),
       )
     ) {
       return@withLock true
@@ -99,13 +101,47 @@ internal object WallpaperRotationRunner {
     success
   }
 
+  /**
+   * Completes schedule changes that were interrupted after their preference commit. This always
+   * uses the latest stored config and returns without applying a wallpaper.
+   */
+  fun recoverPendingSchedules(context: Context): Boolean = WallpaperRotationCoordinator.withLock {
+    val store = WallpaperRotationStore(context)
+    recoverPendingRotationSchedules(store) { config ->
+      WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(context, store, config))
+    }
+  }
+
   internal fun shouldApply(
     isRunning: Boolean,
     expectedGeneration: Long?,
     currentGeneration: Long,
     isStillRequested: Boolean,
+    schedulesPending: Boolean = false,
   ): Boolean {
-    return isRunning && isStillRequested &&
+    return !schedulesPending && isRunning && isStillRequested &&
       (expectedGeneration == null || expectedGeneration == currentGeneration)
   }
+}
+
+/** The durable marker is cleared only after all schedule operations have completed successfully. */
+internal fun completeScheduleReconciliation(awaitOperations: () -> Unit, clearPending: () -> Boolean) {
+  awaitOperations()
+  check(clearPending()) { "Unable to save completed rotation schedule reconciliation." }
+}
+
+/** Reconciles from current persisted state, ignoring any generation carried by the triggering worker. */
+internal fun recoverPendingRotationSchedules(
+  store: WallpaperRotationStore,
+  reconcileCurrentConfig: (StoredWallpaperRotationConfig?) -> Unit,
+): Boolean {
+  if (!store.areSchedulesPending()) {
+    return false
+  }
+  val currentConfig = if (store.isRunning()) store.getConfig() else null
+  completeScheduleReconciliation(
+    awaitOperations = { reconcileCurrentConfig(currentConfig) },
+    clearPending = { store.clearSchedulesPending() },
+  )
+  return true
 }

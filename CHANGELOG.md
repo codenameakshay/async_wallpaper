@@ -1,3 +1,13 @@
+## Unreleased
+
+- Keep rotation playlists and settings coherent across interrupted or failed saves. Recover unfinished schedule changes, and commit stop before deleting cached images.
+- Keep each active video paired with its scale mode during concurrent promotion and after process interruption.
+- Accept internationalized HTTPS hostnames in Android source loaders while retaining authority validation.
+- Reject shader loop counters that can stagnate or overflow. Static loops now require integer counters with initial values, bounds, steps, and final updates in `-255..255`; the existing 128-iteration limit remains.
+- Allow OpenGL wallpaper initialization when EGL provides window surfaces without pbuffer support.
+- Use add-only Photos authorization on iOS 13, matching the documented usage key.
+- Record the audit coverage, regression tests, and platform limits in [the October reliability audit](doc/reliability-audit-2026-10.md).
+
 ## 3.3.0
 
 Android reliability release. The public API is unchanged, but rotation now needs HTTPS URLs and no longer uses a foreground service. See [doc/migration.md](doc/migration.md#from-32-to-33).

@@ -328,10 +328,15 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
     }
 
+    /**
+     * Detaches EGL from [destroyedSurface] and waits for it, because SurfaceHolder.Callback
+     * requires that nothing draws to the surface after onSurfaceDestroyed returns. The render
+     * thread never waits on the main thread, so the bounded wait cannot deadlock.
+     */
     fun surfaceDestroyed(destroyedSurface: Surface) {
-      handler.post {
+      val detached = postAndAwait(handler::post, SURFACE_DESTROYED_WAIT_MILLIS) {
         if (destroyed) {
-          return@post
+          return@postAndAwait
         }
         if (surface === destroyedSurface || surface?.isValid != true) {
           surface = null
@@ -339,6 +344,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
           renderer?.detachSurface()
         }
         invalidateScheduledFrame()
+      }
+      if (!detached) {
+        Log.w(TAG, "The OpenGL render thread did not detach the surface within $SURFACE_DESTROYED_WAIT_MILLIS ms.")
       }
     }
 
@@ -526,6 +534,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private companion object {
       private const val NANOS_PER_SECOND = 1_000_000_000.0
       private const val SHUTDOWN_WAIT_MILLIS = 1_000L
+      private const val SURFACE_DESTROYED_WAIT_MILLIS = 1_000L
 
       private fun frameIntervalFor(configuration: OpenGlWallpaperConfiguration): Long = max(
         1L,
@@ -681,6 +690,33 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private const val OPENGL_ES2_VERSION = 0x0002_0000
     private const val SHADER_CHECK_TIMEOUT_MILLIS = 2_000L
     private val shaderCheckRunning = AtomicBoolean(false)
+  }
+}
+
+/**
+ * Posts [block] and waits up to [timeoutMillis] for it to finish. Returns false when [post]
+ * accepted the block and it did not finish in time, or when the caller was interrupted; a rejected
+ * post has nothing to wait for.
+ */
+internal fun postAndAwait(post: (Runnable) -> Boolean, timeoutMillis: Long, block: () -> Unit): Boolean {
+  val done = CountDownLatch(1)
+  val accepted = post(
+    Runnable {
+      try {
+        block()
+      } finally {
+        done.countDown()
+      }
+    },
+  )
+  if (!accepted) {
+    return true
+  }
+  return try {
+    done.await(timeoutMillis, TimeUnit.MILLISECONDS)
+  } catch (error: InterruptedException) {
+    Thread.currentThread().interrupt()
+    false
   }
 }
 

@@ -1,4 +1,4 @@
-## Unreleased
+## 3.4.0
 
 - Keep rotation playlists and settings coherent across interrupted or failed saves. Recover unfinished schedule changes, and commit stop before deleting cached images.
 - Keep each active video paired with its scale mode during concurrent promotion and after process interruption.
@@ -9,6 +9,7 @@
 - Allow OpenGL wallpaper initialization when EGL provides window surfaces without pbuffer support.
 - Use add-only Photos authorization on iOS 13, matching the documented usage key.
 - iOS downloads stream into a bounded temporary file (64 MiB) and are saved to Photos under the extension of the image type that ImageIO decodes. Photos validates a file resource by its extension and rejected the extension-less temporary file, so every save failed with `PHPhotosErrorDomain` 3302.
+- Example (Android 12+): the example now destroys its retained `FlutterEngine` when the Activity finishes, so the next launch after Back starts cold. The Android compatibility guide shows the same override.
 - Record the audit coverage, regression tests, and platform limits in [the October reliability audit](doc/reliability-audit-2026-10.md).
 
 ## 3.3.0

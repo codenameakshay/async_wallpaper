@@ -1,3 +1,7 @@
+## Unreleased
+
+- Accept HTTPS URLs that have a `#fragment`. Since 3.3.0 the Dart layer rejected them with `invalid-input`, because `Uri.isAbsolute` is false for any URI with a fragment. Android and iOS accept them and do not send the fragment. Fragment characters that Android rejects stay rejected.
+
 ## 3.4.0
 
 - Keep rotation playlists and settings coherent across interrupted or failed saves. Recover unfinished schedule changes, and commit stop before deleting cached images.

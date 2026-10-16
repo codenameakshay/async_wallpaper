@@ -81,6 +81,147 @@ void main() {
   });
 
   test(
+    'forwards HTTPS URLs with fragments from every URL entry point',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const codec = WallpaperApi.pigeonChannelCodec;
+      final forwarded = <String, Object?>{};
+      for (final method in <String>[
+        'applyWallpaper',
+        'prepareVideoWallpaper',
+        'openLiveWallpaperPreview',
+        'applyOpenGlWallpaper',
+        'downloadWallpaper',
+        'setMaterialYouWallpaper',
+        'startWallpaperRotation',
+      ]) {
+        final channel =
+            'dev.flutter.pigeon.async_wallpaper.WallpaperApi.$method';
+        messenger.setMockMessageHandler(channel, (message) async {
+          forwarded[method] = (codec.decodeMessage(message)! as List).single;
+          return codec.encodeMessage(<Object?>['recorded', null, null]);
+        });
+        addTearDown(() => messenger.setMockMessageHandler(channel, null));
+      }
+
+      for (final url in <String>[
+        'https://example.com/a.jpg#x',
+        'https://i❤.ws/favicon.ico?x=%E2%9D%A4#frag',
+        'https://example.com#%41',
+        'https://example.com/a.jpg#',
+        'https://example.com/a.jpg?first=1#second?third=2',
+        'https://example.com/a.jpg#🚀\u200b',
+        r"https://example.com:8443/a.jpg?q=1#f/?:@!$&'()*+,;=[]%20é",
+      ]) {
+        forwarded.clear();
+        await AsyncWallpaper.applyWallpaper(
+          StaticWallpaperRequest(
+            source: WallpaperSource.url(url),
+            target: WallpaperTarget.home,
+          ),
+        );
+        await AsyncWallpaper.setVideoWallpaper(
+          VideoWallpaperRequest(source: WallpaperSource.url(url)),
+        );
+        await AsyncWallpaper.setOpenGlLiveWallpaper(
+          OpenGlLiveWallpaperRequest(
+            fragmentShader: 'void main() {}',
+            textures: <WallpaperSource>[WallpaperSource.url(url)],
+          ),
+        );
+        await AsyncWallpaper.downloadWallpaper(
+          DownloadWallpaperRequest(url: url),
+        );
+        await AsyncWallpaper.setMaterialYouWallpaper(
+          MaterialYouWallpaperRequest(url: url),
+        );
+        await AsyncWallpaper.startWallpaperRotation(
+          WallpaperRotationRequest(
+            sources: <WallpaperRotationSource>[
+              WallpaperRotationSource(
+                sourceType: WallpaperSourceType.url,
+                source: url,
+              ),
+            ],
+            target: WallpaperTarget.home,
+            intervalMinutes: 60,
+          ),
+        );
+
+        expect(
+          (forwarded['applyWallpaper'] as StaticWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
+        forwarded.remove('applyWallpaper');
+        await AsyncWallpaper.setWallpaper(
+          WallpaperRequest(
+            sourceType: WallpaperSourceType.url,
+            source: url,
+            target: WallpaperTarget.home,
+          ),
+        );
+        expect(
+          (forwarded['applyWallpaper'] as StaticWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
+        expect(
+          (forwarded['prepareVideoWallpaper'] as VideoWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
+        await AsyncWallpaper.openLiveWallpaperPreview(
+          VideoWallpaperRequest(source: WallpaperSource.url(url)),
+        );
+        expect(
+          (forwarded['openLiveWallpaperPreview'] as VideoWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
+        expect(
+          (forwarded['applyOpenGlWallpaper'] as OpenGlWallpaperRequestData?)
+              ?.textures
+              ?.single
+              ?.url,
+          url,
+          reason: url,
+        );
+        expect(forwarded['downloadWallpaper'], url, reason: url);
+        expect(forwarded['setMaterialYouWallpaper'], url, reason: url);
+        expect(
+          (forwarded['startWallpaperRotation'] as WallpaperRotationConfigData?)
+              ?.sources
+              ?.single
+              ?.source,
+          url,
+          reason: url,
+        );
+      }
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      const iosUrl = 'https://example.com/a.jpg#🚀';
+      forwarded.clear();
+      await AsyncWallpaper.downloadWallpaper(
+        const DownloadWallpaperRequest(url: iosUrl),
+      );
+      expect(forwarded['downloadWallpaper'], iosUrl);
+    },
+  );
+
+  test(
     'rejects a rotation interval larger than the native Int range',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -222,6 +363,44 @@ void main() {
         'https://example.com:65536/image.jpg',
         for (final control in <int>[0, 9, 10, 13, 31, 127])
           'https://example.com/${String.fromCharCode(control)}image.jpg',
+        'http://example.com/image.jpg#x',
+        'https://user@example.com/image.jpg#x',
+        'https://%65xample.com#x',
+        'https://%65xample.com/image.jpg#x',
+        'https://example.com:0#x',
+        'https://example.com:65536/image.jpg#x',
+        'https://#x',
+        'https:///image.jpg#x',
+        'https:/example.com/image.jpg#x',
+        'https:example.com#x',
+        'https://example.com/%GG#x',
+        'https://example.com/image.jpg#%',
+        'https://example.com/image.jpg#%G0',
+        'https://example.com/image.jpg#x y',
+        'https://example.com/image.jpg#x\\y',
+        // Characters that java.net.URI rejects in a fragment.
+        for (final character in <String>[
+          '#',
+          '"',
+          '<',
+          '>',
+          '^',
+          '`',
+          '{',
+          '|',
+          '}',
+          '\u0080',
+          '\u0085',
+          '\u009f',
+          '\u1680',
+          '\u2029',
+          '\u202f',
+          '\u205f',
+          '\u00a0',
+          '\u2028',
+          '\u3000',
+        ])
+          'https://example.com/image.jpg#x${character}y',
       ];
       final exhaustiveMalformedUrls = <String>{...malformedUrls};
       for (var controlCode = 0; controlCode <= 0x20; controlCode++) {

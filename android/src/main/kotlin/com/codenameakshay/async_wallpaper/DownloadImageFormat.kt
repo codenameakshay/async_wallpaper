@@ -17,6 +17,25 @@ internal object DownloadImageFormat {
     }
   }
 
+  /** Explains a null [choose] result with MIME types only, so the log never carries the URL. */
+  fun rejectionReason(decodedMimeType: String?, httpContentType: String?): String {
+    val httpMimeType = normalize(httpContentType)
+    if (httpMimeType != null && !httpMimeType.startsWith("image/")) {
+      return "HTTP type $httpMimeType is not an image type"
+    }
+    val decoded = normalize(decodedMimeType)
+    val judged = when {
+      decoded != null -> "decoded type $decoded" + (httpMimeType?.let { " (HTTP $it)" } ?: "")
+      httpMimeType != null -> "HTTP type $httpMimeType"
+      else -> return "no image type was reported; accepted types are $ACCEPTED_TYPES"
+    }
+    return "$judged is not supported; accepted types are $ACCEPTED_TYPES"
+  }
+
+  // Keep in step with selectionFor.
+  private const val ACCEPTED_TYPES =
+    "image/jpeg, image/png, image/webp, image/gif, image/bmp, image/heic, image/heif, image/avif"
+
   private fun selectionFor(value: String?): Selection? {
     return when (normalize(value)) {
       "image/jpeg", "image/jpg" -> Selection("image/jpeg", "jpg")

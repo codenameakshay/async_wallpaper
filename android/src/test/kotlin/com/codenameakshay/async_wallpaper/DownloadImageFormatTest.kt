@@ -27,4 +27,25 @@ class DownloadImageFormatTest {
     assertNull(DownloadImageFormat.choose("image/tiff", "image/jpeg"))
     assertNull(DownloadImageFormat.choose("image/png", "text/html"))
   }
+
+  @Test
+  fun `rejection reason names the judged type and the accepted types`() {
+    val accepted = "image/jpeg, image/png, image/webp, image/gif, image/bmp, image/heic, image/heif, image/avif"
+    assertEquals(
+      "decoded type image/x-ico (HTTP image/x-icon) is not supported; accepted types are $accepted",
+      DownloadImageFormat.rejectionReason("image/x-ico", "image/x-icon"),
+    )
+    assertEquals(
+      "HTTP type image/tiff is not supported; accepted types are $accepted",
+      DownloadImageFormat.rejectionReason(null, "Image/TIFF; q=1"),
+    )
+    assertEquals(
+      "no image type was reported; accepted types are $accepted",
+      DownloadImageFormat.rejectionReason(null, null),
+    )
+    assertEquals(
+      "HTTP type text/html is not an image type",
+      DownloadImageFormat.rejectionReason("image/png", "text/html; charset=utf-8"),
+    )
+  }
 }

@@ -222,6 +222,8 @@ The plugin's exported wallpaper services use overrideable resource values. Put m
 
 Without the grant the plugin returns a failure before downloading anything.
 
+On every Android version, `downloadWallpaper` saves only JPEG, PNG, WebP, GIF, BMP, HEIC, HEIF, and AVIF images. It returns `false` for other formats, such as ICO. The Dart result is a generic failure, so the plugin logs the reason for each failed download under the `AsyncWallpaper` logcat tag. The log names the MIME type, never the URL.
+
 ## iOS and package managers
 
 iOS is download-only. `downloadWallpaper(DownloadWallpaperRequest(url: ...))` saves an image URL to Photos after the host app supplies `NSPhotoLibraryAddUsageDescription`; all wallpaper-apply, video, chooser, and OpenGL APIs return `unsupported`.

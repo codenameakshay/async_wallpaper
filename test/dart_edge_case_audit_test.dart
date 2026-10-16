@@ -93,6 +93,7 @@ void main() {
       for (final method in <String>[
         'applyWallpaper',
         'prepareVideoWallpaper',
+        'openLiveWallpaperPreview',
         'applyOpenGlWallpaper',
         'downloadWallpaper',
         'setMaterialYouWallpaper',
@@ -112,6 +113,8 @@ void main() {
         'https://i❤.ws/favicon.ico?x=%E2%9D%A4#frag',
         'https://example.com#%41',
         'https://example.com/a.jpg#',
+        'https://example.com/a.jpg?first=1#second?third=2',
+        'https://example.com/a.jpg#🚀\u200b',
         r"https://example.com:8443/a.jpg?q=1#f/?:@!$&'()*+,;=[]%20é",
       ]) {
         forwarded.clear();
@@ -156,8 +159,33 @@ void main() {
           url,
           reason: url,
         );
+        forwarded.remove('applyWallpaper');
+        await AsyncWallpaper.setWallpaper(
+          WallpaperRequest(
+            sourceType: WallpaperSourceType.url,
+            source: url,
+            target: WallpaperTarget.home,
+          ),
+        );
+        expect(
+          (forwarded['applyWallpaper'] as StaticWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
         expect(
           (forwarded['prepareVideoWallpaper'] as VideoWallpaperRequestData?)
+              ?.source
+              ?.url,
+          url,
+          reason: url,
+        );
+        await AsyncWallpaper.openLiveWallpaperPreview(
+          VideoWallpaperRequest(source: WallpaperSource.url(url)),
+        );
+        expect(
+          (forwarded['openLiveWallpaperPreview'] as VideoWallpaperRequestData?)
               ?.source
               ?.url,
           url,
@@ -182,6 +210,14 @@ void main() {
           reason: url,
         );
       }
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      const iosUrl = 'https://example.com/a.jpg#🚀';
+      forwarded.clear();
+      await AsyncWallpaper.downloadWallpaper(
+        const DownloadWallpaperRequest(url: iosUrl),
+      );
+      expect(forwarded['downloadWallpaper'], iosUrl);
     },
   );
 
@@ -353,7 +389,13 @@ void main() {
           '{',
           '|',
           '}',
+          '\u0080',
           '\u0085',
+          '\u009f',
+          '\u1680',
+          '\u2029',
+          '\u202f',
+          '\u205f',
           ' ',
           ' ',
           '　',

@@ -396,9 +396,9 @@ void main() {
           '\u2029',
           '\u202f',
           '\u205f',
-          ' ',
-          ' ',
-          '　',
+          '\u00a0',
+          '\u2028',
+          '\u3000',
         ])
           'https://example.com/image.jpg#x${character}y',
       ];

@@ -305,6 +305,9 @@ class OpenGlLiveWallpaperRequest {
   final bool goToHome;
 
   /// Immutable texture sources in the order exposed to the shader.
+  ///
+  /// `texture2D(u_texture0, v_uv)` shows the first texture upright: `v_uv`
+  /// (0, 0) is the bottom-left corner of both the screen and the image.
   List<WallpaperSource> get textures => _textures;
 }
 

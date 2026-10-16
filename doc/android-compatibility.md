@@ -163,6 +163,7 @@ The public request has these guardrails:
 - 1–60 FPS;
 - bounded source, texture, uniform, and loop counts;
 - URL, local-file, content-URI, and bytes texture sources; a URL is bounded and materialized before renderer configuration, and the render thread never fetches it;
+- textures that appear upright: `v_uv` runs from (0, 0) at the bottom-left of the screen to (1, 1) at the top-right, and `texture2D(u_texture0, v_uv)` samples the image's bottom-left corner at (0, 0);
 - errors such as `opengl-es2-unavailable`, `shader-main-missing`, and `frame-rate-out-of-range` are returned as structured failures.
 
 Before the plugin activates a configuration or opens the preview, it compiles and links the fragment shader with its own vertex shader on the device's driver, in a 1x1 offscreen (pbuffer) context. If the driver rejects the shader, the result is `failed` with `shader-compilation-failed` or `shader-link-failed`, and `errorDetails` contains the driver's info log. The active wallpaper does not change and no preview opens. The plugin skips this check and logs the reason when EGL is unavailable, when the device has no pbuffer-capable EGL config, when the check takes longer than 2 seconds or an earlier check is still running, or when the check fails for a reason other than the shader itself. The renderer then compiles the shader when it draws, and a shader that fails there shows a black wallpaper.

@@ -128,7 +128,8 @@ private const val TEXTURE_READ_BUFFER_SIZE = 8 * 1024
  * Fragment shaders may declare these optional uniforms with their exact listed types:
  * `u_time` (`float`), `u_resolution` (`vec2`), `u_touch` (`vec2`, normalized), `u_offset`
  * (`vec2`), and `u_texture0` through `u_texture3` (`sampler2D`). The safe vertex shader supplies
- * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates.
+ * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates. Textures are
+ * uploaded so that `texture2D(u_texture0, v_uv)` shows them upright.
  */
 class OpenGlWallpaperConfiguration(
   val fragmentShader: String,

@@ -5,6 +5,7 @@
 - Reject HTTPS URLs that Android cannot parse with `invalid-input`: `` "<>^`{|} ``, U+0080–U+009F, or a Unicode space separator anywhere in the URL, `[` or `]` in the path, and any `@` in the authority, such as `https://@example.com/a.jpg`. Some Android entry points previously returned `invalid-url`. Behavior change: on iOS 17+, `downloadWallpaper` accepted some of them, because `URL(string:)` percent-encodes them. Percent-encode prohibited characters in path, query, or fragment data. Remove user information from the authority instead of percent-encoding its `@`.
 - OpenGL live wallpapers: compile and link the fragment shader on the device's driver before activating it or opening the preview. A shader that the driver rejects now returns `failed` with `shader-compilation-failed` or `shader-link-failed` and the driver log in `errorDetails`, and the active wallpaper does not change. Before, the preview opened, the wallpaper rendered black, and the result was `previewOpened`. The check is skipped and logged when it cannot run, for example without a pbuffer EGL config or without a result within 2 seconds.
 - OpenGL live wallpapers: wait, for up to 1 second, until the render thread stops using the wallpaper surface before `onSurfaceDestroyed` returns, as `SurfaceHolder.Callback` requires.
+- OpenGL live wallpapers: textures are now upright. `texture2D(u_texture0, v_uv)` showed them upside down. Remove any `1.0 - v_uv.y` flip that compensated; see [doc/migration.md](doc/migration.md#unreleased).
 
 ## 3.4.0
 

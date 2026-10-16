@@ -9,7 +9,6 @@ import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES20
-import android.opengl.GLUtils
 import android.view.Surface
 import androidx.core.graphics.scale
 import java.io.IOException
@@ -459,7 +458,7 @@ class GlRenderer(
             GLES20.GL_TEXTURE_WRAP_T,
             GLES20.GL_CLAMP_TO_EDGE,
           )
-          GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+          uploadUpright(bitmap)
           takeGlError()?.let { error ->
             throw TextureLoadException(
               ERROR_TEXTURE_UPLOAD_FAILED,
@@ -481,10 +480,48 @@ class GlRenderer(
     } catch (error: SecurityException) {
       GLES20.glDeleteTextures(ids.size, ids, 0)
       return Result.Failure(ERROR_TEXTURE_SOURCE_UNAVAILABLE, "Permission to read a wallpaper texture was denied.")
+    } catch (error: OutOfMemoryError) {
+      // Decoding and the upright copy each hold an image-sized buffer; fail this frame, not the process.
+      GLES20.glDeleteTextures(ids.size, ids, 0)
+      return Result.Failure(ERROR_TEXTURE_ALLOCATION_FAILED, "Not enough memory to load a wallpaper texture.")
     }
     textureIds = ids
     GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
     return Result.Success
+  }
+
+  /**
+   * Uploads [bitmap] bottom row first. Texture coordinates start at the bottom-left, as `v_uv`
+   * does, so `texture2D(u_texture0, v_uv)` shows the image upright.
+   */
+  @Throws(TextureLoadException::class)
+  private fun uploadUpright(bitmap: Bitmap) {
+    val rgba = if (bitmap.config == Bitmap.Config.ARGB_8888) {
+      bitmap
+    } else {
+      bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        ?: throw TextureLoadException(ERROR_TEXTURE_DECODE_FAILED, "Texture image could not be converted to RGBA.")
+    }
+    try {
+      val pixels = ByteArray(rgba.rowBytes * rgba.height)
+      rgba.copyPixelsToBuffer(ByteBuffer.wrap(pixels))
+      flipRowsInPlace(pixels, rgba.rowBytes)
+      GLES20.glTexImage2D(
+        GLES20.GL_TEXTURE_2D,
+        0,
+        GLES20.GL_RGBA,
+        rgba.width,
+        rgba.height,
+        0,
+        GLES20.GL_RGBA,
+        GLES20.GL_UNSIGNED_BYTE,
+        ByteBuffer.wrap(pixels),
+      )
+    } finally {
+      if (rgba !== bitmap) {
+        rgba.recycle()
+      }
+    }
   }
 
   @Throws(IOException::class, TextureLoadException::class)
@@ -763,3 +800,16 @@ internal fun shaderCompileFailure(code: String, message: String, log: String?): 
 }
 
 private const val ERROR_GL_OBJECT_ALLOCATION_FAILED = "gl-object-allocation-failed"
+
+/** Reverses the row order of packed pixels in place, so the last row is uploaded first. */
+internal fun flipRowsInPlace(pixels: ByteArray, rowBytes: Int) {
+  val rows = pixels.size / rowBytes
+  val swap = ByteArray(rowBytes)
+  for (top in 0 until rows / 2) {
+    val topStart = top * rowBytes
+    val bottomStart = (rows - 1 - top) * rowBytes
+    System.arraycopy(pixels, topStart, swap, 0, rowBytes)
+    System.arraycopy(pixels, bottomStart, pixels, topStart, rowBytes)
+    System.arraycopy(swap, 0, pixels, bottomStart, rowBytes)
+  }
+}

@@ -13,6 +13,39 @@ import XCTest
   @objcMembers
 #endif
 final class DownloadTransportTests: XCTestCase {
+  #if canImport(ImageIO)
+    // Photos validates a file resource by its extension, and the temporary download has none.
+    func testPhotosFileIsNamedForTheDecodedImageType() throws {
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("async-wallpaper-\(UUID().uuidString).download")
+      let expected = url.deletingPathExtension().appendingPathExtension("png")
+      defer {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: expected)
+      }
+
+      let onePixelPng = Data(
+        base64Encoded:
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mOwD9wKAAIYAUbd/mmIAAAAAElFTkSuQmCC"
+      )!
+      try onePixelPng.write(to: url)
+
+      XCTAssertEqual(WallpaperDownloadImage.prepareForPhotos(at: url), expected)
+      XCTAssertTrue(FileManager.default.fileExists(atPath: expected.path))
+      XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testUndecodableDownloadIsNotRenamedForPhotos() throws {
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("async-wallpaper-\(UUID().uuidString).download")
+      defer { try? FileManager.default.removeItem(at: url) }
+      try Data("not an image".utf8).write(to: url)
+
+      XCTAssertNil(WallpaperDownloadImage.prepareForPhotos(at: url))
+      XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+    }
+  #endif
+
   func testFileWriterRetriesPartialWrites() throws {
     let expected = Data([1, 2, 3, 4, 5])
     var actual = Data()

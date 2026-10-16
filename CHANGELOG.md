@@ -8,6 +8,7 @@
 - Reject shader loop counters that can stagnate or overflow. Static loops now require integer counters with initial values, bounds, steps, and final updates in `-255..255`; the existing 128-iteration limit remains.
 - Allow OpenGL wallpaper initialization when EGL provides window surfaces without pbuffer support.
 - Use add-only Photos authorization on iOS 13, matching the documented usage key.
+- iOS downloads stream into a bounded temporary file (64 MiB) and are saved to Photos under the extension of the image type that ImageIO decodes. Photos validates a file resource by its extension and rejected the extension-less temporary file, so every save failed with `PHPhotosErrorDomain` 3302.
 - Record the audit coverage, regression tests, and platform limits in [the October reliability audit](doc/reliability-audit-2026-10.md).
 
 ## 3.3.0

@@ -84,6 +84,9 @@ class VideoWallpaperRepository(
   private val validator: VideoFileValidator = VideoMetadataValidator(),
   private val fileSystem: VideoFileSystem = DefaultVideoFileSystem,
 ) {
+  /** Last pending candidate successfully prepared by this repository instance. */
+  private var preparedPendingToken: Any? = null
+
   val activeFile: File
     get() = File(storageDirectory, ACTIVE_VIDEO_FILE_NAME)
 
@@ -123,13 +126,42 @@ class VideoWallpaperRepository(
   @Throws(IOException::class, VideoMetadataValidationException::class)
   fun preparePending(source: InputStream): PreparedVideo = mutationLock.withLock {
     beginMutationLocked()
-    prepareLocked(source, pendingFile)
+    // Resolve the key before the rename. If key resolution fails, the pending candidate remains
+    // untouched; after the rename, publishing the token is an in-memory operation only.
+    val directoryKey = canonicalStorageDirectoryKey()
+    val token = Any()
+    prepareLocked(source, pendingFile) {
+      pendingCandidateTokensByDirectory[directoryKey] = token
+      preparedPendingToken = token
+    }
   }
 
-  /** Promotes the validated pending candidate and records its active scale mode. */
+  /**
+   * Promotes the validated pending candidate and records its active scale mode.
+   *
+   * Promotion does not wait for another repository mutation: callers may invoke it on the main
+   * thread immediately before opening the system wallpaper UI. If a copy or cleanup already owns
+   * the mutation lock, this throws before recovery, cleanup, or any other filesystem mutation;
+   * the caller can retry after that mutation completes.
+   */
   @Throws(IOException::class, VideoMetadataValidationException::class)
-  fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo = mutationLock.withLock {
-    replacementLock.withLock { promotePendingLocked(scaleMode) }
+  fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo {
+    if (!mutationLock.tryLock()) {
+      throw IOException("Unable to promote the video wallpaper while another repository mutation is in progress.")
+    }
+    try {
+      val directoryKey = canonicalStorageDirectoryKey()
+      val token = preparedPendingToken
+      if (token != null && pendingCandidateTokensByDirectory[directoryKey] !== token) {
+        throw IOException("The pending video candidate was replaced by another repository mutation.")
+      }
+
+      val promoted = replacementLock.withLock { promotePendingLocked(scaleMode) }
+      pendingCandidateTokensByDirectory.remove(directoryKey)
+      return promoted
+    } finally {
+      mutationLock.unlock()
+    }
   }
 
   private fun promotePendingLocked(scaleMode: VideoWallpaperScaleMode): PreparedVideo {
@@ -194,13 +226,18 @@ class VideoWallpaperRepository(
    * Copies and validates outside [replacementLock], which the wallpaper engine takes on the main
    * thread. A network or large-file source can take minutes. Only the final rename is exclusive.
    */
-  private fun prepareLocked(source: InputStream, destination: File): PreparedVideo {
+  private fun prepareLocked(
+    source: InputStream,
+    destination: File,
+    onReplaced: (() -> Unit)? = null,
+  ): PreparedVideo {
     var temporaryFile: File? = null
     try {
       temporaryFile = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
       fileSystem.copyAndSync(source, temporaryFile)
       val metadata = validator.validate(temporaryFile)
       replacementLock.withLock { fileSystem.replaceAtomically(temporaryFile, destination) }
+      onReplaced?.invoke()
       return PreparedVideo(destination, metadata)
     } finally {
       temporaryFile?.let(fileSystem::delete)
@@ -289,6 +326,9 @@ class VideoWallpaperRepository(
     }
   }
 
+  /** Caller must hold [mutationLock], and the directory must already exist. */
+  private fun canonicalStorageDirectoryKey(): String = storageDirectory.canonicalPath
+
   private fun cleanupTemporaryFilesLocked(): Int {
     return storageDirectory.listFiles()
       ?.asSequence()
@@ -328,6 +368,8 @@ class VideoWallpaperRepository(
     // lock readers take. Always acquire mutationLock before replacementLock.
     private val mutationLock = ReentrantLock()
     private val replacementLock = ReentrantLock()
+    // Accessed only while mutationLock is held. Tokens are identity markers, not persisted IDs.
+    private val pendingCandidateTokensByDirectory = mutableMapOf<String, Any>()
   }
 }
 

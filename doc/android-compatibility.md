@@ -222,7 +222,7 @@ The plugin's exported wallpaper services use overrideable resource values. Put m
 
 Without the grant the plugin returns a failure before downloading anything.
 
-On every Android version, `downloadWallpaper` saves only JPEG, PNG, WebP, GIF, BMP, HEIC, HEIF, and AVIF images. It returns `false` for other formats, such as ICO. The Dart result is a generic failure, so the plugin logs the reason for each failed download under the `AsyncWallpaper` logcat tag. The log names the MIME type, never the URL.
+On every Android version, the Android MIME selector accepts JPEG, PNG, WebP, GIF, BMP, HEIC, HEIF, and AVIF. It rejects other formats, such as ICO. Whether an accepted format can be decoded can still depend on Android's codec support on that device. Native failures return `false`, which Dart exposes as a generic failed `WallpaperResult`. The plugin logs failures under the `AsyncWallpaper` logcat tag, with sanitized MIME types when available. Exception logs identify permission, I/O, or unexpected failures without printing exception details or URLs.
 
 ## iOS and package managers
 

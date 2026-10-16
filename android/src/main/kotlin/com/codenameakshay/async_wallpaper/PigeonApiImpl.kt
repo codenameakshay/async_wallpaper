@@ -749,7 +749,7 @@ class PigeonApiImpl(
       completed = true
       true
     } catch (error: Exception) {
-      Log.e(TAG, "downloadWallpaper failed", error)
+      Log.e(TAG, downloadExceptionReason(error))
       false
     } finally {
       // Do not leave an abandoned, user-visible pending record if writing failed midway.

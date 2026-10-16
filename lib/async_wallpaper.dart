@@ -26,10 +26,12 @@ class AsyncWallpaper {
   static const int _maxRotationIntervalMinutes = 0x7fffffff;
   static const int _maxRotationSources = 100;
   static final RegExp _malformedPercentEscape = RegExp(r'%(?![0-9A-Fa-f]{2})');
-  // Characters after the first '#' that Android's java.net.URI rejects in a
-  // fragment. Whitespace, ASCII controls, and backslashes are rejected earlier.
-  static final RegExp _invalidFragmentCharacter = RegExp(
-    r'#.*[#"<>^`{|}\u0080-\u009F\p{Z}]',
+  // Characters that Android's java.net.URI rejects anywhere in the URL, and a
+  // second '#'. Whitespace, ASCII controls, and backslashes are rejected
+  // earlier. Brackets are checked in _hasInvalidRawAuthorityOrPath, because a
+  // query, a fragment, and an IPv6 host accept them.
+  static final RegExp _invalidUriCharacter = RegExp(
+    r'["<>^`{|}\u0080-\u009F\p{Z}]|#.*#',
     unicode: true,
     dotAll: true,
   );
@@ -719,7 +721,7 @@ class AsyncWallpaper {
         value.codeUnits.any((unit) => unit <= 0x20 || unit == 0x7f) ||
         value.contains('\\') ||
         _malformedPercentEscape.hasMatch(value) ||
-        _invalidFragmentCharacter.hasMatch(value)) {
+        _invalidUriCharacter.hasMatch(value)) {
       return false;
     }
     try {
@@ -729,26 +731,31 @@ class AsyncWallpaper {
       return uri.isScheme('https') &&
           uri.hasAuthority &&
           uri.host.isNotEmpty &&
-          !_authorityHostContainsPercentEscape(value) &&
-          uri.userInfo.isEmpty &&
+          !_hasInvalidRawAuthorityOrPath(value) &&
           (!uri.hasPort || (uri.port > 0 && uri.port <= 65535));
     } on FormatException {
       return false;
     }
   }
 
-  static bool _authorityHostContainsPercentEscape(String value) {
+  // Checks the raw URL for what Uri.parse normalizes but Android's
+  // HttpsSourceUrlParser rejects: any '@' in the authority, a '%' in the host,
+  // and '[' or ']' in the path.
+  static bool _hasInvalidRawAuthorityOrPath(String value) {
     final authorityStart = value.indexOf('://') + 3;
-    final authorityEnd = value.indexOf(RegExp(r'[/\?#]'), authorityStart);
-    final authority = authorityEnd < 0
-        ? value.substring(authorityStart)
-        : value.substring(authorityStart, authorityEnd);
+    var authorityEnd = value.indexOf(RegExp(r'[/\?#]'), authorityStart);
+    if (authorityEnd < 0) authorityEnd = value.length;
+    final authority = value.substring(authorityStart, authorityEnd);
     final hostEnd = authority.startsWith('[')
         ? authority.indexOf(']') + 1
         : !authority.contains(':')
         ? authority.length
         : authority.indexOf(':');
-    return hostEnd > 0 && authority.substring(0, hostEnd).contains('%');
+    var pathEnd = value.indexOf(RegExp(r'[\?#]'), authorityEnd);
+    if (pathEnd < 0) pathEnd = value.length;
+    return authority.contains('@') ||
+        (hostEnd > 0 && authority.substring(0, hostEnd).contains('%')) ||
+        value.substring(authorityEnd, pathEnd).contains(RegExp(r'[\[\]]'));
   }
 
   static bool _isContentUri(String value) {

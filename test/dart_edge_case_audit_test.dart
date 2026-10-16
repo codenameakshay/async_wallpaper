@@ -81,7 +81,7 @@ void main() {
   });
 
   test(
-    'forwards HTTPS URLs with fragments from every URL entry point',
+    'forwards valid HTTPS URLs, fragments included, from every entry point',
     () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -116,6 +116,19 @@ void main() {
         'https://example.com/a.jpg?first=1#second?third=2',
         'https://example.com/a.jpg#🚀\u200b',
         r"https://example.com:8443/a.jpg?q=1#f/?:@!$&'()*+,;=[]%20é",
+        // Empty paths, brackets in a query or fragment, '@' after the
+        // authority, non-ASCII in a path, IPv6, and an IDN host.
+        'https://example.com/a.jpg?x=[1]',
+        'https://example.com?x=[1]',
+        'https://example.com',
+        'https://example.com/a.jpg#[x]',
+        'https://example.com/a@b.jpg?c=@d#@e',
+        'https://example.com/é.jpg',
+        'https://[2001:db8::1]:8443/a.jpg',
+        'https://[2001:db8::1]:8443',
+        'https://[2001:db8::1]:8443?x=[1]#[y]',
+        'https://[2001:db8::1]/a.jpg?x=[1]#[y]',
+        'https://bücher.example/a.jpg',
       ]) {
         forwarded.clear();
         await AsyncWallpaper.applyWallpaper(
@@ -346,6 +359,33 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
+      const javaUriRejectedCharacters = <String>[
+        '"',
+        '<',
+        '>',
+        '^',
+        '`',
+        '{',
+        '|',
+        '}',
+        '\u0080',
+        '\u0085',
+        '\u009f',
+        '\u1680',
+        '\u2029',
+        '\u202f',
+        '\u205f',
+        '\u00a0',
+        '\u2028',
+        '\u3000',
+      ];
+      // These are retained as regression coverage, but baseline Dart already
+      // rejected them: non-empty user info and percent escapes in IPv6 hosts.
+      const baselineRejectedUrls = <String>[
+        'https://:@example.com/a.jpg',
+        'https://[fe80::1%25en0]/a.jpg',
+        'https://[fe80::1%25en0]:8443/a.jpg#x',
+      ];
       final malformedUrls = <String>[
         'https://',
         'https://%',
@@ -379,30 +419,29 @@ void main() {
         'https://example.com/image.jpg#x y',
         'https://example.com/image.jpg#x\\y',
         // Characters that java.net.URI rejects in a fragment.
-        for (final character in <String>[
-          '#',
-          '"',
-          '<',
-          '>',
-          '^',
-          '`',
-          '{',
-          '|',
-          '}',
-          '\u0080',
-          '\u0085',
-          '\u009f',
-          '\u1680',
-          '\u2029',
-          '\u202f',
-          '\u205f',
-          '\u00a0',
-          '\u2028',
-          '\u3000',
-        ])
+        for (final character in <String>['#', ...javaUriRejectedCharacters])
           'https://example.com/image.jpg#x${character}y',
+        // Characters that java.net.URI rejects in a path or a query.
+        for (final character in javaUriRejectedCharacters) ...<String>[
+          'https://example.com/a${character}b.jpg',
+          'https://example.com/image.jpg?x=${character}y',
+          'https://example.com?x=${character}y',
+        ],
+        // A path rejects brackets; a query, a fragment, and IPv6 accept them.
+        'https://example.com/a[b].jpg',
+        'https://example.com/a[',
+        'https://example.com/a]?x=[1]',
+        'https://[2001:db8::1]:8443/a[b].jpg#[x]',
+        // Android rejects any '@' in the authority, even with no user info.
+        'https://@example.com/a.jpg',
+        'https://@example.com#x',
+        'https://@example.com',
+        'https://@[2001:db8::1]/a.jpg',
       ];
-      final exhaustiveMalformedUrls = <String>{...malformedUrls};
+      final exhaustiveMalformedUrls = <String>{
+        ...malformedUrls,
+        ...baselineRejectedUrls,
+      };
       for (var controlCode = 0; controlCode <= 0x20; controlCode++) {
         final control = String.fromCharCode(controlCode);
         exhaustiveMalformedUrls

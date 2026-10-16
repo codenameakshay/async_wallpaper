@@ -2,6 +2,7 @@
 
 - Accept HTTPS URLs that have a `#fragment`. Since 3.3.0 the Dart layer rejected them with `invalid-input`, because `Uri.isAbsolute` is false for any URI with a fragment. Android and iOS accept them and do not send the fragment. Fragment characters that Android rejects stay rejected.
 - Android `downloadWallpaper` logs why a download failed under the `AsyncWallpaper` logcat tag: an unsupported image type such as ICO, an image that does not decode, a MediaStore error, or a source error code. Dart still receives a generic failure, because the method returns a Boolean. The log names MIME types, error codes, or the exception class, and never the URL. Exception logs no longer print exception messages, which could include the URL.
+- Reject HTTPS URLs that Android cannot parse with `invalid-input`: `` "<>^`{|} ``, U+0080–U+009F, or a Unicode space separator anywhere in the URL, `[` or `]` in the path, and any `@` in the authority, such as `https://@example.com/a.jpg`. Some Android entry points previously returned `invalid-url`. Behavior change: on iOS 17+, `downloadWallpaper` accepted some of them, because `URL(string:)` percent-encodes them. Percent-encode prohibited characters in path, query, or fragment data. Remove user information from the authority instead of percent-encoding its `@`.
 
 ## 3.4.0
 

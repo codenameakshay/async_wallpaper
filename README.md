@@ -34,7 +34,7 @@ Flutter plugin to set wallpapers on Android and save them to Photos on iOS.
 
 ```yaml
 dependencies:
-  async_wallpaper: ^3.4.0
+  async_wallpaper: ^3.5.0
 ```
 
 ```dart

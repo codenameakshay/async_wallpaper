@@ -1,8 +1,11 @@
 # Migration guide
 
-## Unreleased
+## From 3.4 to 3.5
+
+The Dart API is unchanged. Update the version and check these behavior changes.
 
 - **OpenGL textures are upright.** Before, `texture2D(u_texture0, v_uv)` showed each texture upside down. If your shader flips `v_uv.y` (for example with `1.0 - v_uv.y`) to compensate, remove the flip.
+- **HTTPS URLs that Android cannot parse are rejected on every platform** with `invalid-input`. On iOS 17+, `downloadWallpaper` used to accept some of them. Percent-encode prohibited characters in the path, query, or fragment, and remove user information (`user@`) from the authority. See the [changelog](../CHANGELOG.md#350) for the exact character list.
 
 ## From 3.2 to 3.3
 

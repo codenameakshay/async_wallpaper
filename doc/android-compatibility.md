@@ -123,7 +123,7 @@ Video live wallpapers are muted by default; no foreground service is used. Playb
 
 Video preparation validates a playable video track, MIME type, dimensions, rotation, and duration before atomically replacing the active asset. A failed candidate does not replace a previously valid active video. Playback is visibility-aware, muted by default, and releases its player through one lifecycle path; it does not start a foreground service.
 
-The video engine supports only `centerCrop` and `fitCenter`. Other `VideoWallpaperRequest.scaleMode` values return `unsupported` with the `video-scale-unsupported` error code; they are not silently converted to center crop.
+The video engine supports only `centerCrop` and `fitCenter`. Other `VideoWallpaperRequest.scaleMode` values return `unsupported` with the `video-scale-unsupported` error code; they are not silently converted to center crop. `fitCenter` draws the whole video between black bars with OpenGL ES 2. If the device cannot create that OpenGL surface, the video fills the screen without letterboxing and the plugin logs an error.
 
 ### Live-wallpaper targets and OEM behavior
 

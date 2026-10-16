@@ -2,6 +2,7 @@
 
 - Keep rotation playlists and settings coherent across interrupted or failed saves. Recover unfinished schedule changes, and commit stop before deleting cached images.
 - Keep each active video paired with its scale mode during concurrent promotion and after process interruption.
+- Letterbox `fitCenter` video live wallpapers instead of stretching them to the screen. Android's `MediaPlayer` has no aspect-preserving fit mode, so the plugin now draws the video between black bars with OpenGL ES 2. `centerCrop` is unchanged.
 - Accept internationalized HTTPS hostnames in Android source loaders while retaining authority validation.
 - Reject shader loop counters that can stagnate or overflow. Static loops now require integer counters with initial values, bounds, steps, and final updates in `-255..255`; the existing 128-iteration limit remains.
 - Allow OpenGL wallpaper initialization when EGL provides window surfaces without pbuffer support.

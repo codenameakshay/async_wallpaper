@@ -116,14 +116,17 @@ void main() {
         'https://example.com/a.jpg?first=1#second?third=2',
         'https://example.com/a.jpg#🚀\u200b',
         r"https://example.com:8443/a.jpg?q=1#f/?:@!$&'()*+,;=[]%20é",
-        // Brackets in a query or a fragment, '@' after the authority, non-ASCII
-        // in a path, IPv6 with a port, and an IDN host.
+        // Empty paths, brackets in a query or fragment, '@' after the
+        // authority, non-ASCII in a path, IPv6, and an IDN host.
         'https://example.com/a.jpg?x=[1]',
         'https://example.com?x=[1]',
+        'https://example.com',
         'https://example.com/a.jpg#[x]',
         'https://example.com/a@b.jpg?c=@d#@e',
         'https://example.com/é.jpg',
         'https://[2001:db8::1]:8443/a.jpg',
+        'https://[2001:db8::1]:8443',
+        'https://[2001:db8::1]:8443?x=[1]#[y]',
         'https://[2001:db8::1]/a.jpg?x=[1]#[y]',
         'https://bücher.example/a.jpg',
       ]) {
@@ -376,6 +379,13 @@ void main() {
         '\u2028',
         '\u3000',
       ];
+      // These are retained as regression coverage, but baseline Dart already
+      // rejected them: non-empty user info and percent escapes in IPv6 hosts.
+      const baselineRejectedUrls = <String>[
+        'https://:@example.com/a.jpg',
+        'https://[fe80::1%25en0]/a.jpg',
+        'https://[fe80::1%25en0]:8443/a.jpg#x',
+      ];
       final malformedUrls = <String>[
         'https://',
         'https://%',
@@ -426,13 +436,12 @@ void main() {
         'https://@example.com/a.jpg',
         'https://@example.com#x',
         'https://@example.com',
-        'https://:@example.com/a.jpg',
         'https://@[2001:db8::1]/a.jpg',
-        // IPv6 zone IDs stay rejected.
-        'https://[fe80::1%25en0]/a.jpg',
-        'https://[fe80::1%25en0]:8443/a.jpg#x',
       ];
-      final exhaustiveMalformedUrls = <String>{...malformedUrls};
+      final exhaustiveMalformedUrls = <String>{
+        ...malformedUrls,
+        ...baselineRejectedUrls,
+      };
       for (var controlCode = 0; controlCode <= 0x20; controlCode++) {
         final control = String.fromCharCode(controlCode);
         exhaustiveMalformedUrls

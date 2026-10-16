@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -52,6 +53,7 @@ internal class VideoFitRenderer private constructor(private val target: Surface)
 
   // Everything below is owned by the render thread.
   private var display: EGLDisplay = EGL14.EGL_NO_DISPLAY
+  private var displayInitialized = false
   private var context: EGLContext = EGL14.EGL_NO_CONTEXT
   private var windowSurface: EGLSurface = EGL14.EGL_NO_SURFACE
   private var program = 0
@@ -113,6 +115,7 @@ internal class VideoFitRenderer private constructor(private val target: Surface)
       display = EGL14.EGL_NO_DISPLAY
       return false
     }
+    displayInitialized = true
     val config = chooseConfig() ?: return false
     context = EGL14.eglCreateContext(
       display,
@@ -282,7 +285,8 @@ internal class VideoFitRenderer private constructor(private val target: Surface)
       EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
       if (windowSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, windowSurface)
       if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)
-      // ponytail: no eglTerminate; the default display is shared with other engines in this process.
+      // Android reference-counts eglInitialize, so this releases only this renderer's reference.
+      if (displayInitialized) EGL14.eglTerminate(display)
       EGL14.eglReleaseThread()
     }
     windowSurface = EGL14.EGL_NO_SURFACE
@@ -296,9 +300,13 @@ internal class VideoFitRenderer private constructor(private val target: Surface)
     private const val TIMEOUT_MILLIS = 1_000L
 
     /**
-     * Creates the renderer for [target], or returns null when OpenGL ES 2 is unavailable. The
-     * caller then plays to [target] directly.
+     * Creates the renderer for [target], or returns null when OpenGL ES 2 is unavailable and the
+     * renderer has released [target]. The caller then plays to [target] directly.
+     *
+     * Throws when initialization does not finish in time: EGL may still connect to [target], so
+     * the caller must not attach a second producer to it.
      */
+    @Throws(IOException::class)
     fun create(target: Surface, surfaceWidth: Int, surfaceHeight: Int): VideoFitRenderer? {
       val renderer = VideoFitRenderer(target)
       val ready = CountDownLatch(1)
@@ -317,7 +325,7 @@ internal class VideoFitRenderer private constructor(private val target: Surface)
       }
       if (!ready.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
         renderer.release()
-        return null
+        throw IOException("The video fit renderer did not initialize within $TIMEOUT_MILLIS ms")
       }
       return renderer.takeIf { initialized }
     }

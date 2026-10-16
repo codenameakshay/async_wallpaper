@@ -1,6 +1,6 @@
 # Android compatibility
 
-This page describes the Android contract for `async_wallpaper` 3.3. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
+This page describes the Android contract for `async_wallpaper` 3.4. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
 
 ## Baseline and capability check
 

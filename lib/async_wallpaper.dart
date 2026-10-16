@@ -26,6 +26,13 @@ class AsyncWallpaper {
   static const int _maxRotationIntervalMinutes = 0x7fffffff;
   static const int _maxRotationSources = 100;
   static final RegExp _malformedPercentEscape = RegExp(r'%(?![0-9A-Fa-f]{2})');
+  // Characters after the first '#' that Android's java.net.URI rejects in a
+  // fragment. Whitespace, ASCII controls, and backslashes are rejected earlier.
+  static final RegExp _invalidFragmentCharacter = RegExp(
+    r'#.*[#"<>^`{|}\u0080-\u009F\p{Z}]',
+    unicode: true,
+    dotAll: true,
+  );
 
   static final WallpaperApi _api = WallpaperApi();
   static final WallpaperClient _defaultClient = PigeonWallpaperClient(
@@ -711,13 +718,16 @@ class AsyncWallpaper {
         trimmed != value ||
         value.codeUnits.any((unit) => unit <= 0x20 || unit == 0x7f) ||
         value.contains('\\') ||
-        _malformedPercentEscape.hasMatch(value)) {
+        _malformedPercentEscape.hasMatch(value) ||
+        _invalidFragmentCharacter.hasMatch(value)) {
       return false;
     }
     try {
       final uri = Uri.parse(value);
-      return uri.isAbsolute &&
-          uri.scheme.toLowerCase() == 'https' &&
+      // Not Uri.isAbsolute: it is false for any URI with a fragment, which
+      // HTTP clients never send.
+      return uri.isScheme('https') &&
+          uri.hasAuthority &&
           uri.host.isNotEmpty &&
           !_authorityHostContainsPercentEscape(value) &&
           uri.userInfo.isEmpty &&

@@ -676,11 +676,18 @@ class PigeonApiImpl(
       temporaryFile = downloadedFile
       val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
       BitmapFactory.decodeFile(downloadedFile.absolutePath, options)
-      val imageFormat = if (options.outWidth > 0 && options.outHeight > 0) {
-        DownloadImageFormat.choose(options.outMimeType, contentType)
-      } else {
-        null
-      } ?: return false
+      if (options.outWidth <= 0 || options.outHeight <= 0) {
+        Log.w(TAG, "downloadWallpaper rejected the download: the image header has no decodable dimensions.")
+        return false
+      }
+      val imageFormat = DownloadImageFormat.choose(options.outMimeType, contentType) ?: run {
+        Log.w(
+          TAG,
+          "downloadWallpaper rejected the download: " +
+            "${DownloadImageFormat.rejectionReason(options.outMimeType, contentType)}.",
+        )
+        return false
+      }
       // A header can report valid dimensions for a truncated file, so decode once with a bounded
       // sample size to prove the payload is a complete image before publishing it.
       val decoded = BitmapFactory.decodeFile(
@@ -693,7 +700,13 @@ class PigeonApiImpl(
           )
           inPreferredConfig = Bitmap.Config.ARGB_8888
         },
-      ) ?: return false
+      ) ?: run {
+        Log.w(
+          TAG,
+          "downloadWallpaper rejected the download: the ${imageFormat.mimeType} image could not be fully decoded.",
+        )
+        return false
+      }
       decoded.recycle()
       val values = ContentValues().apply {
         put(
@@ -707,7 +720,10 @@ class PigeonApiImpl(
         }
       }
       val resolver = appContext.contentResolver
-      uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+      uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: run {
+        Log.e(TAG, "downloadWallpaper failed: MediaStore did not create a ${imageFormat.mimeType} image row.")
+        return false
+      }
       val written = downloadedFile.inputStream().use { input ->
         resolver.openOutputStream(uri!!)?.use { output ->
           input.copyTo(output)
@@ -715,6 +731,7 @@ class PigeonApiImpl(
         } ?: false
       }
       if (!written) {
+        Log.e(TAG, "downloadWallpaper failed: MediaStore did not open an output stream for the new image row.")
         return false
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -725,13 +742,14 @@ class PigeonApiImpl(
           null,
         )
         if (updatedRows == 0) {
+          Log.e(TAG, "downloadWallpaper failed: MediaStore updated 0 rows when clearing IS_PENDING.")
           return false
         }
       }
       completed = true
       true
     } catch (error: Exception) {
-      Log.e(TAG, "downloadWallpaper failed", error)
+      Log.e(TAG, downloadExceptionReason(error))
       false
     } finally {
       // Do not leave an abandoned, user-visible pending record if writing failed midway.

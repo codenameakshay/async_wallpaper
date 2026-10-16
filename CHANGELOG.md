@@ -1,6 +1,7 @@
 ## Unreleased
 
 - Accept HTTPS URLs that have a `#fragment`. Since 3.3.0 the Dart layer rejected them with `invalid-input`, because `Uri.isAbsolute` is false for any URI with a fragment. Android and iOS accept them and do not send the fragment. Fragment characters that Android rejects stay rejected.
+- Android `downloadWallpaper` logs why a download failed under the `AsyncWallpaper` logcat tag: an unsupported image type such as ICO, an image that does not decode, a MediaStore error, or a source error code. Dart still receives a generic failure, because the method returns a Boolean. The log names MIME types, error codes, or the exception class, and never the URL. Exception logs no longer print exception messages, which could include the URL.
 
 ## 3.4.0
 

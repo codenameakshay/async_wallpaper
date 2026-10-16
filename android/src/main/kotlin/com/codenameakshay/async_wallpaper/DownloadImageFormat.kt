@@ -1,14 +1,14 @@
 package com.codenameakshay.async_wallpaper
 
-import java.io.IOException
 import java.util.Locale
 
+/**
+ * Names a download failure without the exception's message or causes, which can carry the URL.
+ * [BoundedSourceException] messages are plugin-authored and interpolate only status codes.
+ */
 internal fun downloadExceptionReason(error: Exception): String = when (error) {
-  is SecurityException ->
-    "downloadWallpaper failed: access was denied; check storage permission and MediaStore access."
-  is IOException ->
-    "downloadWallpaper failed: an I/O error occurred while downloading or saving the image."
-  else -> "downloadWallpaper failed: an unexpected error occurred."
+  is BoundedSourceException -> "downloadWallpaper failed (${error.code}): ${error.message}"
+  else -> "downloadWallpaper failed with ${error.javaClass.name}; details are omitted because they can include the URL."
 }
 
 internal object DownloadImageFormat {
@@ -64,18 +64,9 @@ internal object DownloadImageFormat {
     return value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
   }
 
-  private fun loggingMimeType(value: String?): String? {
-    val normalized = normalize(value) ?: return null
-    val slash = normalized.indexOf('/')
-    if (slash <= 0 || slash != normalized.lastIndexOf('/') || slash == normalized.lastIndex) {
-      return "<invalid>"
-    }
-    return if (normalized.indices.all { index ->
-        index == slash || normalized[index].isSafeMimeTokenCharacter()
-      }
-    ) normalized else "<invalid>"
-  }
+  // Content-Type is server-controlled, so log it only when it is a plain type/subtype token.
+  private fun loggingMimeType(normalized: String): String =
+    if (LOGGABLE_MIME_TYPE.matches(normalized)) normalized else "<invalid>"
 
-  private fun Char.isSafeMimeTokenCharacter(): Boolean =
-    this in 'a'..'z' || this in '0'..'9' || this in "!#$&^_.+-"
+  private val LOGGABLE_MIME_TYPE = Regex("[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+")
 }

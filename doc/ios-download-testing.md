@@ -12,8 +12,9 @@ suite and returns failure if no tests run or any test fails.
 
 The tests cover HTTPS redirect policy, HTTP status handling, streaming size
 limits, empty bodies, partial writes, write failures, temporary-file cleanup,
-and exactly-once completion. The
-Photos integration also checks that ImageIO can create a thumbnail capped at
-2048 pixels before asking Photos to save the file. That UIKit/ImageIO/Photos
-path needs an iOS build or device test; it is not exercised by the portable
-transport harness.
+and exactly-once completion. On macOS
+they also check that the downloaded file is renamed with the extension of the
+image type ImageIO decodes, because Photos validates a file resource by its
+extension. ImageIO must create a thumbnail capped at 2048 pixels first. The
+Photos save itself needs an iOS simulator or device; it is not exercised by the
+portable transport harness.

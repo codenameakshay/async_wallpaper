@@ -7,6 +7,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -373,6 +374,107 @@ class AtomicFileReplacementTest {
       assertNoTemporaryFiles()
     } finally {
       fileSystem.allowFirstCopy.countDown()
+      executor.shutdownNow()
+    }
+  }
+
+  @Test
+  fun `a slow candidate copy does not block the wallpaper engine from opening the active video`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "active-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val fileSystem = BlockingFileSystem()
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), fileSystem)
+    val executor = Executors.newFixedThreadPool(2)
+
+    try {
+      val preparation = executor.submit<PreparedVideo> {
+        repository.preparePending("candidate-video".byteInputStream())
+      }
+      assertTrue(fileSystem.firstCopyStarted.await(5, TimeUnit.SECONDS))
+
+      // The engine opens the active video on the app's main thread. A network or large-file copy
+      // can take minutes, so the engine must not wait for it.
+      val snapshot = executor.submit<String> {
+        repository.openActiveSnapshot().use { "${it.input.readBytes().decodeToString()}:${it.scaleMode}" }
+      }
+      assertEquals("active-video:${VideoWallpaperScaleMode.FIT_CENTER}", snapshot.get(1, TimeUnit.SECONDS))
+      assertEquals(
+        VideoWallpaperScaleMode.FIT_CENTER,
+        executor.submit<VideoWallpaperScaleMode> { repository.activeScaleMode() }.get(1, TimeUnit.SECONDS),
+      )
+
+      fileSystem.allowFirstCopy.countDown()
+      preparation.get(5, TimeUnit.SECONDS)
+      assertEquals("candidate-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+      assertEquals("active-video", File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+      assertNoTemporaryFiles()
+    } finally {
+      fileSystem.allowFirstCopy.countDown()
+      executor.shutdownNow()
+    }
+  }
+
+  @Test
+  fun `promotion fails without changing repository state while another instance copies`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "active-video")
+    writeFile(VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME, "previous-pending-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.CENTER_CROP.name)
+    val copyFileSystem = BlockingFileSystem()
+    val copyingRepository = VideoWallpaperRepository(directory, acceptingValidator(), copyFileSystem)
+    // Separate plugin instances can construct repositories for the same files directory.
+    val promotingRepository = VideoWallpaperRepository(directory, acceptingValidator(), HostFileSystem)
+    val executor = Executors.newFixedThreadPool(2)
+    var preparation: java.util.concurrent.Future<PreparedVideo>? = null
+    var promotion: java.util.concurrent.Future<PreparedVideo>? = null
+
+    try {
+      val preparationFuture = executor.submit<PreparedVideo> {
+        copyingRepository.preparePending("candidate-video".byteInputStream())
+      }
+      preparation = preparationFuture
+      assertTrue(copyFileSystem.firstCopyStarted.await(5, TimeUnit.SECONDS))
+      val inFlightTemporaryFile = directory.listFiles()
+        ?.single { it.name.startsWith("file.mp4.") && it.name.endsWith(".tmp") }
+        ?: throw AssertionError("Expected the blocked copy to retain its temporary candidate")
+
+      val promotionFuture = executor.submit<PreparedVideo> {
+        promotingRepository.promotePending(VideoWallpaperScaleMode.FIT_CENTER)
+      }
+      promotion = promotionFuture
+      try {
+        promotionFuture.get(1, TimeUnit.SECONDS)
+        fail("Expected promotion to reject while another mutation owns the repository")
+      } catch (error: ExecutionException) {
+        assertTrue("Expected IOException, got ${error.cause}", error.cause is IOException)
+      }
+
+      assertEquals("active-video", File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+      assertEquals("previous-pending-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+      assertEquals(
+        VideoWallpaperScaleMode.CENTER_CROP.name,
+        File(directory, "file.mp4.scale-mode").readText(),
+      )
+      assertFalse(File(directory, "file.mp4.promotion-journal").exists())
+      assertTrue("Busy rejection must not clean the in-flight copy", inFlightTemporaryFile.exists())
+
+      copyFileSystem.allowFirstCopy.countDown()
+      preparationFuture.get(5, TimeUnit.SECONDS)
+      assertEquals("candidate-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+
+      val promoted = promotingRepository.promotePending(VideoWallpaperScaleMode.FIT_CENTER)
+      assertEquals(File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).absolutePath, promoted.file.absolutePath)
+      assertEquals("candidate-video", File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+      assertEquals(
+        VideoWallpaperScaleMode.FIT_CENTER.name,
+        File(directory, "file.mp4.scale-mode").readText(),
+      )
+      assertFalse(File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).exists())
+      assertFalse(File(directory, "file.mp4.promotion-journal").exists())
+      assertNoTemporaryFiles()
+    } finally {
+      copyFileSystem.allowFirstCopy.countDown()
+      runCatching { preparation?.get(5, TimeUnit.SECONDS) }
+      runCatching { promotion?.get(5, TimeUnit.SECONDS) }
       executor.shutdownNow()
     }
   }

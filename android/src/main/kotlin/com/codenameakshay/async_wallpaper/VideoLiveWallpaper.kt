@@ -18,7 +18,7 @@ import java.io.IOException
  */
 internal const val WALLPAPER_COMMAND_REAPPLY = "android.wallpaper.reapply"
 
-/** The two scaling modes supported directly by Android's MediaPlayer. */
+/** The two video scaling modes. MediaPlayer crops for centerCrop; [VideoFitRenderer] letterboxes fitCenter. */
 enum class VideoWallpaperScaleMode {
   CENTER_CROP,
   FIT_CENTER,
@@ -38,6 +38,7 @@ class VideoLiveWallpaper : WallpaperService() {
     private val stateMachine = VideoPlaybackStateMachine()
 
     private var mediaPlayer: MediaPlayer? = null
+    private var fitRenderer: VideoFitRenderer? = null
     private var playerGeneration = 0L
 
     override fun onSurfaceCreated(holder: SurfaceHolder) {
@@ -46,6 +47,13 @@ class VideoLiveWallpaper : WallpaperService() {
         if (stateMachine.onSurfaceCreated() == VideoPlaybackAction.PREPARE) {
           preparePlayerLocked(holder)
         }
+      }
+    }
+
+    override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+      super.onSurfaceChanged(holder, format, width, height)
+      synchronized(lifecycleLock) {
+        fitRenderer?.setSurfaceSize(width, height)
       }
     }
 
@@ -136,7 +144,21 @@ class VideoLiveWallpaper : WallpaperService() {
           }
           true
         }
-        player.setSurface(holder.surface)
+        player.setOnVideoSizeChangedListener { sizedPlayer, width, height ->
+          synchronized(lifecycleLock) {
+            if (isCurrentPlayer(sizedPlayer, generation)) {
+              fitRenderer?.setVideoSize(width, height)
+            }
+          }
+        }
+        if (snapshot.scaleMode.usesFitRenderer()) {
+          val frame = holder.surfaceFrame
+          fitRenderer = VideoFitRenderer.create(holder.surface, frame.width(), frame.height())
+          if (fitRenderer == null) {
+            Log.e(TAG, "fitCenter needs OpenGL ES 2; the video fills the screen without letterboxing")
+          }
+        }
+        player.setSurface(fitRenderer?.inputSurface ?: holder.surface)
         player.setDataSource(snapshot.input.fd)
         snapshot.close()
         player.isLooping = true
@@ -186,15 +208,21 @@ class VideoLiveWallpaper : WallpaperService() {
       releasePlayerLocked()
     }
 
-    /** The only release path. Clearing the reference first makes it idempotent. */
+    /**
+     * The only release path. Clearing the references first makes it idempotent. The player stops
+     * producing frames before the fit renderer frees its surface.
+     */
     private fun releasePlayerLocked() {
       val player = mediaPlayer
+      val renderer = fitRenderer
       mediaPlayer = null
+      fitRenderer = null
       playerGeneration += 1L
       if (player != null) {
         runCatching { player.release() }
           .onFailure { error -> Log.w(TAG, "Failed to release live wallpaper player", error) }
       }
+      renderer?.release()
     }
 
     private fun isCurrentPlayer(candidate: MediaPlayer, generation: Long): Boolean {
@@ -225,7 +253,7 @@ class VideoLiveWallpaper : WallpaperService() {
   }
 }
 
-private fun VideoWallpaperScaleMode.mediaPlayerMode(): Int {
+internal fun VideoWallpaperScaleMode.mediaPlayerMode(): Int {
   return when (this) {
     VideoWallpaperScaleMode.CENTER_CROP -> {
       MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING

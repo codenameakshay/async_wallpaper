@@ -15,6 +15,68 @@ enum WallpaperDownloadTransportError: Error, Equatable {
   case transportFailure
 }
 
+#if canImport(ImageIO)
+  import ImageIO
+  #if canImport(UniformTypeIdentifiers)
+    import UniformTypeIdentifiers
+  #endif
+  #if canImport(MobileCoreServices)
+    import MobileCoreServices
+  #elseif canImport(CoreServices)
+    import CoreServices
+  #endif
+
+  enum WallpaperDownloadImage {
+    /// Validates a downloaded image and renames it with the file extension of its decoded type.
+    ///
+    /// Photos validates a resource file by its extension, so it rejects the extension-less
+    /// temporary download (PHPhotosErrorDomain 3302) even when a type identifier is supplied.
+    /// Returns nil, leaving the file at [url], when the image cannot be decoded or renamed.
+    static func prepareForPhotos(at url: URL, maxPixelSize: Int = 2048) -> URL? {
+      guard let type = typeIdentifier(at: url, maxPixelSize: maxPixelSize),
+        let pathExtension = filenameExtension(for: type)
+      else {
+        return nil
+      }
+      let namedUrl = url.deletingPathExtension().appendingPathExtension(pathExtension)
+      do {
+        try FileManager.default.moveItem(at: url, to: namedUrl)
+      } catch {
+        return nil
+      }
+      return namedUrl
+    }
+
+    /// The image type ImageIO decodes from the bytes, or nil when it cannot create a thumbnail.
+    static func typeIdentifier(at url: URL, maxPixelSize: Int = 2048) -> String? {
+      guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        CGImageSourceGetCount(source) > 0,
+        let type = CGImageSourceGetType(source)
+      else {
+        return nil
+      }
+      let thumbnailOptions =
+        [
+          kCGImageSourceCreateThumbnailFromImageAlways: true,
+          kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+          kCGImageSourceShouldCacheImmediately: true,
+        ] as CFDictionary
+      guard CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) != nil else {
+        return nil
+      }
+      return type as String
+    }
+
+    private static func filenameExtension(for type: String) -> String? {
+      if #available(iOS 14, macOS 11, *) {
+        return UTType(type)?.preferredFilenameExtension
+      }
+      return UTTypeCopyPreferredTagWithClass(type as CFString, kUTTagClassFilenameExtension)?
+        .takeRetainedValue() as String?
+    }
+  }
+#endif
+
 enum WallpaperDownloadFileWriter {
   static func writeAll(
     _ data: Data,

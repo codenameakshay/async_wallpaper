@@ -2,10 +2,13 @@
 
 - Keep rotation playlists and settings coherent across interrupted or failed saves. Recover unfinished schedule changes, and commit stop before deleting cached images.
 - Keep each active video paired with its scale mode during concurrent promotion and after process interruption.
+- Letterbox `fitCenter` video live wallpapers instead of stretching them to the screen. Android's `MediaPlayer` has no aspect-preserving fit mode, so the plugin now draws the video between black bars with OpenGL ES 2. `centerCrop` is unchanged.
+- Keep the video live wallpaper and the app responsive while a new video is prepared. The engine started on the main thread and waited for the same lock as the copy, so a large or slow video source blocked the main thread until the copy finished.
 - Accept internationalized HTTPS hostnames in Android source loaders while retaining authority validation.
 - Reject shader loop counters that can stagnate or overflow. Static loops now require integer counters with initial values, bounds, steps, and final updates in `-255..255`; the existing 128-iteration limit remains.
 - Allow OpenGL wallpaper initialization when EGL provides window surfaces without pbuffer support.
 - Use add-only Photos authorization on iOS 13, matching the documented usage key.
+- iOS downloads stream into a bounded temporary file (64 MiB) and are saved to Photos under the extension of the image type that ImageIO decodes. Photos validates a file resource by its extension and rejected the extension-less temporary file, so every save failed with `PHPhotosErrorDomain` 3302.
 - Record the audit coverage, regression tests, and platform limits in [the October reliability audit](doc/reliability-audit-2026-10.md).
 
 ## 3.3.0

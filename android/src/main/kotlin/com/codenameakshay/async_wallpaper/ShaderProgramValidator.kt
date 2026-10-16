@@ -6,7 +6,8 @@ package com.codenameakshay.async_wallpaper
  *
  * This intentionally is not a GLSL compiler. It catches request-shape problems and constructs
  * that the ES2 renderer cannot safely provide, while the driver remains the authority for shader
- * compilation and linking on a real device.
+ * compilation and linking on a real device. Staging also compiles and links the shader on the
+ * driver when EGL offers a pbuffer; see [OpenGlLiveWallpaper.stageConfiguration].
  */
 object ShaderProgramValidator {
   const val MAX_FRAGMENT_SHADER_BYTES = 64 * 1024
@@ -38,6 +39,8 @@ object ShaderProgramValidator {
     SHADER_UNIFORM_LIMIT_EXCEEDED("shader-uniform-limit-exceeded"),
     SHADER_UNIFORM_ARRAY_TOO_LARGE("shader-uniform-array-too-large"),
     SHADER_SAMPLER_UNSUPPORTED("shader-sampler-unsupported"),
+    SHADER_COMPILATION_FAILED("shader-compilation-failed"),
+    SHADER_LINK_FAILED("shader-link-failed"),
     TEXTURE_COUNT_EXCEEDED("texture-count-exceeded"),
     TEXTURE_SOURCE_TOO_LARGE("texture-source-too-large"),
     TEXTURE_SIZE_INVALID("texture-size-invalid"),
@@ -67,6 +70,8 @@ object ShaderProgramValidator {
   data class ValidationError(
     val code: ErrorCode,
     val message: String,
+    /** The driver's info log for [ErrorCode.SHADER_COMPILATION_FAILED] and [ErrorCode.SHADER_LINK_FAILED]. */
+    val details: String? = null,
   ) {
     val wireCode: String
       get() = code.wireCode

@@ -55,6 +55,8 @@ class GlRenderer(
     data class Failure(
       val code: String,
       val message: String,
+      /** The driver's info log, when a shader failed to compile or link. */
+      val details: String? = null,
     ) : Result()
   }
 
@@ -219,6 +221,27 @@ class GlRenderer(
     resetState()
   }
 
+  /**
+   * Compiles and links the fragment shader with the built-in vertex shader in the 1x1 pbuffer
+   * context, then releases everything. Textures are not read. On window-only EGL configs there
+   * is no surface to check against, so this returns an [ERROR_PBUFFER_UNAVAILABLE] failure.
+   */
+  fun checkProgram(): Result {
+    assertRenderThread()
+    try {
+      initializeEglIfNeeded()?.let { return it }
+      if (cleanupSurface == EGL14.EGL_NO_SURFACE) {
+        return Result.Failure(ERROR_PBUFFER_UNAVAILABLE, "EGL exposes no pbuffer surface for a shader check.")
+      }
+      if (!makeCurrent(cleanupSurface)) {
+        return eglFailure("make pbuffer current")
+      }
+      return linkProgram()
+    } finally {
+      release()
+    }
+  }
+
   private fun initializeEglIfNeeded(): Result? {
     if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
       return null
@@ -307,40 +330,11 @@ class GlRenderer(
       return Result.Failure(validation.error.wireCode, validation.error.message)
     }
 
-    val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, SAFE_VERTEX_SHADER, "vertex")
-      ?: return Result.Failure(ERROR_VERTEX_SHADER_COMPILATION_FAILED, "The built-in vertex shader could not compile.")
-    val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, configuration.fragmentShader, "fragment")
-      ?: run {
-        GLES20.glDeleteShader(vertexShader)
-        return Result.Failure(
-          ERROR_FRAGMENT_SHADER_COMPILATION_FAILED,
-          "Fragment shader compilation failed: ${limitedGlLog()}",
-        )
+    linkProgram().let { linked ->
+      if (linked !is Result.Success) {
+        return linked
       }
-    val linkedProgram = GLES20.glCreateProgram()
-    if (linkedProgram == 0) {
-      GLES20.glDeleteShader(vertexShader)
-      GLES20.glDeleteShader(fragmentShader)
-      return Result.Failure(ERROR_PROGRAM_LINK_FAILED, "Unable to allocate an OpenGL program.")
     }
-    GLES20.glAttachShader(linkedProgram, vertexShader)
-    GLES20.glAttachShader(linkedProgram, fragmentShader)
-    GLES20.glBindAttribLocation(linkedProgram, 0, POSITION_ATTRIBUTE)
-    GLES20.glLinkProgram(linkedProgram)
-    val linkStatus = IntArray(1)
-    GLES20.glGetProgramiv(linkedProgram, GLES20.GL_LINK_STATUS, linkStatus, 0)
-    GLES20.glDeleteShader(vertexShader)
-    GLES20.glDeleteShader(fragmentShader)
-    if (linkStatus[0] != GLES20.GL_TRUE) {
-      val log = GLES20.glGetProgramInfoLog(linkedProgram).take(MAX_GL_LOG_CHARS)
-      GLES20.glDeleteProgram(linkedProgram)
-      return Result.Failure(
-        ERROR_PROGRAM_LINK_FAILED,
-        "Fragment shader could not link with the built-in vertex shader: $log",
-      )
-    }
-
-    program = linkedProgram
     positionAttribute = GLES20.glGetAttribLocation(program, POSITION_ATTRIBUTE)
     if (positionAttribute < 0) {
       releaseGlResources()
@@ -363,7 +357,53 @@ class GlRenderer(
     return Result.Success
   }
 
-  private fun compileShader(type: Int, source: String, label: String): Int? {
+  /** Compiles both shaders and links them into [program] on the current context. */
+  private fun linkProgram(): Result {
+    val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, SAFE_VERTEX_SHADER)
+      ?: return shaderCompileFailure(
+        ERROR_VERTEX_SHADER_COMPILATION_FAILED,
+        "The built-in vertex shader could not compile.",
+        lastShaderLog,
+      )
+    val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, configuration.fragmentShader)
+      ?: run {
+        GLES20.glDeleteShader(vertexShader)
+        return shaderCompileFailure(
+          ERROR_FRAGMENT_SHADER_COMPILATION_FAILED,
+          "The fragment shader failed to compile.",
+          lastShaderLog,
+        )
+      }
+    val linkedProgram = GLES20.glCreateProgram()
+    if (linkedProgram == 0) {
+      GLES20.glDeleteShader(vertexShader)
+      GLES20.glDeleteShader(fragmentShader)
+      return Result.Failure(ERROR_GL_OBJECT_ALLOCATION_FAILED, "Unable to allocate an OpenGL program.")
+    }
+    GLES20.glAttachShader(linkedProgram, vertexShader)
+    GLES20.glAttachShader(linkedProgram, fragmentShader)
+    GLES20.glBindAttribLocation(linkedProgram, 0, POSITION_ATTRIBUTE)
+    GLES20.glLinkProgram(linkedProgram)
+    val linkStatus = IntArray(1)
+    GLES20.glGetProgramiv(linkedProgram, GLES20.GL_LINK_STATUS, linkStatus, 0)
+    GLES20.glDeleteShader(vertexShader)
+    GLES20.glDeleteShader(fragmentShader)
+    if (linkStatus[0] != GLES20.GL_TRUE) {
+      val log = GLES20.glGetProgramInfoLog(linkedProgram).take(MAX_GL_LOG_CHARS)
+      GLES20.glDeleteProgram(linkedProgram)
+      return Result.Failure(
+        ERROR_PROGRAM_LINK_FAILED,
+        "The fragment shader could not link with the built-in vertex shader.",
+        log,
+      )
+    }
+    program = linkedProgram
+    return Result.Success
+  }
+
+  /** Returns the shader, or null with [lastShaderLog] set to the log, or to null if none was allocated. */
+  private fun compileShader(type: Int, source: String): Int? {
+    lastShaderLog = null
     val shader = GLES20.glCreateShader(type)
     if (shader == 0) {
       return null
@@ -376,14 +416,9 @@ class GlRenderer(
       return shader
     }
     // Query the log before deleting the shader because several drivers discard it on delete.
-    val log = GLES20.glGetShaderInfoLog(shader).take(MAX_GL_LOG_CHARS)
+    lastShaderLog = GLES20.glGetShaderInfoLog(shader).take(MAX_GL_LOG_CHARS)
     GLES20.glDeleteShader(shader)
-    lastShaderLog = "$label shader: $log"
     return null
-  }
-
-  private fun limitedGlLog(): String {
-    return lastShaderLog?.take(MAX_GL_LOG_CHARS).orEmpty()
   }
 
   private fun uploadTextures(): Result {
@@ -667,8 +702,9 @@ class GlRenderer(
     private const val ERROR_EGL_INITIALIZATION_FAILED = "egl-initialization-failed"
     private const val ERROR_EGL_OPERATION_FAILED = "egl-operation-failed"
     private const val ERROR_VERTEX_SHADER_COMPILATION_FAILED = "vertex-shader-compilation-failed"
-    private const val ERROR_FRAGMENT_SHADER_COMPILATION_FAILED = "shader-compilation-failed"
-    private const val ERROR_PROGRAM_LINK_FAILED = "shader-link-failed"
+    private val ERROR_FRAGMENT_SHADER_COMPILATION_FAILED = ShaderProgramValidator.ErrorCode.SHADER_COMPILATION_FAILED.wireCode
+    private val ERROR_PROGRAM_LINK_FAILED = ShaderProgramValidator.ErrorCode.SHADER_LINK_FAILED.wireCode
+    private const val ERROR_PBUFFER_UNAVAILABLE = "egl-pbuffer-unavailable"
     private const val ERROR_TEXTURE_LIMIT_UNAVAILABLE = "texture-limit-unavailable"
     private const val ERROR_TEXTURE_ALLOCATION_FAILED = "texture-allocation-failed"
     private const val ERROR_TEXTURE_SOURCE_UNAVAILABLE = "texture-source-unavailable"
@@ -713,3 +749,17 @@ class GlRenderer(
     }
   }
 }
+
+/**
+ * A failed compile always has a driver log, possibly empty. Without one, GL could not allocate the
+ * shader at all, which says nothing about the source, so staging must not reject it.
+ */
+internal fun shaderCompileFailure(code: String, message: String, log: String?): GlRenderer.Result.Failure {
+  return if (log == null) {
+    GlRenderer.Result.Failure(ERROR_GL_OBJECT_ALLOCATION_FAILED, "Unable to allocate an OpenGL shader.")
+  } else {
+    GlRenderer.Result.Failure(code, message, log)
+  }
+}
+
+private const val ERROR_GL_OBJECT_ALLOCATION_FAILED = "gl-object-allocation-failed"

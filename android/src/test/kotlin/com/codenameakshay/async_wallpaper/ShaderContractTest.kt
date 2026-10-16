@@ -2,6 +2,7 @@ package com.codenameakshay.async_wallpaper
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -264,6 +265,57 @@ class ShaderContractTest {
       root.deleteRecursively()
       outside.deleteRecursively()
     }
+  }
+
+  @Test
+  fun aDriverCompileFailureRejectsStagingWithTheDriverLog() {
+    val rejection = shaderCheckRejection(
+      GlRenderer.Result.Failure(
+        "shader-compilation-failed",
+        "The fragment shader failed to compile.",
+        "ERROR: 0:3: 'undefinedSymbol' : undeclared identifier",
+      ),
+    )
+
+    assertEquals("shader-compilation-failed", rejection?.wireCode)
+    assertEquals("ERROR: 0:3: 'undefinedSymbol' : undeclared identifier", rejection?.details)
+  }
+
+  @Test
+  fun aDriverLinkFailureRejectsStaging() {
+    val rejection = shaderCheckRejection(
+      GlRenderer.Result.Failure("shader-link-failed", "Link failed.", "varying v_other not written"),
+    )
+
+    assertEquals("shader-link-failed", rejection?.wireCode)
+    assertEquals("varying v_other not written", rejection?.details)
+  }
+
+  @Test
+  fun aDriverCheckThatCouldNotRunKeepsTheRenderThreadAuthoritative() {
+    // Timeout, window-only EGL (G2), missing EGL, and a broken built-in shader are not the
+    // caller's shader errors, so staging must continue as before the check existed.
+    assertNull(shaderCheckRejection(GlRenderer.Result.Failure("shader-check-skipped", "Timed out.")))
+    assertNull(shaderCheckRejection(GlRenderer.Result.Success))
+    assertNull(shaderCheckRejection(GlRenderer.Result.ContextLost))
+    assertNull(shaderCheckRejection(GlRenderer.Result.Failure("egl-pbuffer-unavailable", "No pbuffer.")))
+    assertNull(shaderCheckRejection(GlRenderer.Result.Failure("egl-unavailable", "No display.")))
+    assertNull(shaderCheckRejection(GlRenderer.Result.Failure("vertex-shader-compilation-failed", "Vertex.")))
+  }
+
+  @Test
+  fun aShaderGlCouldNotAllocateIsNotRejected() {
+    val failure = shaderCompileFailure("shader-compilation-failed", "The fragment shader failed to compile.", null)
+
+    assertEquals("gl-object-allocation-failed", failure.code)
+    assertNull(shaderCheckRejection(failure))
+  }
+
+  @Test
+  fun aCompileFailureWithAnEmptyDriverLogIsStillRejected() {
+    val failure = shaderCompileFailure("shader-compilation-failed", "The fragment shader failed to compile.", "")
+
+    assertEquals("shader-compilation-failed", shaderCheckRejection(failure)?.wireCode)
   }
 
   private fun invalidCode(request: ShaderProgramValidator.Request): String {

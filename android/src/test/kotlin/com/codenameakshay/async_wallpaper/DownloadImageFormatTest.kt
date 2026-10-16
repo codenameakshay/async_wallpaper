@@ -50,6 +50,13 @@ class DownloadImageFormatTest {
       "HTTP type text/html is not an image type",
       DownloadImageFormat.rejectionReason("image/png", "text/html; charset=utf-8"),
     )
+    listOf("image/x-icon", "image/svg+xml").forEach { decoded ->
+      assertEquals(
+        "decoded type $decoded (HTTP image/png) is not supported; accepted types are $accepted",
+        DownloadImageFormat.rejectionReason(decoded, "image/png"),
+      )
+      assertNull(DownloadImageFormat.choose(decoded, "image/png"))
+    }
   }
 
   @Test
@@ -153,6 +160,32 @@ class DownloadImageFormatTest {
   }
 
   @Test
+  fun `malformed normalized MIME tokens are redacted`() {
+    val malformed = listOf(
+      "image/tiffé",
+      "image/漢字",
+      "image/ti\rff",
+      "image/ti\nff",
+      "image/tiff/extra",
+      "image",
+      "image/",
+      "image//tiff",
+      "/tiff",
+      "image/tiff:secret",
+      "image/tiff?secret",
+      "image/tiff=secret",
+      "image/ti ff",
+    )
+    malformed.forEach { decoded ->
+      assertEquals(
+        decoded,
+        "decoded type <invalid> (HTTP image/png) is not supported; accepted types are $accepted",
+        DownloadImageFormat.rejectionReason(decoded, "image/png"),
+      )
+    }
+  }
+
+  @Test
   fun `download exception reasons keep plugin codes and drop URL-bearing details`() {
     assertEquals(
       "downloadWallpaper failed (invalid-url): The source URL is invalid.",
@@ -164,12 +197,48 @@ class DownloadImageFormatTest {
         ),
       ),
     )
+    assertEquals(
+      "downloadWallpaper failed (http-status): The source server returned HTTP 404.",
+      downloadExceptionReason(
+        BoundedSourceException(
+          BoundedSourceOpener.ERROR_HTTP_STATUS,
+          "The source server returned HTTP 404.",
+        ),
+      ),
+    )
+    assertEquals(
+      "downloadWallpaper failed (source-too-large): The source exceeds the configured byte limit.",
+      downloadExceptionReason(
+        BoundedSourceException(
+          BoundedSourceOpener.ERROR_SOURCE_TOO_LARGE,
+          "The source exceeds the configured byte limit.",
+        ),
+      ),
+    )
     val ioError = IOException("https://cdn.example/image.png?token=io-secret").apply {
       initCause(IOException("https://cdn.example/cause?token=cause-secret"))
+      addSuppressed(IOException("https://cdn.example/suppressed?token=suppressed-secret"))
     }
     assertEquals(
       "downloadWallpaper failed with java.io.IOException; details are omitted because they can include the URL.",
       downloadExceptionReason(ioError),
+    )
+    assertEquals(
+      "downloadWallpaper failed with java.lang.SecurityException; details are omitted because they can include the URL.",
+      downloadExceptionReason(SecurityException("https://cdn.example/image.png?token=security-secret")),
+    )
+    val hostileError = object : Exception() {
+      override val message: String?
+        get() = error("message getter must not be read")
+
+      override fun toString(): String = error("toString must not be called")
+    }.apply {
+      initCause(IOException("https://cdn.example/cause?token=cause-secret"))
+      addSuppressed(IOException("https://cdn.example/suppressed?token=suppressed-secret"))
+    }
+    assertEquals(
+      "downloadWallpaper failed with ${hostileError.javaClass.name}; details are omitted because they can include the URL.",
+      downloadExceptionReason(hostileError),
     )
   }
 }

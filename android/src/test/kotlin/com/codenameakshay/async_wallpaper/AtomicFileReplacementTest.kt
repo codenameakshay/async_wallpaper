@@ -377,6 +377,42 @@ class AtomicFileReplacementTest {
     }
   }
 
+  @Test
+  fun `a slow candidate copy does not block the wallpaper engine from opening the active video`() {
+    writeFile(VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME, "active-video")
+    writeFile("file.mp4.scale-mode", VideoWallpaperScaleMode.FIT_CENTER.name)
+    val fileSystem = BlockingFileSystem()
+    val repository = VideoWallpaperRepository(directory, acceptingValidator(), fileSystem)
+    val executor = Executors.newFixedThreadPool(2)
+
+    try {
+      val preparation = executor.submit<PreparedVideo> {
+        repository.preparePending("candidate-video".byteInputStream())
+      }
+      assertTrue(fileSystem.firstCopyStarted.await(5, TimeUnit.SECONDS))
+
+      // The engine opens the active video on the app's main thread. A network or large-file copy
+      // can take minutes, so the engine must not wait for it.
+      val snapshot = executor.submit<String> {
+        repository.openActiveSnapshot().use { "${it.input.readBytes().decodeToString()}:${it.scaleMode}" }
+      }
+      assertEquals("active-video:${VideoWallpaperScaleMode.FIT_CENTER}", snapshot.get(1, TimeUnit.SECONDS))
+      assertEquals(
+        VideoWallpaperScaleMode.FIT_CENTER,
+        executor.submit<VideoWallpaperScaleMode> { repository.activeScaleMode() }.get(1, TimeUnit.SECONDS),
+      )
+
+      fileSystem.allowFirstCopy.countDown()
+      preparation.get(5, TimeUnit.SECONDS)
+      assertEquals("candidate-video", File(directory, VideoWallpaperRepository.PENDING_VIDEO_FILE_NAME).readText())
+      assertEquals("active-video", File(directory, VideoWallpaperRepository.ACTIVE_VIDEO_FILE_NAME).readText())
+      assertNoTemporaryFiles()
+    } finally {
+      fileSystem.allowFirstCopy.countDown()
+      executor.shutdownNow()
+    }
+  }
+
   private fun acceptingValidator(): VideoFileValidator = VideoFileValidator {
     VideoMetadata(
       mimeType = "video/mp4",

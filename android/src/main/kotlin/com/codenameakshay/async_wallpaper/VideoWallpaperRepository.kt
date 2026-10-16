@@ -96,10 +96,8 @@ class VideoWallpaperRepository(
    * no-op after validation, preventing accidental self-truncation.
    */
   @Throws(IOException::class, VideoMetadataValidationException::class)
-  fun prepare(source: File): PreparedVideo = replacementLock.withLock {
-    ensureStorageDirectory()
-    recoverPromotionLocked()
-    cleanupTemporaryFilesLocked()
+  fun prepare(source: File): PreparedVideo = mutationLock.withLock {
+    beginMutationLocked()
 
     val destination = activeFile
     if (source.isSameFileAs(destination)) {
@@ -116,25 +114,25 @@ class VideoWallpaperRepository(
    * or network source themselves. This method does not close [source].
    */
   @Throws(IOException::class, VideoMetadataValidationException::class)
-  fun prepare(source: InputStream): PreparedVideo = replacementLock.withLock {
-    ensureStorageDirectory()
-    recoverPromotionLocked()
-    cleanupTemporaryFilesLocked()
+  fun prepare(source: InputStream): PreparedVideo = mutationLock.withLock {
+    beginMutationLocked()
     prepareLocked(source, activeFile)
   }
 
   /** Writes a validated candidate without changing the active wallpaper. */
   @Throws(IOException::class, VideoMetadataValidationException::class)
-  fun preparePending(source: InputStream): PreparedVideo = replacementLock.withLock {
-    ensureStorageDirectory()
-    recoverPromotionLocked()
-    cleanupTemporaryFilesLocked()
+  fun preparePending(source: InputStream): PreparedVideo = mutationLock.withLock {
+    beginMutationLocked()
     prepareLocked(source, pendingFile)
   }
 
   /** Promotes the validated pending candidate and records its active scale mode. */
   @Throws(IOException::class, VideoMetadataValidationException::class)
-  fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo = replacementLock.withLock {
+  fun promotePending(scaleMode: VideoWallpaperScaleMode): PreparedVideo = mutationLock.withLock {
+    replacementLock.withLock { promotePendingLocked(scaleMode) }
+  }
+
+  private fun promotePendingLocked(scaleMode: VideoWallpaperScaleMode): PreparedVideo {
     ensureStorageDirectory()
     recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
@@ -158,7 +156,7 @@ class VideoWallpaperRepository(
     // Journal cleanup cannot undo the committed rename. A later read can use the committed
     // mode while mutations keep the marker as a witness until a repository entry clears it.
     runCatching { fileSystem.delete(promotionJournalFile) }
-    PreparedVideo(activeFile, metadata)
+    return PreparedVideo(activeFile, metadata)
   }
 
   /** Reads the active asset's scale mode, defaulting safely for old installs. */
@@ -183,19 +181,26 @@ class VideoWallpaperRepository(
   }
 
   /** Removes abandoned temporary candidates left behind by a process interruption. */
-  fun cleanupTemporaryFiles(): Int = replacementLock.withLock {
+  fun cleanupTemporaryFiles(): Int = mutationLock.withLock { beginMutationLocked() }
+
+  /** Recovers an interrupted promotion and removes abandoned candidates before a mutation. */
+  private fun beginMutationLocked(): Int = replacementLock.withLock {
     ensureStorageDirectory()
     recoverPromotionLocked()
     cleanupTemporaryFilesLocked()
   }
 
+  /**
+   * Copies and validates outside [replacementLock], which the wallpaper engine takes on the main
+   * thread. A network or large-file source can take minutes. Only the final rename is exclusive.
+   */
   private fun prepareLocked(source: InputStream, destination: File): PreparedVideo {
     var temporaryFile: File? = null
     try {
       temporaryFile = fileSystem.createTempFile(storageDirectory, tempFilePrefix(), TEMP_FILE_SUFFIX)
       fileSystem.copyAndSync(source, temporaryFile)
       val metadata = validator.validate(temporaryFile)
-      fileSystem.replaceAtomically(temporaryFile, destination)
+      replacementLock.withLock { fileSystem.replaceAtomically(temporaryFile, destination) }
       return PreparedVideo(destination, metadata)
     } finally {
       temporaryFile?.let(fileSystem::delete)
@@ -317,8 +322,11 @@ class VideoWallpaperRepository(
     private const val SCALE_MODE_ABSENT = "ABSENT"
     private const val TEMP_FILE_SUFFIX = ".tmp"
 
-    // One process-wide lock protects the one active-file hand-off protocol,
-    // even when callers construct separate repository instances.
+    // Process-wide locks, shared by separate repository instances. Mutations hold mutationLock
+    // for their whole duration, including slow copies, so their temporary files and journal steps
+    // never interleave. replacementLock guards only the short active-file hand-off and is the only
+    // lock readers take. Always acquire mutationLock before replacementLock.
+    private val mutationLock = ReentrantLock()
     private val replacementLock = ReentrantLock()
   }
 }

@@ -1,5 +1,9 @@
 # Migration guide
 
+## Unreleased
+
+- **OpenGL textures are upright.** Before, `texture2D(u_texture0, v_uv)` showed each texture upside down. If your shader flips `v_uv.y` (for example with `1.0 - v_uv.y`) to compensate, remove the flip.
+
 ## From 3.2 to 3.3
 
 The Dart API is unchanged. Update the version and check these Android behavior changes.

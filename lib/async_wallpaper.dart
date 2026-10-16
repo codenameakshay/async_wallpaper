@@ -202,6 +202,12 @@ class AsyncWallpaper {
   }
 
   /// Applies a shader-based OpenGL live wallpaper.
+  ///
+  /// Android compiles and links the shader on the device's driver before it
+  /// opens the preview. If the driver rejects the shader, the result is
+  /// `failed` with `shader-compilation-failed` or `shader-link-failed`, and
+  /// [WallpaperOperationResult.errorDetails] contains the driver's info log.
+  /// If the check cannot run, Android skips it and opens the preview.
   static Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
     OpenGlLiveWallpaperRequest request,
   ) async {

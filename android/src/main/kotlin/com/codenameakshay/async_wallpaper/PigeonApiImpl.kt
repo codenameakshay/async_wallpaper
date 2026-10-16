@@ -588,7 +588,12 @@ class PigeonApiImpl(
     val prepared = when (val staged = OpenGlLiveWallpaper.stageConfiguration(appContext, configuration)) {
       is OpenGlConfigurationStageResult.Prepared -> staged.configuration
       is OpenGlConfigurationStageResult.Rejected -> {
-        return OperationResultPolicy.failed(target, staged.error.wireCode, staged.error.message)
+        return OperationResultPolicy.failed(
+          target,
+          staged.error.wireCode,
+          staged.error.message,
+          staged.error.details,
+        )
       }
     }
 

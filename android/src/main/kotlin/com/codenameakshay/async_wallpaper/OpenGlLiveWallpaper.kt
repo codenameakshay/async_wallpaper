@@ -23,9 +23,11 @@ import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.thread
 import kotlin.concurrent.withLock
 import kotlin.math.max
 
@@ -126,7 +128,8 @@ private const val TEXTURE_READ_BUFFER_SIZE = 8 * 1024
  * Fragment shaders may declare these optional uniforms with their exact listed types:
  * `u_time` (`float`), `u_resolution` (`vec2`), `u_touch` (`vec2`, normalized), `u_offset`
  * (`vec2`), and `u_texture0` through `u_texture3` (`sampler2D`). The safe vertex shader supplies
- * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates.
+ * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates. Textures are
+ * uploaded so that `texture2D(u_texture0, v_uv)` shows them upright.
  */
 class OpenGlWallpaperConfiguration(
   val fragmentShader: String,
@@ -326,10 +329,15 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
     }
 
+    /**
+     * Detaches EGL from [destroyedSurface] and waits for it, because SurfaceHolder.Callback
+     * requires that nothing draws to the surface after onSurfaceDestroyed returns. The render
+     * thread never waits on the main thread, so the bounded wait cannot deadlock.
+     */
     fun surfaceDestroyed(destroyedSurface: Surface) {
-      handler.post {
+      val detached = postAndAwait(handler::post, SURFACE_DESTROYED_WAIT_MILLIS) {
         if (destroyed) {
-          return@post
+          return@postAndAwait
         }
         if (surface === destroyedSurface || surface?.isValid != true) {
           surface = null
@@ -337,6 +345,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
           renderer?.detachSurface()
         }
         invalidateScheduledFrame()
+      }
+      if (!detached) {
+        Log.w(TAG, "The OpenGL render thread did not detach the surface within $SURFACE_DESTROYED_WAIT_MILLIS ms.")
       }
     }
 
@@ -475,7 +486,11 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
         is GlRenderer.Result.SurfaceLost -> handleSurfaceLost()
         is GlRenderer.Result.Failure -> {
-          Log.e(TAG, "OpenGL wallpaper render failure [${result.code}]: ${result.message}")
+          Log.e(
+            TAG,
+            "OpenGL wallpaper render failure [${result.code}]: ${result.message}" +
+              result.details?.let { details -> " $details" }.orEmpty(),
+          )
           renderer?.release()
           renderer = null
           attachedGeneration = -1L
@@ -520,6 +535,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private companion object {
       private const val NANOS_PER_SECOND = 1_000_000_000.0
       private const val SHUTDOWN_WAIT_MILLIS = 1_000L
+      private const val SURFACE_DESTROYED_WAIT_MILLIS = 1_000L
 
       private fun frameIntervalFor(configuration: OpenGlWallpaperConfiguration): Long = max(
         1L,
@@ -542,7 +558,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
       } ?: false
     }
 
-    /** Validates and stages bounded texture files without changing the active configuration. */
+    /**
+     * Validates the shader, compiles it on this device's driver, and stages bounded texture files
+     * without changing the active configuration. Call it off the main thread.
+     */
     internal fun stageConfiguration(
       context: Context,
       configuration: OpenGlWallpaperConfiguration,
@@ -555,6 +574,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
       )
       if (validation is ShaderProgramValidator.Result.Invalid) {
         return OpenGlConfigurationStageResult.Rejected(validation.error)
+      }
+      checkShaderOnDriver(context, configuration.fragmentShader)?.let { error ->
+        return OpenGlConfigurationStageResult.Rejected(error)
       }
       return try {
         OpenGlConfigurationStageResult.Prepared(
@@ -584,6 +606,28 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
     }
 
+    /**
+     * Compiles and links [fragmentShader] in a pbuffer context on a short-lived thread. Returns the
+     * rejection for a shader the driver refuses. Returns null when the shader links, or when the
+     * check cannot run here (no EGL, a window-only config, or no answer within
+     * [SHADER_CHECK_TIMEOUT_MILLIS]); the render thread's own compile stays authoritative then.
+     */
+    private fun checkShaderOnDriver(
+      context: Context,
+      fragmentShader: String,
+    ): ShaderProgramValidator.ValidationError? {
+      // A timed-out check outlives this call, so it must not hold an Activity context.
+      val appContext = context.applicationContext
+      val checked = runShaderCheck(shaderCheckRunning, SHADER_CHECK_TIMEOUT_MILLIS) {
+        GlRenderer(appContext, OpenGlWallpaperConfiguration(fragmentShader)).checkProgram()
+      }
+      return shaderCheckRejection(checked).also { rejection ->
+        if (rejection == null && checked !is GlRenderer.Result.Success) {
+          Log.w(TAG, "Skipped the driver shader check: $checked")
+        }
+      }
+    }
+
     /** Commits a staged configuration after its caller has passed the foreground/activity check. */
     internal fun activatePreparedConfiguration(
       context: Context,
@@ -609,7 +653,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
     }
 
-    /** Compatibility entry point for callers that do not need a separate Activity recheck. */
+    /**
+     * Compatibility entry point for callers that do not need a separate Activity recheck. The
+     * driver shader check can take up to 2 seconds, so call it off the main thread.
+     */
     fun saveConfiguration(
       context: Context,
       configuration: OpenGlWallpaperConfiguration,
@@ -642,8 +689,97 @@ class OpenGlLiveWallpaper : WallpaperService() {
     }
 
     private const val OPENGL_ES2_VERSION = 0x0002_0000
+    private const val SHADER_CHECK_TIMEOUT_MILLIS = 2_000L
+    private val shaderCheckRunning = AtomicBoolean(false)
   }
 }
+
+/**
+ * Posts [block] and waits up to [timeoutMillis] for it to finish. Returns false when [post]
+ * accepted the block and it did not finish in time, or when the caller was interrupted; a rejected
+ * post has nothing to wait for.
+ */
+internal fun postAndAwait(post: (Runnable) -> Boolean, timeoutMillis: Long, block: () -> Unit): Boolean {
+  val done = CountDownLatch(1)
+  val accepted = post(
+    Runnable {
+      try {
+        block()
+      } finally {
+        done.countDown()
+      }
+    },
+  )
+  if (!accepted) {
+    return true
+  }
+  return try {
+    done.await(timeoutMillis, TimeUnit.MILLISECONDS)
+  } catch (error: InterruptedException) {
+    Thread.currentThread().interrupt()
+    false
+  }
+}
+
+/**
+ * Maps a driver shader check to a staging rejection. Only a fragment shader that fails to compile
+ * or link is rejected; a check that could not run (null, EGL failures, window-only configs) is not.
+ */
+internal fun shaderCheckRejection(result: GlRenderer.Result): ShaderProgramValidator.ValidationError? {
+  val failure = result as? GlRenderer.Result.Failure ?: return null
+  val code = when (failure.code) {
+    ShaderProgramValidator.ErrorCode.SHADER_COMPILATION_FAILED.wireCode ->
+      ShaderProgramValidator.ErrorCode.SHADER_COMPILATION_FAILED
+    ShaderProgramValidator.ErrorCode.SHADER_LINK_FAILED.wireCode -> ShaderProgramValidator.ErrorCode.SHADER_LINK_FAILED
+    else -> return null
+  }
+  return ShaderProgramValidator.ValidationError(code, failure.message, failure.details)
+}
+
+/**
+ * Runs [check] on a daemon thread and waits up to [timeoutMillis]. While [running] is set, later
+ * calls do not start another thread, so a hung driver cannot collect threads and EGL contexts.
+ * A busy, crashed, or late check returns a failure that [shaderCheckRejection] does not reject.
+ */
+internal fun runShaderCheck(
+  running: AtomicBoolean,
+  timeoutMillis: Long,
+  check: () -> GlRenderer.Result,
+): GlRenderer.Result {
+  if (!running.compareAndSet(false, true)) {
+    return GlRenderer.Result.Failure(SHADER_CHECK_SKIPPED, "An earlier shader check is still running.")
+  }
+  val result = AtomicReference<GlRenderer.Result>()
+  val done = CountDownLatch(1)
+  try {
+    thread(name = "AsyncWallpaper-ShaderCheck", isDaemon = true) {
+      try {
+        result.set(check())
+      } catch (error: Throwable) {
+        result.set(GlRenderer.Result.Failure(SHADER_CHECK_SKIPPED, "The shader check failed: $error"))
+      } finally {
+        running.set(false)
+        done.countDown()
+      }
+    }
+  } catch (error: Throwable) {
+    running.set(false)
+    return GlRenderer.Result.Failure(SHADER_CHECK_SKIPPED, "The shader check could not start: $error")
+  }
+  val finished = try {
+    done.await(timeoutMillis, TimeUnit.MILLISECONDS)
+  } catch (error: InterruptedException) {
+    Thread.currentThread().interrupt()
+    false
+  }
+  return if (finished) {
+    result.get()
+  } else {
+    GlRenderer.Result.Failure(SHADER_CHECK_SKIPPED, "The shader check gave no result within $timeoutMillis ms.")
+  }
+}
+
+private const val SHADER_CHECK_SKIPPED = "shader-check-skipped"
 
 /** Persists a renderable configuration in the application-private files directory. */
 internal object OpenGlWallpaperConfigurationStore {

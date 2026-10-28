@@ -36,7 +36,7 @@ class AsyncWallpaper {
     dotAll: true,
   );
 
-  static final WallpaperApi _api = WallpaperApi();
+  static final WallpaperApi _api = CapabilitiesCompatibleWallpaperApi();
   static final WallpaperClient _defaultClient = PigeonWallpaperClient(
     api: _api,
   );

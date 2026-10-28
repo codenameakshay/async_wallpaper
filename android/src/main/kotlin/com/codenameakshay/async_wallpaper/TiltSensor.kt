@@ -51,7 +51,7 @@ internal class TiltSensor(context: Context, private val handler: Handler) : Sens
   override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
 
   companion object {
-    /** About 15 Hz. The renderer eases between samples, so a faster rate only costs battery. */
+    /** About 15 Hz. */
     private const val SAMPLING_PERIOD_US = 66_667
 
     fun isAvailable(context: Context): Boolean {
@@ -78,6 +78,7 @@ internal class TiltTracker {
   private var hasBase = false
   private var baseX = 0f
   private var baseY = 0f
+  private var baseZ = 0f
 
   fun reset() {
     hasBase = false
@@ -93,15 +94,19 @@ internal class TiltTracker {
     }
     val unitX = upX / length
     val unitY = upY / length
+    val unitZ = upZ / length
     if (!hasBase) {
       baseX = unitX
       baseY = unitY
+      baseZ = unitZ
       hasBase = true
     }
     baseX += (unitX - baseX) * REST_FOLLOW
     baseY += (unitY - baseY) * REST_FOLLOW
+    baseZ += (unitZ - baseZ) * REST_FOLLOW
     x = ((baseX - unitX) / FULL_TILT).coerceIn(-1f, 1f)
-    y = ((baseY - unitY) / FULL_TILT).coerceIn(-1f, 1f)
+    // The Y/Z cross component keeps pitch signed even when the rest pose is upright.
+    y = ((baseY * unitZ - baseZ * unitY) / FULL_TILT).coerceIn(-1f, 1f)
   }
 
   companion object {

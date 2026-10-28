@@ -277,8 +277,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private val configuration: OpenGlWallpaperConfiguration
       get() = loadedConfiguration.configuration
     private var frameIntervalMillis = frameIntervalFor(initialLoadedConfiguration.configuration)
-    private var destroyed = false
-    private var visible = false
+    private val destroyed: Boolean
+      get() = tiltLifecycle.destroyed
+    private val visible: Boolean
+      get() = tiltLifecycle.visible
     private var surface: Surface? = null
     private var surfaceGeneration = 0L
     private var attachedGeneration = -1L
@@ -293,9 +295,16 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private var offsetX = 0f
     private var offsetY = 0f
     private val frameState = GlRenderer.FrameState(0f, 1, 1, 0.5f, 0.5f, 0f, 0f)
-    private val tilt = TiltSensor(appContext, handler)
-    private var tiltX = 0f
-    private var tiltY = 0f
+    private var tiltSensor: TiltSensor? = null
+    private val tiltLifecycle = TiltLifecycle { active ->
+      if (active) {
+        val sensor = tiltSensor ?: TiltSensor(appContext, handler).also { tiltSensor = it }
+        sensor.setActive(true)
+      } else {
+        tiltSensor?.setActive(false)
+        tiltSensor?.tracker?.reset()
+      }
+    }
     private val frameRunnable = Runnable {
       val generation = scheduledFrameGeneration
       if (scheduledFrameGeneration == generation) {
@@ -313,6 +322,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         if (destroyed) {
           return@post
         }
+        tiltLifecycle.rendererUnavailable()
         surface = newSurface
         surfaceGeneration += 1L
         attachedGeneration = -1L
@@ -345,7 +355,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           return@postAndAwait
         }
         if (surface === destroyedSurface || surface?.isValid != true) {
-          tilt.setActive(false)
+          tiltLifecycle.rendererUnavailable()
           surface = null
           attachedGeneration = -1L
           renderer?.detachSurface()
@@ -362,12 +372,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
         if (destroyed) {
           return@post
         }
-        visible = isVisible
+        tiltLifecycle.visibilityChanged(isVisible)
         invalidateScheduledFrame()
         if (visible) {
           scheduleFrame(immediate = true)
-        } else {
-          tilt.setActive(false)
         }
       }
     }
@@ -401,6 +409,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           newConfiguration.close()
           return@post
         }
+        tiltLifecycle.rendererUnavailable()
         runCatching { renderer?.release() }
         renderer = null
         val previousConfiguration = loadedConfiguration
@@ -464,7 +473,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
       if (attachedGeneration != surfaceGeneration) {
         when (val result = currentRenderer.attachSurface(currentSurface, width, height)) {
-          is GlRenderer.Result.Success -> attachedGeneration = surfaceGeneration
+          is GlRenderer.Result.Success -> {
+            attachedGeneration = surfaceGeneration
+            tiltLifecycle.rendererReady(currentRenderer.usesTilt)
+          }
           else -> {
             handleRendererResult(result)
             return
@@ -480,14 +492,13 @@ class OpenGlLiveWallpaper : WallpaperService() {
       frameState.touchY = touchY
       frameState.offsetX = offsetX
       frameState.offsetY = offsetY
-      tiltX += (tilt.tracker.x - tiltX) * TILT_EASE
-      tiltY += (tilt.tracker.y - tiltY) * TILT_EASE
-      frameState.tiltX = tiltX
-      frameState.tiltY = tiltY
-      val result = currentRenderer.render(frameState)
-      if (result is GlRenderer.Result.Success) {
-        tilt.setActive(currentRenderer.usesTilt)
+      if (tiltLifecycle.active) {
+        val tracker = tiltSensor?.tracker
+        tiltLifecycle.sample(tracker?.x ?: 0f, tracker?.y ?: 0f)
       }
+      frameState.tiltX = tiltLifecycle.x
+      frameState.tiltY = tiltLifecycle.y
+      val result = currentRenderer.render(frameState)
       handleRendererResult(result)
     }
 
@@ -495,6 +506,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
       when (result) {
         is GlRenderer.Result.Success -> Unit
         is GlRenderer.Result.ContextLost -> {
+          tiltLifecycle.rendererUnavailable()
           renderer?.release()
           renderer = null
           attachedGeneration = -1L
@@ -502,6 +514,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
         is GlRenderer.Result.SurfaceLost -> handleSurfaceLost()
         is GlRenderer.Result.Failure -> {
+          tiltLifecycle.rendererUnavailable()
           Log.e(
             TAG,
             "OpenGL wallpaper render failure [${result.code}]: ${result.message}" +
@@ -512,7 +525,6 @@ class OpenGlLiveWallpaper : WallpaperService() {
           attachedGeneration = -1L
           // Compilation/linking and texture-source failures need a new configuration or surface;
           // do not spin at the requested FPS while a persistent failure remains.
-          tilt.setActive(false)
           fatalSurfaceGeneration = surfaceGeneration
           invalidateScheduledFrame()
         }
@@ -520,7 +532,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     }
 
     private fun handleSurfaceLost() {
-      tilt.setActive(false)
+      tiltLifecycle.rendererUnavailable()
       renderer?.detachSurface()
       surface = null
       attachedGeneration = -1L
@@ -541,9 +553,8 @@ class OpenGlLiveWallpaper : WallpaperService() {
       if (destroyed) {
         return
       }
-      destroyed = true
+      tiltLifecycle.destroy()
       invalidateScheduledFrame()
-      tilt.setActive(false)
       runCatching { renderer?.release() }
       renderer = null
       loadedConfiguration.close()
@@ -555,9 +566,6 @@ class OpenGlLiveWallpaper : WallpaperService() {
       private const val NANOS_PER_SECOND = 1_000_000_000.0
       private const val SHUTDOWN_WAIT_MILLIS = 1_000L
       private const val SURFACE_DESTROYED_WAIT_MILLIS = 1_000L
-
-      // ponytail: per-frame ease, so it is slower at 15 fps than at 30 fps; scale by frame time if that shows.
-      private const val TILT_EASE = 0.15f
 
       private fun frameIntervalFor(configuration: OpenGlWallpaperConfiguration): Long = max(
         1L,

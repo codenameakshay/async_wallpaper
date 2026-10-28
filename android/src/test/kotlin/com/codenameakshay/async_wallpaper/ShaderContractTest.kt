@@ -71,6 +71,25 @@ class ShaderContractTest {
   }
 
   @Test
+  fun rejectsTiltUniformArraysOfOneOrTwoWithStableErrorCode() {
+    listOf(1, 2).forEach { arrayLength ->
+      assertEquals(
+        ShaderProgramValidator.ErrorCode.SHADER_UNIFORM_TYPE_MISMATCH.wireCode,
+        invalidCode(
+          ShaderProgramValidator.Request(
+            fragmentShader = """
+              precision mediump float;
+              uniform vec2 u_tilt[$arrayLength];
+              void main() { gl_FragColor = vec4(u_tilt[0], 0.0, 1.0); }
+            """.trimIndent(),
+            frameRate = 30L,
+          ),
+        ),
+      )
+    }
+  }
+
+  @Test
   fun requiresARealMainEntryPointWithStableErrorCode() {
     assertEquals(
       ShaderProgramValidator.ErrorCode.SHADER_MAIN_MISSING.wireCode,

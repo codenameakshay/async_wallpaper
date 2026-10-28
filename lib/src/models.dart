@@ -271,8 +271,8 @@ class WallpaperCapabilities {
 
   /// True when OpenGL shaders may declare `uniform vec2 u_tilt;` and the device has a tilt sensor.
   ///
-  /// `u_tilt` runs from -1 to 1 on each axis and is (0, 0) while the phone rests. Shaders for older
-  /// plugin versions should not declare it.
+  /// `u_tilt` runs from -1 to 1 on each axis and is (0, 0) while the phone rests. Plugin version
+  /// 3.5.0 accepts it as a generic uniform initialized to (0, 0).
   final bool supportsTilt;
 }
 

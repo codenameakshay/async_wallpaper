@@ -40,6 +40,10 @@ class GlRenderer(
     var offsetX: Float,
     /** Wallpaper-engine vertical offset, normally in the inclusive 0..1 range. */
     var offsetY: Float,
+    /** Smoothed phone tilt in the inclusive -1..1 range, (0, 0) without a tilt sensor. */
+    var tiltX: Float = 0f,
+    /** Smoothed phone tilt in the inclusive -1..1 range, (0, 0) without a tilt sensor. */
+    var tiltY: Float = 0f,
   )
 
   sealed class Result {
@@ -84,6 +88,10 @@ class GlRenderer(
   private var viewportWidth = 1
   private var viewportHeight = 1
   private var lastShaderLog: String? = null
+
+  /** True when the linked program reads `u_tilt`, so the tilt sensor is worth running. */
+  val usesTilt: Boolean
+    get() = (uniformLocations["u_tilt"] ?: -1) >= 0
 
   /** Attaches the renderer to the current WallpaperService surface without drawing a frame. */
   fun attachSurface(surface: Surface, width: Int, height: Int): Result {
@@ -169,6 +177,7 @@ class GlRenderer(
     setVec2("u_resolution", width.toFloat(), height.toFloat())
     setVec2("u_touch", frame.touchX, frame.touchY)
     setVec2("u_offset", frame.offsetX, frame.offsetY)
+    setVec2("u_tilt", frame.tiltX, frame.tiltY)
     textureIds.forEachIndexed { index, texture ->
       GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + index)
       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture)
@@ -765,6 +774,7 @@ class GlRenderer(
       "u_resolution",
       "u_touch",
       "u_offset",
+      "u_tilt",
       "u_texture0",
       "u_texture1",
       "u_texture2",

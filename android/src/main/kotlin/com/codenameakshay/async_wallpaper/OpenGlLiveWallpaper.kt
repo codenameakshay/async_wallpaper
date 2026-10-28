@@ -127,8 +127,10 @@ private const val TEXTURE_READ_BUFFER_SIZE = 8 * 1024
  *
  * Fragment shaders may declare these optional uniforms with their exact listed types:
  * `u_time` (`float`), `u_resolution` (`vec2`), `u_touch` (`vec2`, normalized), `u_offset`
- * (`vec2`), and `u_texture0` through `u_texture3` (`sampler2D`). The safe vertex shader supplies
- * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates. Textures are
+ * (`vec2`), `u_tilt` (`vec2`, -1..1, (0, 0) without a tilt sensor), and `u_texture0` through
+ * `u_texture3` (`sampler2D`). The tilt sensor runs only while the wallpaper is visible and its
+ * shader reads `u_tilt`. The safe vertex shader supplies a `varying vec2 v_uv` in conventional
+ * bottom-left-origin texture coordinates. Textures are
  * uploaded so that `texture2D(u_texture0, v_uv)` shows them upright.
  */
 class OpenGlWallpaperConfiguration(
@@ -275,8 +277,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private val configuration: OpenGlWallpaperConfiguration
       get() = loadedConfiguration.configuration
     private var frameIntervalMillis = frameIntervalFor(initialLoadedConfiguration.configuration)
-    private var destroyed = false
-    private var visible = false
+    private val destroyed: Boolean
+      get() = tiltLifecycle.destroyed
+    private val visible: Boolean
+      get() = tiltLifecycle.visible
     private var surface: Surface? = null
     private var surfaceGeneration = 0L
     private var attachedGeneration = -1L
@@ -291,6 +295,16 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private var offsetX = 0f
     private var offsetY = 0f
     private val frameState = GlRenderer.FrameState(0f, 1, 1, 0.5f, 0.5f, 0f, 0f)
+    private var tiltSensor: TiltSensor? = null
+    private val tiltLifecycle = TiltLifecycle { active ->
+      if (active) {
+        val sensor = tiltSensor ?: TiltSensor(appContext, handler).also { tiltSensor = it }
+        sensor.setActive(true)
+      } else {
+        tiltSensor?.setActive(false)
+        tiltSensor?.tracker?.reset()
+      }
+    }
     private val frameRunnable = Runnable {
       val generation = scheduledFrameGeneration
       if (scheduledFrameGeneration == generation) {
@@ -308,6 +322,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         if (destroyed) {
           return@post
         }
+        tiltLifecycle.rendererUnavailable()
         surface = newSurface
         surfaceGeneration += 1L
         attachedGeneration = -1L
@@ -340,6 +355,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           return@postAndAwait
         }
         if (surface === destroyedSurface || surface?.isValid != true) {
+          tiltLifecycle.rendererUnavailable()
           surface = null
           attachedGeneration = -1L
           renderer?.detachSurface()
@@ -356,7 +372,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         if (destroyed) {
           return@post
         }
-        visible = isVisible
+        tiltLifecycle.visibilityChanged(isVisible)
         invalidateScheduledFrame()
         if (visible) {
           scheduleFrame(immediate = true)
@@ -393,6 +409,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           newConfiguration.close()
           return@post
         }
+        tiltLifecycle.rendererUnavailable()
         runCatching { renderer?.release() }
         renderer = null
         val previousConfiguration = loadedConfiguration
@@ -456,7 +473,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
       if (attachedGeneration != surfaceGeneration) {
         when (val result = currentRenderer.attachSurface(currentSurface, width, height)) {
-          is GlRenderer.Result.Success -> attachedGeneration = surfaceGeneration
+          is GlRenderer.Result.Success -> {
+            attachedGeneration = surfaceGeneration
+            tiltLifecycle.rendererReady(currentRenderer.usesTilt)
+          }
           else -> {
             handleRendererResult(result)
             return
@@ -472,13 +492,21 @@ class OpenGlLiveWallpaper : WallpaperService() {
       frameState.touchY = touchY
       frameState.offsetX = offsetX
       frameState.offsetY = offsetY
-      handleRendererResult(currentRenderer.render(frameState))
+      if (tiltLifecycle.active) {
+        val tracker = tiltSensor?.tracker
+        tiltLifecycle.sample(tracker?.x ?: 0f, tracker?.y ?: 0f)
+      }
+      frameState.tiltX = tiltLifecycle.x
+      frameState.tiltY = tiltLifecycle.y
+      val result = currentRenderer.render(frameState)
+      handleRendererResult(result)
     }
 
     private fun handleRendererResult(result: GlRenderer.Result) {
       when (result) {
         is GlRenderer.Result.Success -> Unit
         is GlRenderer.Result.ContextLost -> {
+          tiltLifecycle.rendererUnavailable()
           renderer?.release()
           renderer = null
           attachedGeneration = -1L
@@ -486,6 +514,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
         }
         is GlRenderer.Result.SurfaceLost -> handleSurfaceLost()
         is GlRenderer.Result.Failure -> {
+          tiltLifecycle.rendererUnavailable()
           Log.e(
             TAG,
             "OpenGL wallpaper render failure [${result.code}]: ${result.message}" +
@@ -503,6 +532,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     }
 
     private fun handleSurfaceLost() {
+      tiltLifecycle.rendererUnavailable()
       renderer?.detachSurface()
       surface = null
       attachedGeneration = -1L
@@ -523,7 +553,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
       if (destroyed) {
         return
       }
-      destroyed = true
+      tiltLifecycle.destroy()
       invalidateScheduledFrame()
       runCatching { renderer?.release() }
       renderer = null

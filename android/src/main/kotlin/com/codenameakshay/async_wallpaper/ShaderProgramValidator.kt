@@ -321,6 +321,7 @@ object ShaderProgramValidator {
 
       val type = declaration.groupValues[1]
       val name = declaration.groupValues[2]
+      val arrayDeclaration = declaration.groupValues[3].isNotEmpty()
       val arrayLength = declaration.groupValues[3].ifEmpty { "1" }.toIntOrNull()
         ?: return error(ErrorCode.SHADER_UNIFORM_INVALID, "Uniform array length must be an integer.")
       if (arrayLength !in 1..MAX_UNIFORM_ARRAY_LENGTH) {
@@ -344,7 +345,9 @@ object ShaderProgramValidator {
       }
 
       val expectedType = RENDERER_UNIFORM_TYPES[name]
-      if (expectedType != null && (type != expectedType || arrayLength != 1)) {
+      if (expectedType != null &&
+        (type != expectedType || arrayLength != 1 || (name == "u_tilt" && arrayDeclaration))
+      ) {
         return error(
           ErrorCode.SHADER_UNIFORM_TYPE_MISMATCH,
           "Renderer uniform $name must be declared as $expectedType.",
@@ -527,6 +530,7 @@ object ShaderProgramValidator {
     "u_resolution" to "vec2",
     "u_touch" to "vec2",
     "u_offset" to "vec2",
+    "u_tilt" to "vec2",
   )
 
   private const val PORTABLE_LOOP_INT_MIN = -255L

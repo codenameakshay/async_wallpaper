@@ -1,5 +1,4 @@
 import 'package:async_wallpaper/pigeon_impl_api.dart';
-import 'package:flutter/services.dart';
 
 import 'models.dart';
 
@@ -282,8 +281,7 @@ abstract interface class WallpaperClient {
 
 /// Default Pigeon-backed client for structured wallpaper operations.
 class PigeonWallpaperClient implements WallpaperClient {
-  PigeonWallpaperClient({WallpaperApi? api})
-    : _api = api ?? CapabilitiesCompatibleWallpaperApi();
+  PigeonWallpaperClient({WallpaperApi? api}) : _api = api ?? WallpaperApi();
 
   final WallpaperApi _api;
 
@@ -330,65 +328,6 @@ class PigeonWallpaperClient implements WallpaperClient {
       await _api.applyOpenGlWallpaper(openGlWallpaperRequestToData(request)),
       expectedTarget: request.target,
     );
-  }
-}
-
-/// Accepts capability replies from hosts predating the optional tilt field.
-/// All other operations retain the generated Pigeon transport.
-class CapabilitiesCompatibleWallpaperApi extends WallpaperApi {
-  CapabilitiesCompatibleWallpaperApi({
-    super.binaryMessenger,
-    super.messageChannelSuffix,
-  });
-
-  @override
-  Future<WallpaperCapabilitiesData> getCapabilities() async {
-    final channelName =
-        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.getCapabilities$pigeonVar_messageChannelSuffix';
-    final channel = BasicMessageChannel<Object?>(
-      channelName,
-      const _CapabilitiesCodec(),
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final reply = await channel.send(null) as List<Object?>?;
-    if (reply == null) {
-      throw PlatformException(
-        code: 'channel-error',
-        message: 'Unable to establish connection on channel: "$channelName".',
-      );
-    } else if (reply.length > 1) {
-      throw PlatformException(
-        code: reply[0]! as String,
-        message: reply[1] as String?,
-        details: reply[2],
-      );
-    } else if (reply[0] == null) {
-      throw PlatformException(
-        code: 'null-error',
-        message: 'Host platform returned null value for non-null return value.',
-      );
-    } else {
-      return (reply[0] as WallpaperCapabilitiesData?)!;
-    }
-  }
-}
-
-class _CapabilitiesCodec extends StandardMessageCodec {
-  const _CapabilitiesCodec();
-
-  static final int _capabilitiesTag = WallpaperApi.pigeonChannelCodec
-      .encodeMessage(WallpaperCapabilitiesData())!
-      .getUint8(0);
-
-  @override
-  Object? readValueOfType(int type, ReadBuffer buffer) {
-    if (type == _capabilitiesTag) {
-      final fields = readValue(buffer)! as List<Object?>;
-      return WallpaperCapabilitiesData.decode(
-        fields.length == 13 ? <Object?>[...fields, null] : fields,
-      );
-    }
-    return super.readValueOfType(type, buffer);
   }
 }
 

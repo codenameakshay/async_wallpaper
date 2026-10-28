@@ -127,8 +127,10 @@ private const val TEXTURE_READ_BUFFER_SIZE = 8 * 1024
  *
  * Fragment shaders may declare these optional uniforms with their exact listed types:
  * `u_time` (`float`), `u_resolution` (`vec2`), `u_touch` (`vec2`, normalized), `u_offset`
- * (`vec2`), and `u_texture0` through `u_texture3` (`sampler2D`). The safe vertex shader supplies
- * a `varying vec2 v_uv` in conventional bottom-left-origin texture coordinates. Textures are
+ * (`vec2`), `u_tilt` (`vec2`, -1..1, (0, 0) without a tilt sensor), and `u_texture0` through
+ * `u_texture3` (`sampler2D`). The tilt sensor runs only while the wallpaper is visible and its
+ * shader reads `u_tilt`. The safe vertex shader supplies a `varying vec2 v_uv` in conventional
+ * bottom-left-origin texture coordinates. Textures are
  * uploaded so that `texture2D(u_texture0, v_uv)` shows them upright.
  */
 class OpenGlWallpaperConfiguration(
@@ -291,6 +293,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
     private var offsetX = 0f
     private var offsetY = 0f
     private val frameState = GlRenderer.FrameState(0f, 1, 1, 0.5f, 0.5f, 0f, 0f)
+    private val tilt = TiltSensor(appContext, handler)
+    private var tiltX = 0f
+    private var tiltY = 0f
     private val frameRunnable = Runnable {
       val generation = scheduledFrameGeneration
       if (scheduledFrameGeneration == generation) {
@@ -340,6 +345,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           return@postAndAwait
         }
         if (surface === destroyedSurface || surface?.isValid != true) {
+          tilt.setActive(false)
           surface = null
           attachedGeneration = -1L
           renderer?.detachSurface()
@@ -360,6 +366,8 @@ class OpenGlLiveWallpaper : WallpaperService() {
         invalidateScheduledFrame()
         if (visible) {
           scheduleFrame(immediate = true)
+        } else {
+          tilt.setActive(false)
         }
       }
     }
@@ -472,7 +480,15 @@ class OpenGlLiveWallpaper : WallpaperService() {
       frameState.touchY = touchY
       frameState.offsetX = offsetX
       frameState.offsetY = offsetY
-      handleRendererResult(currentRenderer.render(frameState))
+      tiltX += (tilt.tracker.x - tiltX) * TILT_EASE
+      tiltY += (tilt.tracker.y - tiltY) * TILT_EASE
+      frameState.tiltX = tiltX
+      frameState.tiltY = tiltY
+      val result = currentRenderer.render(frameState)
+      if (result is GlRenderer.Result.Success) {
+        tilt.setActive(currentRenderer.usesTilt)
+      }
+      handleRendererResult(result)
     }
 
     private fun handleRendererResult(result: GlRenderer.Result) {
@@ -496,6 +512,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
           attachedGeneration = -1L
           // Compilation/linking and texture-source failures need a new configuration or surface;
           // do not spin at the requested FPS while a persistent failure remains.
+          tilt.setActive(false)
           fatalSurfaceGeneration = surfaceGeneration
           invalidateScheduledFrame()
         }
@@ -503,6 +520,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     }
 
     private fun handleSurfaceLost() {
+      tilt.setActive(false)
       renderer?.detachSurface()
       surface = null
       attachedGeneration = -1L
@@ -525,6 +543,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
       destroyed = true
       invalidateScheduledFrame()
+      tilt.setActive(false)
       runCatching { renderer?.release() }
       renderer = null
       loadedConfiguration.close()
@@ -536,6 +555,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
       private const val NANOS_PER_SECOND = 1_000_000_000.0
       private const val SHUTDOWN_WAIT_MILLIS = 1_000L
       private const val SURFACE_DESTROYED_WAIT_MILLIS = 1_000L
+
+      // ponytail: per-frame ease, so it is slower at 15 fps than at 30 fps; scale by frame time if that shows.
+      private const val TILT_EASE = 0.15f
 
       private fun frameIntervalFor(configuration: OpenGlWallpaperConfiguration): Long = max(
         1L,

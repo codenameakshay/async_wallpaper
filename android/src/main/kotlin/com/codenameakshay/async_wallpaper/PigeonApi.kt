@@ -346,7 +346,8 @@ data class WallpaperCapabilitiesData (
   val manufacturer: String? = null,
   val sdkInt: Long? = null,
   val openGlVersion: String? = null,
-  val openGlRenderer: String? = null
+  val openGlRenderer: String? = null,
+  val supportsTilt: Boolean? = null
 )
  {
   companion object {
@@ -364,7 +365,8 @@ data class WallpaperCapabilitiesData (
       val sdkInt = pigeonVar_list[10] as Long?
       val openGlVersion = pigeonVar_list[11] as String?
       val openGlRenderer = pigeonVar_list[12] as String?
-      return WallpaperCapabilitiesData(supportsStaticWallpaper, supportsLiveWallpaper, supportsOpenGlLiveWallpaper, supportsHomeWallpaper, supportsLockWallpaper, supportsBothWallpapers, canSetWallpaper, hasSystemWallpaperPicker, requiresForeground, manufacturer, sdkInt, openGlVersion, openGlRenderer)
+      val supportsTilt = pigeonVar_list[13] as Boolean?
+      return WallpaperCapabilitiesData(supportsStaticWallpaper, supportsLiveWallpaper, supportsOpenGlLiveWallpaper, supportsHomeWallpaper, supportsLockWallpaper, supportsBothWallpapers, canSetWallpaper, hasSystemWallpaperPicker, requiresForeground, manufacturer, sdkInt, openGlVersion, openGlRenderer, supportsTilt)
     }
   }
   fun toList(): List<Any?> {
@@ -382,6 +384,7 @@ data class WallpaperCapabilitiesData (
       sdkInt,
       openGlVersion,
       openGlRenderer,
+      supportsTilt,
     )
   }
   override fun equals(other: Any?): Boolean {

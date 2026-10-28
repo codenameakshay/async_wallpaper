@@ -276,6 +276,7 @@ class WallpaperCapabilitiesData {
     this.sdkInt,
     this.openGlVersion,
     this.openGlRenderer,
+    this.supportsTilt,
   });
 
   bool? supportsStaticWallpaper;
@@ -304,6 +305,8 @@ class WallpaperCapabilitiesData {
 
   String? openGlRenderer;
 
+  bool? supportsTilt;
+
   List<Object?> _toList() {
     return <Object?>[
       supportsStaticWallpaper,
@@ -319,6 +322,7 @@ class WallpaperCapabilitiesData {
       sdkInt,
       openGlVersion,
       openGlRenderer,
+      supportsTilt,
     ];
   }
 
@@ -342,6 +346,7 @@ class WallpaperCapabilitiesData {
       sdkInt: result[10] as int?,
       openGlVersion: result[11] as String?,
       openGlRenderer: result[12] as String?,
+      supportsTilt: result[13] as bool?,
     );
   }
 

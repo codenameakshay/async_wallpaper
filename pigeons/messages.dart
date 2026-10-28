@@ -82,6 +82,7 @@ class WallpaperCapabilitiesData {
   int? sdkInt;
   String? openGlVersion;
   String? openGlRenderer;
+  bool? supportsTilt;
 }
 
 /// Parameters for an image wallpaper operation.

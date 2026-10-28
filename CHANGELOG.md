@@ -1,3 +1,11 @@
+## 3.6.0
+
+Android OpenGL tilt release. The Dart API gains `WallpaperCapabilities.supportsTilt`. Existing shaders are unaffected.
+
+- OpenGL live wallpapers: new optional renderer uniform `u_tilt` (`vec2`, -1 to 1 per axis). `x` grows as the right edge dips, and `y` grows as the top edge leans away from you. `(0, 0)` at rest and on devices without a sensor. It comes from the game rotation vector, or from the accelerometer when that is missing, at about 15 Hz, smoothed per frame. It is measured from a rest pose that follows how you hold the phone over about 7 seconds. The sensor is registered only while the wallpaper is visible and its shader reads `u_tilt`. It is unregistered when the wallpaper goes invisible, loses its surface, fails, or is destroyed.
+- New `WallpaperCapabilities.supportsTilt`: true on Android when OpenGL live wallpapers are supported and the device has one of those sensors; false on iOS.
+- Shaders that declare `u_tilt` and must also run on 3.5.0 keep working. 3.5.0 accepts the declaration and leaves `u_tilt` at (0, 0). Check `supportsTilt` to decide whether to use it.
+
 ## 3.5.0
 
 OpenGL and URL-handling release. The Dart API is unchanged, but OpenGL textures are now upright and some HTTPS URLs are now rejected. See [doc/migration.md](doc/migration.md#from-34-to-35).

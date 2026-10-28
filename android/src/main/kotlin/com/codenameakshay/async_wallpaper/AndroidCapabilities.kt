@@ -40,6 +40,7 @@ object AndroidCapabilities {
       supportsStaticWallpaper = staticSupport.canApplyDirectly,
       supportsLiveWallpaper = supportsLive,
       supportsOpenGlLiveWallpaper = supportsOpenGl,
+      supportsTilt = supportsOpenGl && TiltSensor.isAvailable(appContext),
       supportsHomeWallpaper = staticSupport.canApplyDirectly,
       supportsLockWallpaper = staticSupport.canApplyDirectly,
       supportsBothWallpapers = staticSupport.canApplyDirectly,

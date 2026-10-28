@@ -252,6 +252,7 @@ class WallpaperCapabilities {
     this.sdkInt = 0,
     this.openGlVersion,
     this.openGlRenderer,
+    this.supportsTilt = false,
   });
 
   final bool supportsStaticWallpaper;
@@ -267,6 +268,12 @@ class WallpaperCapabilities {
   final int sdkInt;
   final String? openGlVersion;
   final String? openGlRenderer;
+
+  /// True when OpenGL shaders may declare `uniform vec2 u_tilt;` and the device has a tilt sensor.
+  ///
+  /// `u_tilt` runs from -1 to 1 on each axis and is (0, 0) while the phone rests. Shaders for older
+  /// plugin versions should not declare it.
+  final bool supportsTilt;
 }
 
 /// Typed request for a video live wallpaper.

@@ -212,6 +212,7 @@ WallpaperCapabilities capabilitiesFromData(WallpaperCapabilitiesData data) {
     sdkInt: data.sdkInt ?? 0,
     openGlVersion: data.openGlVersion,
     openGlRenderer: data.openGlRenderer,
+    supportsTilt: data.supportsTilt ?? false,
   );
 }
 

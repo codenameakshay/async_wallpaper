@@ -266,6 +266,20 @@ void main() {
     expect(defaults.sdkInt, 0);
   });
 
+  test('maps supportsTilt when the platform reports it', () {
+    final capabilities = capabilitiesFromData(
+      WallpaperCapabilitiesData(supportsTilt: true),
+    );
+
+    expect(capabilities.supportsTilt, isTrue);
+  });
+
+  test('maps a missing supportsTilt to false', () {
+    final capabilities = capabilitiesFromData(WallpaperCapabilitiesData());
+
+    expect(capabilities.supportsTilt, isFalse);
+  });
+
   test('maps a structured static request to transport data', () {
     const request = StaticWallpaperRequest(
       source: WallpaperSource.filePath('/data/local/tmp/static.jpg'),

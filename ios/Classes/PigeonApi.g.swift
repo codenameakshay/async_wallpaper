@@ -349,6 +349,7 @@ struct WallpaperCapabilitiesData: Hashable {
   var sdkInt: Int64? = nil
   var openGlVersion: String? = nil
   var openGlRenderer: String? = nil
+  var supportsTilt: Bool? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -366,6 +367,7 @@ struct WallpaperCapabilitiesData: Hashable {
     let sdkInt: Int64? = nilOrValue(pigeonVar_list[10])
     let openGlVersion: String? = nilOrValue(pigeonVar_list[11])
     let openGlRenderer: String? = nilOrValue(pigeonVar_list[12])
+    let supportsTilt: Bool? = nilOrValue(pigeonVar_list[13])
 
     return WallpaperCapabilitiesData(
       supportsStaticWallpaper: supportsStaticWallpaper,
@@ -380,7 +382,8 @@ struct WallpaperCapabilitiesData: Hashable {
       manufacturer: manufacturer,
       sdkInt: sdkInt,
       openGlVersion: openGlVersion,
-      openGlRenderer: openGlRenderer
+      openGlRenderer: openGlRenderer,
+      supportsTilt: supportsTilt
     )
   }
   func toList() -> [Any?] {
@@ -398,6 +401,7 @@ struct WallpaperCapabilitiesData: Hashable {
       sdkInt,
       openGlVersion,
       openGlRenderer,
+      supportsTilt,
     ]
   }
   static func == (lhs: WallpaperCapabilitiesData, rhs: WallpaperCapabilitiesData) -> Bool {

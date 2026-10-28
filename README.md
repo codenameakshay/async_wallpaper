@@ -34,7 +34,7 @@ Flutter plugin to set wallpapers on Android and save them to Photos on iOS.
 
 ```yaml
 dependencies:
-  async_wallpaper: ^3.5.0
+  async_wallpaper: ^3.6.0
 ```
 
 ```dart
@@ -88,6 +88,20 @@ if (prepared.status == WallpaperOperationStatus.awaitingUserConfirmation) {
 ### OpenGL live wallpaper
 
 Check `supportsOpenGlLiveWallpaper` first, then call `setOpenGlLiveWallpaper` with a GLSL ES 1.00 fragment shader (1-60 FPS).
+
+The shader can read the optional `u_tilt` uniform (`vec2`, -1 to 1 per axis) to react to how the phone is tilted. It is `(0, 0)` at rest and on devices without a sensor. Check `supportsTilt` first. Declaring it does not fail on 3.5.0, but it stays `(0, 0)` there.
+
+```glsl
+precision mediump float;
+varying vec2 v_uv;
+uniform vec2 u_tilt;
+uniform sampler2D u_texture0;
+
+void main() {
+  vec2 uv = v_uv + u_tilt * 0.01;
+  gl_FragColor = texture2D(u_texture0, uv);
+}
+```
 
 ### Wallpaper rotation
 

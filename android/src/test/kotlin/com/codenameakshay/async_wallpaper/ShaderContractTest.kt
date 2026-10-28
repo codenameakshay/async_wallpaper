@@ -35,6 +35,42 @@ class ShaderContractTest {
   }
 
   @Test
+  fun acceptsTheTiltUniformDeclaredAsVec2() {
+    val result = ShaderProgramValidator.validate(
+      fragmentShader = """
+        precision mediump float;
+        varying vec2 v_uv;
+        uniform vec2 u_tilt;
+
+        void main() {
+          gl_FragColor = vec4(v_uv + u_tilt * 0.01, 0.0, 1.0);
+        }
+      """.trimIndent(),
+      textures = emptyList(),
+      frameRate = 30L,
+    )
+
+    assertTrue(result is ShaderProgramValidator.Result.Valid)
+  }
+
+  @Test
+  fun rejectsTheTiltUniformDeclaredAsFloatWithStableErrorCode() {
+    assertEquals(
+      ShaderProgramValidator.ErrorCode.SHADER_UNIFORM_TYPE_MISMATCH.wireCode,
+      invalidCode(
+        ShaderProgramValidator.Request(
+          fragmentShader = """
+            precision mediump float;
+            uniform float u_tilt;
+            void main() { gl_FragColor = vec4(u_tilt); }
+          """.trimIndent(),
+          frameRate = 30L,
+        ),
+      ),
+    )
+  }
+
+  @Test
   fun requiresARealMainEntryPointWithStableErrorCode() {
     assertEquals(
       ShaderProgramValidator.ErrorCode.SHADER_MAIN_MISSING.wireCode,

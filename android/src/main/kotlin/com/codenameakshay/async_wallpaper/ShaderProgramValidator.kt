@@ -527,6 +527,7 @@ object ShaderProgramValidator {
     "u_resolution" to "vec2",
     "u_touch" to "vec2",
     "u_offset" to "vec2",
+    "u_tilt" to "vec2",
   )
 
   private const val PORTABLE_LOOP_INT_MIN = -255L

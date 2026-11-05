@@ -301,6 +301,8 @@ struct OperationResultData: Hashable {
   var errorDetails: String? = nil
   var fallbackUsed: Bool? = nil
   var fallbackStrategy: WallpaperApplyStrategyData? = nil
+  /// The screens this content can reach. Without per-screen live support it is [both].
+  var effectiveTarget: WallpaperTargetData? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -314,6 +316,7 @@ struct OperationResultData: Hashable {
     let errorDetails: String? = nilOrValue(pigeonVar_list[6])
     let fallbackUsed: Bool? = nilOrValue(pigeonVar_list[7])
     let fallbackStrategy: WallpaperApplyStrategyData? = nilOrValue(pigeonVar_list[8])
+    let effectiveTarget: WallpaperTargetData? = nilOrValue(pigeonVar_list[9])
 
     return OperationResultData(
       status: status,
@@ -324,7 +327,8 @@ struct OperationResultData: Hashable {
       errorMessage: errorMessage,
       errorDetails: errorDetails,
       fallbackUsed: fallbackUsed,
-      fallbackStrategy: fallbackStrategy
+      fallbackStrategy: fallbackStrategy,
+      effectiveTarget: effectiveTarget
     )
   }
   func toList() -> [Any?] {
@@ -338,6 +342,7 @@ struct OperationResultData: Hashable {
       errorDetails,
       fallbackUsed,
       fallbackStrategy,
+      effectiveTarget,
     ]
   }
   static func == (lhs: OperationResultData, rhs: OperationResultData) -> Bool {
@@ -365,6 +370,8 @@ struct WallpaperCapabilitiesData: Hashable {
   var openGlVersion: String? = nil
   var openGlRenderer: String? = nil
   var supportsTilt: Bool? = nil
+  /// True when the OpenGL live wallpaper can show different content on Home and Lock.
+  var supportsPerScreenLiveWallpaper: Bool? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -383,6 +390,7 @@ struct WallpaperCapabilitiesData: Hashable {
     let openGlVersion: String? = nilOrValue(pigeonVar_list[11])
     let openGlRenderer: String? = nilOrValue(pigeonVar_list[12])
     let supportsTilt: Bool? = nilOrValue(pigeonVar_list[13])
+    let supportsPerScreenLiveWallpaper: Bool? = nilOrValue(pigeonVar_list[14])
 
     return WallpaperCapabilitiesData(
       supportsStaticWallpaper: supportsStaticWallpaper,
@@ -398,7 +406,8 @@ struct WallpaperCapabilitiesData: Hashable {
       sdkInt: sdkInt,
       openGlVersion: openGlVersion,
       openGlRenderer: openGlRenderer,
-      supportsTilt: supportsTilt
+      supportsTilt: supportsTilt,
+      supportsPerScreenLiveWallpaper: supportsPerScreenLiveWallpaper
     )
   }
   func toList() -> [Any?] {
@@ -417,6 +426,7 @@ struct WallpaperCapabilitiesData: Hashable {
       openGlVersion,
       openGlRenderer,
       supportsTilt,
+      supportsPerScreenLiveWallpaper,
     ]
   }
   static func == (lhs: WallpaperCapabilitiesData, rhs: WallpaperCapabilitiesData) -> Bool {
@@ -508,6 +518,8 @@ struct OpenGlWallpaperRequestData: Hashable {
   var textures: [WallpaperSourceData?]? = nil
   var target: WallpaperTargetData? = nil
   var frameRate: Int64? = nil
+  /// An opaque caller label that [WallpaperApi.getLiveWallpaperScreens] reports per screen.
+  var contentTag: String? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -516,12 +528,14 @@ struct OpenGlWallpaperRequestData: Hashable {
     let textures: [WallpaperSourceData?]? = nilOrValue(pigeonVar_list[1])
     let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[2])
     let frameRate: Int64? = nilOrValue(pigeonVar_list[3])
+    let contentTag: String? = nilOrValue(pigeonVar_list[4])
 
     return OpenGlWallpaperRequestData(
       fragmentShader: fragmentShader,
       textures: textures,
       target: target,
-      frameRate: frameRate
+      frameRate: frameRate,
+      contentTag: contentTag
     )
   }
   func toList() -> [Any?] {
@@ -530,9 +544,76 @@ struct OpenGlWallpaperRequestData: Hashable {
       textures,
       target,
       frameRate,
+      contentTag,
     ]
   }
   static func == (lhs: OpenGlWallpaperRequestData, rhs: OpenGlWallpaperRequestData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// What one screen shows, as far as this app's OpenGL live wallpaper is concerned.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct LiveScreenStateData: Hashable {
+  var showsThisWallpaper: Bool? = nil
+  var contentTag: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> LiveScreenStateData? {
+    let showsThisWallpaper: Bool? = nilOrValue(pigeonVar_list[0])
+    let contentTag: String? = nilOrValue(pigeonVar_list[1])
+
+    return LiveScreenStateData(
+      showsThisWallpaper: showsThisWallpaper,
+      contentTag: contentTag
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      showsThisWallpaper,
+      contentTag,
+    ]
+  }
+  static func == (lhs: LiveScreenStateData, rhs: LiveScreenStateData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// The OpenGL live wallpaper content on each screen.
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct LiveWallpaperScreensData: Hashable {
+  var perScreen: Bool? = nil
+  var home: LiveScreenStateData? = nil
+  var lock: LiveScreenStateData? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> LiveWallpaperScreensData? {
+    let perScreen: Bool? = nilOrValue(pigeonVar_list[0])
+    let home: LiveScreenStateData? = nilOrValue(pigeonVar_list[1])
+    let lock: LiveScreenStateData? = nilOrValue(pigeonVar_list[2])
+
+    return LiveWallpaperScreensData(
+      perScreen: perScreen,
+      home: home,
+      lock: lock
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      perScreen,
+      home,
+      lock,
+    ]
+  }
+  static func == (lhs: LiveWallpaperScreensData, rhs: LiveWallpaperScreensData) -> Bool {
     return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
   func hash(into hasher: inout Hasher) {
     deepHashPigeonApi(value: toList(), hasher: &hasher)
@@ -917,20 +998,24 @@ private class PigeonApiPigeonCodecReader: FlutterStandardReader {
     case 145:
       return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 146:
-      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
+      return LiveScreenStateData.fromList(self.readValue() as! [Any?])
     case 147:
-      return RotationSourceData.fromList(self.readValue() as! [Any?])
+      return LiveWallpaperScreensData.fromList(self.readValue() as! [Any?])
     case 148:
-      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
+      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
     case 149:
-      return WallpaperRotationStatusData.fromList(self.readValue() as! [Any?])
+      return RotationSourceData.fromList(self.readValue() as! [Any?])
     case 150:
-      return DailyScheduleEntryData.fromList(self.readValue() as! [Any?])
+      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
     case 151:
-      return DailyScheduleRequestData.fromList(self.readValue() as! [Any?])
+      return WallpaperRotationStatusData.fromList(self.readValue() as! [Any?])
     case 152:
-      return DailyScheduleStatusData.fromList(self.readValue() as! [Any?])
+      return DailyScheduleEntryData.fromList(self.readValue() as! [Any?])
     case 153:
+      return DailyScheduleRequestData.fromList(self.readValue() as! [Any?])
+    case 154:
+      return DailyScheduleStatusData.fromList(self.readValue() as! [Any?])
+    case 155:
       return DailyScheduleApplyResultData.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -991,29 +1076,35 @@ private class PigeonApiPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? OpenGlWallpaperRequestData {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? MaterialYouSupportData {
+    } else if let value = value as? LiveScreenStateData {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? RotationSourceData {
+    } else if let value = value as? LiveWallpaperScreensData {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationConfigData {
+    } else if let value = value as? MaterialYouSupportData {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationStatusData {
+    } else if let value = value as? RotationSourceData {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? DailyScheduleEntryData {
+    } else if let value = value as? WallpaperRotationConfigData {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? DailyScheduleRequestData {
+    } else if let value = value as? WallpaperRotationStatusData {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? DailyScheduleStatusData {
+    } else if let value = value as? DailyScheduleEntryData {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? DailyScheduleApplyResultData {
+    } else if let value = value as? DailyScheduleRequestData {
       super.writeByte(153)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleStatusData {
+      super.writeByte(154)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleApplyResultData {
+      super.writeByte(155)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1050,6 +1141,8 @@ protocol WallpaperApi {
   func openLiveWallpaperPreview(request: VideoWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
   /// Applies a shader-based OpenGL live wallpaper.
   func applyOpenGlWallpaper(request: OpenGlWallpaperRequestData, completion: @escaping (Result<OperationResultData, Error>) -> Void)
+  /// Reports which screens show this app's OpenGL live wallpaper, and with which content tag.
+  func getLiveWallpaperScreens(completion: @escaping (Result<LiveWallpaperScreensData, Error>) -> Void)
   func setMaterialYouWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void)
   func openWallpaperChooser(completion: @escaping (Result<Bool, Error>) -> Void)
   func downloadWallpaper(url: String, completion: @escaping (Result<Bool, Error>) -> Void)
@@ -1190,6 +1283,22 @@ class WallpaperApiSetup {
       }
     } else {
       applyOpenGlWallpaperChannel.setMessageHandler(nil)
+    }
+    /// Reports which screens show this app's OpenGL live wallpaper, and with which content tag.
+    let getLiveWallpaperScreensChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getLiveWallpaperScreens\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getLiveWallpaperScreensChannel.setMessageHandler { _, reply in
+        api.getLiveWallpaperScreens { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      getLiveWallpaperScreensChannel.setMessageHandler(nil)
     }
     let setMaterialYouWallpaperChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.setMaterialYouWallpaper\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

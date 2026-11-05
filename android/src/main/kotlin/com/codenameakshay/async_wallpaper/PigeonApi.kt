@@ -313,7 +313,9 @@ data class OperationResultData (
   val errorMessage: String? = null,
   val errorDetails: String? = null,
   val fallbackUsed: Boolean? = null,
-  val fallbackStrategy: WallpaperApplyStrategyData? = null
+  val fallbackStrategy: WallpaperApplyStrategyData? = null,
+  /** The screens this content can reach. Without per-screen live support it is [both]. */
+  val effectiveTarget: WallpaperTargetData? = null
 )
  {
   companion object {
@@ -327,7 +329,8 @@ data class OperationResultData (
       val errorDetails = pigeonVar_list[6] as String?
       val fallbackUsed = pigeonVar_list[7] as Boolean?
       val fallbackStrategy = pigeonVar_list[8] as WallpaperApplyStrategyData?
-      return OperationResultData(status, requestedTarget, home, lock, errorCode, errorMessage, errorDetails, fallbackUsed, fallbackStrategy)
+      val effectiveTarget = pigeonVar_list[9] as WallpaperTargetData?
+      return OperationResultData(status, requestedTarget, home, lock, errorCode, errorMessage, errorDetails, fallbackUsed, fallbackStrategy, effectiveTarget)
     }
   }
   fun toList(): List<Any?> {
@@ -341,6 +344,7 @@ data class OperationResultData (
       errorDetails,
       fallbackUsed,
       fallbackStrategy,
+      effectiveTarget,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -374,7 +378,9 @@ data class WallpaperCapabilitiesData (
   val sdkInt: Long? = null,
   val openGlVersion: String? = null,
   val openGlRenderer: String? = null,
-  val supportsTilt: Boolean? = null
+  val supportsTilt: Boolean? = null,
+  /** True when the OpenGL live wallpaper can show different content on Home and Lock. */
+  val supportsPerScreenLiveWallpaper: Boolean? = null
 )
  {
   companion object {
@@ -393,7 +399,8 @@ data class WallpaperCapabilitiesData (
       val openGlVersion = pigeonVar_list[11] as String?
       val openGlRenderer = pigeonVar_list[12] as String?
       val supportsTilt = pigeonVar_list[13] as Boolean?
-      return WallpaperCapabilitiesData(supportsStaticWallpaper, supportsLiveWallpaper, supportsOpenGlLiveWallpaper, supportsHomeWallpaper, supportsLockWallpaper, supportsBothWallpapers, canSetWallpaper, hasSystemWallpaperPicker, requiresForeground, manufacturer, sdkInt, openGlVersion, openGlRenderer, supportsTilt)
+      val supportsPerScreenLiveWallpaper = pigeonVar_list[14] as Boolean?
+      return WallpaperCapabilitiesData(supportsStaticWallpaper, supportsLiveWallpaper, supportsOpenGlLiveWallpaper, supportsHomeWallpaper, supportsLockWallpaper, supportsBothWallpapers, canSetWallpaper, hasSystemWallpaperPicker, requiresForeground, manufacturer, sdkInt, openGlVersion, openGlRenderer, supportsTilt, supportsPerScreenLiveWallpaper)
     }
   }
   fun toList(): List<Any?> {
@@ -412,6 +419,7 @@ data class WallpaperCapabilitiesData (
       openGlVersion,
       openGlRenderer,
       supportsTilt,
+      supportsPerScreenLiveWallpaper,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -514,7 +522,9 @@ data class OpenGlWallpaperRequestData (
   val fragmentShader: String? = null,
   val textures: List<WallpaperSourceData?>? = null,
   val target: WallpaperTargetData? = null,
-  val frameRate: Long? = null
+  val frameRate: Long? = null,
+  /** An opaque caller label that [WallpaperApi.getLiveWallpaperScreens] reports per screen. */
+  val contentTag: String? = null
 )
  {
   companion object {
@@ -523,7 +533,8 @@ data class OpenGlWallpaperRequestData (
       val textures = pigeonVar_list[1] as List<WallpaperSourceData?>?
       val target = pigeonVar_list[2] as WallpaperTargetData?
       val frameRate = pigeonVar_list[3] as Long?
-      return OpenGlWallpaperRequestData(fragmentShader, textures, target, frameRate)
+      val contentTag = pigeonVar_list[4] as String?
+      return OpenGlWallpaperRequestData(fragmentShader, textures, target, frameRate, contentTag)
     }
   }
   fun toList(): List<Any?> {
@@ -532,10 +543,84 @@ data class OpenGlWallpaperRequestData (
       textures,
       target,
       frameRate,
+      contentTag,
     )
   }
   override fun equals(other: Any?): Boolean {
     if (other !is OpenGlWallpaperRequestData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/**
+ * What one screen shows, as far as this app's OpenGL live wallpaper is concerned.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LiveScreenStateData (
+  val showsThisWallpaper: Boolean? = null,
+  val contentTag: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LiveScreenStateData {
+      val showsThisWallpaper = pigeonVar_list[0] as Boolean?
+      val contentTag = pigeonVar_list[1] as String?
+      return LiveScreenStateData(showsThisWallpaper, contentTag)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      showsThisWallpaper,
+      contentTag,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is LiveScreenStateData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/**
+ * The OpenGL live wallpaper content on each screen.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LiveWallpaperScreensData (
+  val perScreen: Boolean? = null,
+  val home: LiveScreenStateData? = null,
+  val lock: LiveScreenStateData? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LiveWallpaperScreensData {
+      val perScreen = pigeonVar_list[0] as Boolean?
+      val home = pigeonVar_list[1] as LiveScreenStateData?
+      val lock = pigeonVar_list[2] as LiveScreenStateData?
+      return LiveWallpaperScreensData(perScreen, home, lock)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      perScreen,
+      home,
+      lock,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is LiveWallpaperScreensData) {
       return false
     }
     if (this === other) {
@@ -934,40 +1019,50 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MaterialYouSupportData.fromList(it)
+          LiveScreenStateData.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          RotationSourceData.fromList(it)
+          LiveWallpaperScreensData.fromList(it)
         }
       }
       148.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperRotationConfigData.fromList(it)
+          MaterialYouSupportData.fromList(it)
         }
       }
       149.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperRotationStatusData.fromList(it)
+          RotationSourceData.fromList(it)
         }
       }
       150.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DailyScheduleEntryData.fromList(it)
+          WallpaperRotationConfigData.fromList(it)
         }
       }
       151.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DailyScheduleRequestData.fromList(it)
+          WallpaperRotationStatusData.fromList(it)
         }
       }
       152.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          DailyScheduleStatusData.fromList(it)
+          DailyScheduleEntryData.fromList(it)
         }
       }
       153.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleRequestData.fromList(it)
+        }
+      }
+      154.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleStatusData.fromList(it)
+        }
+      }
+      155.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           DailyScheduleApplyResultData.fromList(it)
         }
@@ -1045,36 +1140,44 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is MaterialYouSupportData -> {
+      is LiveScreenStateData -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is RotationSourceData -> {
+      is LiveWallpaperScreensData -> {
         stream.write(147)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationConfigData -> {
+      is MaterialYouSupportData -> {
         stream.write(148)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationStatusData -> {
+      is RotationSourceData -> {
         stream.write(149)
         writeValue(stream, value.toList())
       }
-      is DailyScheduleEntryData -> {
+      is WallpaperRotationConfigData -> {
         stream.write(150)
         writeValue(stream, value.toList())
       }
-      is DailyScheduleRequestData -> {
+      is WallpaperRotationStatusData -> {
         stream.write(151)
         writeValue(stream, value.toList())
       }
-      is DailyScheduleStatusData -> {
+      is DailyScheduleEntryData -> {
         stream.write(152)
         writeValue(stream, value.toList())
       }
-      is DailyScheduleApplyResultData -> {
+      is DailyScheduleRequestData -> {
         stream.write(153)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleStatusData -> {
+        stream.write(154)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleApplyResultData -> {
+        stream.write(155)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1097,6 +1200,8 @@ interface WallpaperApi {
   fun openLiveWallpaperPreview(request: VideoWallpaperRequestData, callback: (Result<OperationResultData>) -> Unit)
   /** Applies a shader-based OpenGL live wallpaper. */
   fun applyOpenGlWallpaper(request: OpenGlWallpaperRequestData, callback: (Result<OperationResultData>) -> Unit)
+  /** Reports which screens show this app's OpenGL live wallpaper, and with which content tag. */
+  fun getLiveWallpaperScreens(callback: (Result<LiveWallpaperScreensData>) -> Unit)
   fun setMaterialYouWallpaper(url: String, callback: (Result<Boolean>) -> Unit)
   fun openWallpaperChooser(callback: (Result<Boolean>) -> Unit)
   fun downloadWallpaper(url: String, callback: (Result<Boolean>) -> Unit)
@@ -1247,6 +1352,24 @@ interface WallpaperApi {
             val args = message as List<Any?>
             val requestArg = args[0] as OpenGlWallpaperRequestData
             api.applyOpenGlWallpaper(requestArg) { result: Result<OperationResultData> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getLiveWallpaperScreens$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.getLiveWallpaperScreens{ result: Result<LiveWallpaperScreensData> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

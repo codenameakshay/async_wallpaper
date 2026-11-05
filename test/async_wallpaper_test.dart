@@ -29,6 +29,7 @@ class _RecordingWallpaperClient implements WallpaperClient {
     WallpaperOperationResult? previewResult,
     WallpaperOperationResult? openGlResult,
     this.capabilities = const WallpaperCapabilities(),
+    this.screens = const LiveWallpaperScreens(),
   }) : staticResult = staticResult ?? _appliedHome,
        videoResult =
            videoResult ??
@@ -49,12 +50,15 @@ class _RecordingWallpaperClient implements WallpaperClient {
   WallpaperOperationResult previewResult;
   WallpaperOperationResult openGlResult;
   WallpaperCapabilities capabilities;
+  LiveWallpaperScreens screens;
   bool throwStatic = false;
   bool throwCapabilities = false;
+  bool throwLiveScreens = false;
   int staticCalls = 0;
   int prepareCalls = 0;
   int previewCalls = 0;
   int openGlCalls = 0;
+  int liveScreensCalls = 0;
   StaticWallpaperRequest? staticRequest;
   VideoWallpaperRequest? videoRequest;
   VideoWallpaperRequest? previewRequest;
@@ -105,6 +109,15 @@ class _RecordingWallpaperClient implements WallpaperClient {
     openGlCalls += 1;
     openGlRequest = request;
     return openGlResult;
+  }
+
+  @override
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens() async {
+    liveScreensCalls += 1;
+    if (throwLiveScreens) {
+      throw StateError('live screens unavailable');
+    }
+    return screens;
   }
 }
 
@@ -721,6 +734,76 @@ void main() {
       expect(capabilities.supportsStaticWallpaper, isFalse);
       expect(legacy.error?.code, WallpaperErrorCode.unsupported);
       expect(client.staticCalls, 0);
+    },
+  );
+
+  test(
+    'returns live wallpaper screens through the client on Android',
+    () async {
+      final client = _RecordingWallpaperClient(
+        screens: const LiveWallpaperScreens(
+          perScreen: true,
+          home: LiveScreenState(showsThisWallpaper: true, contentTag: 'a'),
+          lock: LiveScreenState(contentTag: 'b'),
+        ),
+      );
+      AsyncWallpaper.debugSetClient(client);
+
+      final screens = await AsyncWallpaper.getLiveWallpaperScreens();
+
+      expect(client.liveScreensCalls, 1);
+      expect(screens.perScreen, isTrue);
+      expect(screens.home.showsThisWallpaper, isTrue);
+      expect(screens.home.contentTag, 'a');
+      expect(screens.lock.showsThisWallpaper, isFalse);
+      expect(screens.lock.contentTag, 'b');
+    },
+  );
+
+  test(
+    'returns an empty live screens snapshot when the client throws',
+    () async {
+      final client = _RecordingWallpaperClient()..throwLiveScreens = true;
+      AsyncWallpaper.debugSetClient(client);
+
+      final screens = await AsyncWallpaper.getLiveWallpaperScreens();
+
+      expect(client.liveScreensCalls, 1);
+      expect(screens.perScreen, isFalse);
+      expect(screens.home.showsThisWallpaper, isFalse);
+      expect(screens.lock.showsThisWallpaper, isFalse);
+    },
+  );
+
+  test(
+    'validates the OpenGL content tag length at the 256 character limit',
+    () async {
+      final client = _RecordingWallpaperClient();
+      AsyncWallpaper.debugSetClient(client);
+      final tooLongTag = List<String>.filled(257, 'x').join();
+      final maxLengthTag = List<String>.filled(256, 'x').join();
+
+      final rejected = await AsyncWallpaper.setOpenGlLiveWallpaper(
+        OpenGlLiveWallpaperRequest(
+          fragmentShader: 'void main() {}',
+          contentTag: tooLongTag,
+        ),
+      );
+
+      expect(rejected.status, WallpaperOperationStatus.failed);
+      expect(rejected.errorCode, 'invalid-input');
+      expect(client.openGlCalls, 0);
+
+      final accepted = await AsyncWallpaper.setOpenGlLiveWallpaper(
+        OpenGlLiveWallpaperRequest(
+          fragmentShader: 'void main() {}',
+          contentTag: maxLengthTag,
+        ),
+      );
+
+      expect(accepted.status, WallpaperOperationStatus.applied);
+      expect(client.openGlCalls, 1);
+      expect(client.openGlRequest?.contentTag, maxLengthTag);
     },
   );
 

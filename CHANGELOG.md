@@ -1,6 +1,18 @@
 ## 3.7.0
 
-Android daily schedule release. The Dart API gains a daily wallpaper schedule that applies one wallpaper for each time of day. No breaking change.
+Android release with per-screen OpenGL live wallpapers and a daily wallpaper schedule. The Dart API gains fields and methods. Existing callers are unaffected.
+
+### Per-screen OpenGL live wallpapers
+
+- Android 16 (API 36): the OpenGL live wallpaper can show different content on the Home Screen and the Lock Screen. Each screen keeps its own shader, textures, and frame rate.
+- The user still picks Home, Lock, or both in the system preview. Android has no public API to set a live wallpaper on one screen. Each engine reads its screen (`getWallpaperFlags`) and that screen's wallpaper id. A new id means the user just set that screen, so the engine takes the staged content. A known id means a restart, so the engine keeps that screen's content. This works with the stock AOSP live picker, which never calls `onApplyWallpaper`. A picker that calls `onApplyWallpaper` gets a `WallpaperDescription` that carries the content.
+- New `OpenGlLiveWallpaperRequest.contentTag` (opaque, at most 256 characters) and `WallpaperOperationResult.effectiveTarget`. Applying new content to one screen does not change the other screen.
+- New `WallpaperCapabilities.supportsPerScreenLiveWallpaper` and `AsyncWallpaper.getLiveWallpaperScreens()`, which returns `LiveWallpaperScreens` with the Home and Lock `LiveScreenState`. Call it after the preview closes.
+- Android 15 (API 35) and older, or a build with the description flag off, is unchanged: all OpenGL engines share the latest content, and `effectiveTarget` is `both`. Video live wallpapers are unchanged. On iOS, `supportsPerScreenLiveWallpaper` is false, and `getLiveWallpaperScreens()` returns an empty snapshot.
+
+### Daily schedule
+
+A daily schedule applies one wallpaper for each time of day.
 
 - New `startDailySchedule`, `stopDailySchedule`, `applyCurrentScheduleEntry`, and `getDailyScheduleStatus`. A schedule has 2 to 100 entries, each at a different minute of the day. Each entry owns the local time up to the next entry, and the last entry wraps past midnight.
 - Every source is cached when the schedule starts. If one source fails, the request fails and the running schedule or rotation stays as it was.

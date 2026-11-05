@@ -76,6 +76,9 @@ class OperationResultData {
   String? errorDetails;
   bool? fallbackUsed;
   WallpaperApplyStrategyData? fallbackStrategy;
+
+  /// The screens this content can reach. Without per-screen live support it is [both].
+  WallpaperTargetData? effectiveTarget;
 }
 
 /// Capability snapshot reported by the host platform.
@@ -94,6 +97,9 @@ class WallpaperCapabilitiesData {
   String? openGlVersion;
   String? openGlRenderer;
   bool? supportsTilt;
+
+  /// True when the OpenGL live wallpaper can show different content on Home and Lock.
+  bool? supportsPerScreenLiveWallpaper;
 }
 
 /// Parameters for an image wallpaper operation.
@@ -117,6 +123,22 @@ class OpenGlWallpaperRequestData {
   List<WallpaperSourceData?>? textures;
   WallpaperTargetData? target;
   int? frameRate;
+
+  /// An opaque caller label that [WallpaperApi.getLiveWallpaperScreens] reports per screen.
+  String? contentTag;
+}
+
+/// What one screen shows, as far as this app's OpenGL live wallpaper is concerned.
+class LiveScreenStateData {
+  bool? showsThisWallpaper;
+  String? contentTag;
+}
+
+/// The OpenGL live wallpaper content on each screen.
+class LiveWallpaperScreensData {
+  bool? perScreen;
+  LiveScreenStateData? home;
+  LiveScreenStateData? lock;
 }
 
 class MaterialYouSupportData {
@@ -216,6 +238,10 @@ abstract class WallpaperApi {
   /// Applies a shader-based OpenGL live wallpaper.
   @async
   OperationResultData applyOpenGlWallpaper(OpenGlWallpaperRequestData request);
+
+  /// Reports which screens show this app's OpenGL live wallpaper, and with which content tag.
+  @async
+  LiveWallpaperScreensData getLiveWallpaperScreens();
 
   @async
   bool setMaterialYouWallpaper(String url);

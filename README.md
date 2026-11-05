@@ -104,6 +104,28 @@ void main() {
 }
 ```
 
+#### Different content on Home and Lock (Android 16)
+
+On Android 16 (API 36) and later, the OpenGL live wallpaper can show different content on the Home Screen and the Lock Screen. Pass a `contentTag` to label each content set. The user still picks Home, Lock, or both in the system preview, because Android has no public API to set one screen. After the preview closes and the app resumes, call `getLiveWallpaperScreens()` to read what each screen shows. On older Android, all screens share the latest content, and `result.effectiveTarget` is `WallpaperTarget.both`.
+
+```dart
+final caps = await AsyncWallpaper.getCapabilities();
+if (caps.supportsOpenGlLiveWallpaper && caps.supportsPerScreenLiveWallpaper) {
+  final result = await AsyncWallpaper.setOpenGlLiveWallpaper(
+    OpenGlLiveWallpaperRequest(
+      fragmentShader: shader,
+      target: WallpaperTarget.lock,
+      contentTag: 'lock:aurora',
+    ),
+  );
+  // On older Android, result.effectiveTarget is WallpaperTarget.both.
+}
+
+// After the preview closes and the app resumes:
+final screens = await AsyncWallpaper.getLiveWallpaperScreens();
+final lockTag = screens.lock.contentTag; // 'lock:aurora' when Lock shows this content.
+```
+
 ### Wallpaper rotation
 
 ```dart

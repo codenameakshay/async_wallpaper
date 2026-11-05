@@ -20,6 +20,7 @@ class AsyncWallpaper {
   static const int _maxVideoSourceBytes = 256 * 1024 * 1024;
   static const int _maxOpenGlTextureBytes = 8 * 1024 * 1024;
   static const int _maxOpenGlTextures = 4;
+  static const int _maxContentTagLength = 256;
   static const int _maxFragmentShaderBytes = 64 * 1024;
 
   static const int _minRotationIntervalMinutes = 15;
@@ -225,6 +226,23 @@ class AsyncWallpaper {
       operation: 'setting OpenGL live wallpaper',
       call: () => _client.applyOpenGlWallpaper(request),
     );
+  }
+
+  /// Reports which screens show this app's OpenGL live wallpaper, and the
+  /// [OpenGlLiveWallpaperRequest.contentTag] each one received.
+  ///
+  /// Call it after the system preview closes. The user picks Home, Lock, or
+  /// both in that preview, so the apply result cannot say which screen changed.
+  /// Unsupported platforms and unavailable transports return an empty snapshot.
+  static Future<LiveWallpaperScreens> getLiveWallpaperScreens() async {
+    if (!_isAndroid) {
+      return const LiveWallpaperScreens();
+    }
+    try {
+      return await _client.getLiveWallpaperScreens();
+    } catch (_) {
+      return const LiveWallpaperScreens();
+    }
   }
 
   /// Applies a legacy static wallpaper request through [applyWallpaper].
@@ -795,6 +813,10 @@ class AsyncWallpaper {
     }
     if (request.frameRate < 1 || request.frameRate > 60) {
       return 'Frame rate must be between 1 and 60.';
+    }
+    final contentTag = request.contentTag;
+    if (contentTag != null && contentTag.length > _maxContentTagLength) {
+      return 'A content tag must be at most $_maxContentTagLength characters.';
     }
     if (request.textures.length > _maxOpenGlTextures) {
       return 'At most $_maxOpenGlTextures textures may be supplied.';

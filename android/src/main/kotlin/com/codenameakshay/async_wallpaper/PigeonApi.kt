@@ -187,6 +187,33 @@ enum class RotationOrderData(val raw: Int) {
   }
 }
 
+/** The background wallpaper schedule that currently runs. */
+enum class WallpaperScheduleModeData(val raw: Int) {
+  NONE(0),
+  ROTATION(1),
+  DAILY_SCHEDULE(2);
+
+  companion object {
+    fun ofRaw(raw: Int): WallpaperScheduleModeData? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
+/** What one apply of the current daily schedule entry did. */
+enum class DailyScheduleApplyOutcomeData(val raw: Int) {
+  APPLIED(0),
+  ALREADY_CURRENT(1),
+  NOT_RUNNING(2),
+  FAILED(3);
+
+  companion object {
+    fun ofRaw(raw: Int): DailyScheduleApplyOutcomeData? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 /**
  * A static, content-provider, or in-memory wallpaper source.
  *
@@ -681,6 +708,142 @@ data class WallpaperRotationStatusData (
 
   override fun hashCode(): Int = toList().hashCode()
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class DailyScheduleEntryData (
+  val minuteOfDay: Long? = null,
+  val source: RotationSourceData? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): DailyScheduleEntryData {
+      val minuteOfDay = pigeonVar_list[0] as Long?
+      val source = pigeonVar_list[1] as RotationSourceData?
+      return DailyScheduleEntryData(minuteOfDay, source)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      minuteOfDay,
+      source,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is DailyScheduleEntryData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class DailyScheduleRequestData (
+  val entries: List<DailyScheduleEntryData?>? = null,
+  val target: WallpaperTargetData? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): DailyScheduleRequestData {
+      val entries = pigeonVar_list[0] as List<DailyScheduleEntryData?>?
+      val target = pigeonVar_list[1] as WallpaperTargetData?
+      return DailyScheduleRequestData(entries, target)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      entries,
+      target,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is DailyScheduleRequestData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class DailyScheduleStatusData (
+  val mode: WallpaperScheduleModeData? = null,
+  val entryCount: Long? = null,
+  val currentEntryIndex: Long? = null,
+  val lastAppliedEntryIndex: Long? = null,
+  val nextSwitchEpochMs: Long? = null,
+  val lastError: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): DailyScheduleStatusData {
+      val mode = pigeonVar_list[0] as WallpaperScheduleModeData?
+      val entryCount = pigeonVar_list[1] as Long?
+      val currentEntryIndex = pigeonVar_list[2] as Long?
+      val lastAppliedEntryIndex = pigeonVar_list[3] as Long?
+      val nextSwitchEpochMs = pigeonVar_list[4] as Long?
+      val lastError = pigeonVar_list[5] as String?
+      return DailyScheduleStatusData(mode, entryCount, currentEntryIndex, lastAppliedEntryIndex, nextSwitchEpochMs, lastError)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      mode,
+      entryCount,
+      currentEntryIndex,
+      lastAppliedEntryIndex,
+      nextSwitchEpochMs,
+      lastError,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is DailyScheduleStatusData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class DailyScheduleApplyResultData (
+  val outcome: DailyScheduleApplyOutcomeData? = null,
+  val entryIndex: Long? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): DailyScheduleApplyResultData {
+      val outcome = pigeonVar_list[0] as DailyScheduleApplyOutcomeData?
+      val entryIndex = pigeonVar_list[1] as Long?
+      return DailyScheduleApplyResultData(outcome, entryIndex)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      outcome,
+      entryIndex,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is DailyScheduleApplyResultData) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return deepEqualsPigeonApi(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
 private open class PigeonApiPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -725,58 +888,88 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
         }
       }
       137.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperSourceData.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          WallpaperScheduleModeData.ofRaw(it.toInt())
         }
       }
       138.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          TargetResultData.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          DailyScheduleApplyOutcomeData.ofRaw(it.toInt())
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OperationResultData.fromList(it)
+          WallpaperSourceData.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperCapabilitiesData.fromList(it)
+          TargetResultData.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          StaticWallpaperRequestData.fromList(it)
+          OperationResultData.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          VideoWallpaperRequestData.fromList(it)
+          WallpaperCapabilitiesData.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          OpenGlWallpaperRequestData.fromList(it)
+          StaticWallpaperRequestData.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          MaterialYouSupportData.fromList(it)
+          VideoWallpaperRequestData.fromList(it)
         }
       }
       145.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          RotationSourceData.fromList(it)
+          OpenGlWallpaperRequestData.fromList(it)
         }
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          WallpaperRotationConfigData.fromList(it)
+          MaterialYouSupportData.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
+          RotationSourceData.fromList(it)
+        }
+      }
+      148.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          WallpaperRotationConfigData.fromList(it)
+        }
+      }
+      149.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
           WallpaperRotationStatusData.fromList(it)
+        }
+      }
+      150.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleEntryData.fromList(it)
+        }
+      }
+      151.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleRequestData.fromList(it)
+        }
+      }
+      152.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleStatusData.fromList(it)
+        }
+      }
+      153.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          DailyScheduleApplyResultData.fromList(it)
         }
       }
       else -> super.readValueOfType(type, buffer)
@@ -816,48 +1009,72 @@ private open class PigeonApiPigeonCodec : StandardMessageCodec() {
         stream.write(136)
         writeValue(stream, value.raw)
       }
-      is WallpaperSourceData -> {
+      is WallpaperScheduleModeData -> {
         stream.write(137)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is TargetResultData -> {
+      is DailyScheduleApplyOutcomeData -> {
         stream.write(138)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw)
       }
-      is OperationResultData -> {
+      is WallpaperSourceData -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is WallpaperCapabilitiesData -> {
+      is TargetResultData -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is StaticWallpaperRequestData -> {
+      is OperationResultData -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is VideoWallpaperRequestData -> {
+      is WallpaperCapabilitiesData -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is OpenGlWallpaperRequestData -> {
+      is StaticWallpaperRequestData -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is MaterialYouSupportData -> {
+      is VideoWallpaperRequestData -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is RotationSourceData -> {
+      is OpenGlWallpaperRequestData -> {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationConfigData -> {
+      is MaterialYouSupportData -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is WallpaperRotationStatusData -> {
+      is RotationSourceData -> {
         stream.write(147)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationConfigData -> {
+        stream.write(148)
+        writeValue(stream, value.toList())
+      }
+      is WallpaperRotationStatusData -> {
+        stream.write(149)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleEntryData -> {
+        stream.write(150)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleRequestData -> {
+        stream.write(151)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleStatusData -> {
+        stream.write(152)
+        writeValue(stream, value.toList())
+      }
+      is DailyScheduleApplyResultData -> {
+        stream.write(153)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -887,6 +1104,18 @@ interface WallpaperApi {
   fun stopWallpaperRotation(callback: (Result<Boolean>) -> Unit)
   fun getWallpaperRotationStatus(callback: (Result<WallpaperRotationStatusData>) -> Unit)
   fun rotateWallpaperNow(callback: (Result<Boolean>) -> Unit)
+  /**
+   * Caches every entry, applies the one that owns the current local time,
+   * stops rotation, and arms one alarm for the next entry.
+   */
+  fun startDailySchedule(request: DailyScheduleRequestData, callback: (Result<Boolean>) -> Unit)
+  fun stopDailySchedule(callback: (Result<Boolean>) -> Unit)
+  /**
+   * Applies the entry that owns the current local time when it is not the
+   * last one applied, then arms the alarm again.
+   */
+  fun applyCurrentScheduleEntry(callback: (Result<DailyScheduleApplyResultData>) -> Unit)
+  fun getDailyScheduleStatus(callback: (Result<DailyScheduleStatusData>) -> Unit)
 
   companion object {
     /** The codec used by WallpaperApi. */
@@ -1150,6 +1379,80 @@ interface WallpaperApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.rotateWallpaperNow{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.startDailySchedule$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val requestArg = args[0] as DailyScheduleRequestData
+            api.startDailySchedule(requestArg) { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.stopDailySchedule$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.stopDailySchedule{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyCurrentScheduleEntry$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.applyCurrentScheduleEntry{ result: Result<DailyScheduleApplyResultData> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getDailyScheduleStatus$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.getDailyScheduleStatus{ result: Result<DailyScheduleStatusData> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

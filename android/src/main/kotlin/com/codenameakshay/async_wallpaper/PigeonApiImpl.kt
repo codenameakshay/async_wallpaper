@@ -121,6 +121,7 @@ class PigeonApiImpl(
             RotationStartResult.STARTED -> {
               try {
                 reconcileRotationTriggers()
+                check(DailyScheduleRunner.stop(appContext)) { "Unable to stop the daily schedule." }
                 true
               } catch (error: Exception) {
                 // The wallpaper is already applied but the schedules are unknown; report failure and
@@ -150,17 +151,7 @@ class PigeonApiImpl(
     enqueueBoolean(callback) {
       WallpaperRotationCoordinator.withLock {
         runCatching {
-          if (!rotationStore.stopRotation()) {
-            return@runCatching false
-          }
-          completeScheduleReconciliation(
-            awaitOperations = {
-              WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(appContext, rotationStore))
-            },
-            clearPending = { rotationStore.clearSchedulesPending() },
-          )
-          rotationEngine.clearRotationCache()
-          true
+          WallpaperRotationRunner.stop(appContext)
         }.getOrElse {
           Log.e(TAG, "stopWallpaperRotation failed", it)
           false
@@ -236,6 +227,57 @@ class PigeonApiImpl(
         }
       }
     }
+  }
+
+  override fun startDailySchedule(
+    request: DailyScheduleRequestData,
+    callback: (Result<Boolean>) -> Unit,
+  ) {
+    enqueueBoolean(callback) {
+      runCatching { DailyScheduleRunner.start(appContext, request) }.getOrElse {
+        Log.e(TAG, "startDailySchedule failed", it)
+        false
+      }
+    }
+  }
+
+  override fun stopDailySchedule(callback: (Result<Boolean>) -> Unit) {
+    enqueueBoolean(callback) {
+      runCatching { DailyScheduleRunner.stop(appContext) }.getOrElse {
+        Log.e(TAG, "stopDailySchedule failed", it)
+        false
+      }
+    }
+  }
+
+  override fun applyCurrentScheduleEntry(callback: (Result<DailyScheduleApplyResultData>) -> Unit) {
+    operationQueue.submit(
+      operation = { DailyScheduleRunner.applyCurrent(appContext) },
+      callback = { result ->
+        postCallback(
+          callback,
+          Result.success(
+            result.getOrElse {
+              Log.e(TAG, "applyCurrentScheduleEntry failed", it)
+              DailyScheduleApplyResultData(outcome = DailyScheduleApplyOutcomeData.FAILED)
+            },
+          ),
+        )
+      },
+    )
+  }
+
+  override fun getDailyScheduleStatus(callback: (Result<DailyScheduleStatusData>) -> Unit) {
+    val status = runCatching { DailyScheduleRunner.status(appContext) }.getOrElse {
+      Log.e(TAG, "getDailyScheduleStatus failed", it)
+      DailyScheduleStatusData(
+        mode = WallpaperScheduleModeData.NONE,
+        entryCount = 0L,
+        nextSwitchEpochMs = 0L,
+        lastError = it.message,
+      )
+    }
+    callback(Result.success(status))
   }
 
   override fun applyWallpaper(

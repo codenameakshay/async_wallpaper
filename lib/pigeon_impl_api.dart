@@ -70,6 +70,17 @@ enum RotationSourceTypeData { url, file }
 /// The order in which rotation playlist entries are applied.
 enum RotationOrderData { sequential, shuffle }
 
+/// The background wallpaper schedule that currently runs.
+enum WallpaperScheduleModeData { none, rotation, dailySchedule }
+
+/// What one apply of the current daily schedule entry did.
+enum DailyScheduleApplyOutcomeData {
+  applied,
+  alreadyCurrent,
+  notRunning,
+  failed,
+}
+
 /// A static, content-provider, or in-memory wallpaper source.
 class WallpaperSourceData {
   WallpaperSourceData({
@@ -756,6 +767,194 @@ class WallpaperRotationStatusData {
   int get hashCode => Object.hashAll(_toList());
 }
 
+class DailyScheduleEntryData {
+  DailyScheduleEntryData({this.minuteOfDay, this.source});
+
+  int? minuteOfDay;
+
+  RotationSourceData? source;
+
+  List<Object?> _toList() {
+    return <Object?>[minuteOfDay, source];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static DailyScheduleEntryData decode(Object result) {
+    result as List<Object?>;
+    return DailyScheduleEntryData(
+      minuteOfDay: result[0] as int?,
+      source: result[1] as RotationSourceData?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! DailyScheduleEntryData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+class DailyScheduleRequestData {
+  DailyScheduleRequestData({this.entries, this.target});
+
+  List<DailyScheduleEntryData?>? entries;
+
+  WallpaperTargetData? target;
+
+  List<Object?> _toList() {
+    return <Object?>[entries, target];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static DailyScheduleRequestData decode(Object result) {
+    result as List<Object?>;
+    return DailyScheduleRequestData(
+      entries: (result[0] as List<Object?>?)?.cast<DailyScheduleEntryData?>(),
+      target: result[1] as WallpaperTargetData?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! DailyScheduleRequestData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+class DailyScheduleStatusData {
+  DailyScheduleStatusData({
+    this.mode,
+    this.entryCount,
+    this.currentEntryIndex,
+    this.lastAppliedEntryIndex,
+    this.nextSwitchEpochMs,
+    this.lastError,
+  });
+
+  WallpaperScheduleModeData? mode;
+
+  int? entryCount;
+
+  int? currentEntryIndex;
+
+  int? lastAppliedEntryIndex;
+
+  int? nextSwitchEpochMs;
+
+  String? lastError;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      mode,
+      entryCount,
+      currentEntryIndex,
+      lastAppliedEntryIndex,
+      nextSwitchEpochMs,
+      lastError,
+    ];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static DailyScheduleStatusData decode(Object result) {
+    result as List<Object?>;
+    return DailyScheduleStatusData(
+      mode: result[0] as WallpaperScheduleModeData?,
+      entryCount: result[1] as int?,
+      currentEntryIndex: result[2] as int?,
+      lastAppliedEntryIndex: result[3] as int?,
+      nextSwitchEpochMs: result[4] as int?,
+      lastError: result[5] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! DailyScheduleStatusData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+class DailyScheduleApplyResultData {
+  DailyScheduleApplyResultData({this.outcome, this.entryIndex});
+
+  DailyScheduleApplyOutcomeData? outcome;
+
+  int? entryIndex;
+
+  List<Object?> _toList() {
+    return <Object?>[outcome, entryIndex];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static DailyScheduleApplyResultData decode(Object result) {
+    result as List<Object?>;
+    return DailyScheduleApplyResultData(
+      outcome: result[0] as DailyScheduleApplyOutcomeData?,
+      entryIndex: result[1] as int?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! DailyScheduleApplyResultData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -787,38 +986,56 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is RotationOrderData) {
       buffer.putUint8(136);
       writeValue(buffer, value.index);
-    } else if (value is WallpaperSourceData) {
+    } else if (value is WallpaperScheduleModeData) {
       buffer.putUint8(137);
-      writeValue(buffer, value.encode());
-    } else if (value is TargetResultData) {
+      writeValue(buffer, value.index);
+    } else if (value is DailyScheduleApplyOutcomeData) {
       buffer.putUint8(138);
-      writeValue(buffer, value.encode());
-    } else if (value is OperationResultData) {
+      writeValue(buffer, value.index);
+    } else if (value is WallpaperSourceData) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperCapabilitiesData) {
+    } else if (value is TargetResultData) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    } else if (value is StaticWallpaperRequestData) {
+    } else if (value is OperationResultData) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    } else if (value is VideoWallpaperRequestData) {
+    } else if (value is WallpaperCapabilitiesData) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is OpenGlWallpaperRequestData) {
+    } else if (value is StaticWallpaperRequestData) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is MaterialYouSupportData) {
+    } else if (value is VideoWallpaperRequestData) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is RotationSourceData) {
+    } else if (value is OpenGlWallpaperRequestData) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationConfigData) {
+    } else if (value is MaterialYouSupportData) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationStatusData) {
+    } else if (value is RotationSourceData) {
       buffer.putUint8(147);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationConfigData) {
+      buffer.putUint8(148);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationStatusData) {
+      buffer.putUint8(149);
+      writeValue(buffer, value.encode());
+    } else if (value is DailyScheduleEntryData) {
+      buffer.putUint8(150);
+      writeValue(buffer, value.encode());
+    } else if (value is DailyScheduleRequestData) {
+      buffer.putUint8(151);
+      writeValue(buffer, value.encode());
+    } else if (value is DailyScheduleStatusData) {
+      buffer.putUint8(152);
+      writeValue(buffer, value.encode());
+    } else if (value is DailyScheduleApplyResultData) {
+      buffer.putUint8(153);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -853,27 +1070,43 @@ class _PigeonCodec extends StandardMessageCodec {
         final int? value = readValue(buffer) as int?;
         return value == null ? null : RotationOrderData.values[value];
       case 137:
-        return WallpaperSourceData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null ? null : WallpaperScheduleModeData.values[value];
       case 138:
-        return TargetResultData.decode(readValue(buffer)!);
+        final int? value = readValue(buffer) as int?;
+        return value == null
+            ? null
+            : DailyScheduleApplyOutcomeData.values[value];
       case 139:
-        return OperationResultData.decode(readValue(buffer)!);
+        return WallpaperSourceData.decode(readValue(buffer)!);
       case 140:
-        return WallpaperCapabilitiesData.decode(readValue(buffer)!);
+        return TargetResultData.decode(readValue(buffer)!);
       case 141:
-        return StaticWallpaperRequestData.decode(readValue(buffer)!);
+        return OperationResultData.decode(readValue(buffer)!);
       case 142:
-        return VideoWallpaperRequestData.decode(readValue(buffer)!);
+        return WallpaperCapabilitiesData.decode(readValue(buffer)!);
       case 143:
-        return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
+        return StaticWallpaperRequestData.decode(readValue(buffer)!);
       case 144:
-        return MaterialYouSupportData.decode(readValue(buffer)!);
+        return VideoWallpaperRequestData.decode(readValue(buffer)!);
       case 145:
-        return RotationSourceData.decode(readValue(buffer)!);
+        return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
       case 146:
-        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+        return MaterialYouSupportData.decode(readValue(buffer)!);
       case 147:
+        return RotationSourceData.decode(readValue(buffer)!);
+      case 148:
+        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+      case 149:
         return WallpaperRotationStatusData.decode(readValue(buffer)!);
+      case 150:
+        return DailyScheduleEntryData.decode(readValue(buffer)!);
+      case 151:
+        return DailyScheduleRequestData.decode(readValue(buffer)!);
+      case 152:
+        return DailyScheduleStatusData.decode(readValue(buffer)!);
+      case 153:
+        return DailyScheduleApplyResultData.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -1343,6 +1576,132 @@ class WallpaperApi {
       );
     } else {
       return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  /// Caches every entry, applies the one that owns the current local time,
+  /// stops rotation, and arms one alarm for the next entry.
+  Future<bool> startDailySchedule(DailyScheduleRequestData request) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.startDailySchedule$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[request],
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  Future<bool> stopDailySchedule() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.stopDailySchedule$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  /// Applies the entry that owns the current local time when it is not the
+  /// last one applied, then arms the alarm again.
+  Future<DailyScheduleApplyResultData> applyCurrentScheduleEntry() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyCurrentScheduleEntry$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as DailyScheduleApplyResultData?)!;
+    }
+  }
+
+  Future<DailyScheduleStatusData> getDailyScheduleStatus() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.getDailyScheduleStatus$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as DailyScheduleStatusData?)!;
     }
   }
 }

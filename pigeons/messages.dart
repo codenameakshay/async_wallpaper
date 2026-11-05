@@ -37,6 +37,12 @@ enum RotationSourceTypeData { url, file }
 /// The order in which rotation playlist entries are applied.
 enum RotationOrderData { sequential, shuffle }
 
+/// The background wallpaper schedule that currently runs.
+enum WallpaperScheduleModeData { none, rotation, dailySchedule }
+
+/// What one apply of the current daily schedule entry did.
+enum DailyScheduleApplyOutcomeData { applied, alreadyCurrent, notRunning, failed }
+
 /// A static, content-provider, or in-memory wallpaper source.
 class WallpaperSourceData {
   WallpaperSourceKindData? kind;
@@ -141,6 +147,30 @@ class WallpaperRotationStatusData {
   int? effectiveIntervalMinutes;
 }
 
+class DailyScheduleEntryData {
+  int? minuteOfDay;
+  RotationSourceData? source;
+}
+
+class DailyScheduleRequestData {
+  List<DailyScheduleEntryData?>? entries;
+  WallpaperTargetData? target;
+}
+
+class DailyScheduleStatusData {
+  WallpaperScheduleModeData? mode;
+  int? entryCount;
+  int? currentEntryIndex;
+  int? lastAppliedEntryIndex;
+  int? nextSwitchEpochMs;
+  String? lastError;
+}
+
+class DailyScheduleApplyResultData {
+  DailyScheduleApplyOutcomeData? outcome;
+  int? entryIndex;
+}
+
 @ConfigurePigeon(
   PigeonOptions(
     dartOut: 'lib/pigeon_impl_api.dart',
@@ -202,4 +232,20 @@ abstract class WallpaperApi {
 
   @async
   bool rotateWallpaperNow();
+
+  /// Caches every entry, applies the one that owns the current local time,
+  /// stops rotation, and arms one alarm for the next entry.
+  @async
+  bool startDailySchedule(DailyScheduleRequestData request);
+
+  @async
+  bool stopDailySchedule();
+
+  /// Applies the entry that owns the current local time when it is not the
+  /// last one applied, then arms the alarm again.
+  @async
+  DailyScheduleApplyResultData applyCurrentScheduleEntry();
+
+  @async
+  DailyScheduleStatusData getDailyScheduleStatus();
 }

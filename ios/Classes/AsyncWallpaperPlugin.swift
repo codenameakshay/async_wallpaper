@@ -155,6 +155,40 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(false))
   }
 
+  func startDailySchedule(
+    request: DailyScheduleRequestData,
+    completion: @escaping (Result<Bool, Error>) -> Void
+  ) {
+    completion(.success(false))
+  }
+
+  func stopDailySchedule(completion: @escaping (Result<Bool, Error>) -> Void) {
+    completion(.success(false))
+  }
+
+  func applyCurrentScheduleEntry(
+    completion: @escaping (Result<DailyScheduleApplyResultData, Error>) -> Void
+  ) {
+    completion(.success(DailyScheduleApplyResultData(outcome: .notRunning, entryIndex: nil)))
+  }
+
+  func getDailyScheduleStatus(
+    completion: @escaping (Result<DailyScheduleStatusData, Error>) -> Void
+  ) {
+    completion(
+      .success(
+        DailyScheduleStatusData(
+          mode: WallpaperScheduleModeData.none,
+          entryCount: 0,
+          currentEntryIndex: nil,
+          lastAppliedEntryIndex: nil,
+          nextSwitchEpochMs: 0,
+          lastError: nil
+        )
+      )
+    )
+  }
+
   private func completeOnMain<T>(
     _ result: Result<T, Error>,
     _ completion: @escaping (Result<T, Error>) -> Void

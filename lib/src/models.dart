@@ -378,3 +378,86 @@ class WallpaperRotationStatus {
   final int effectiveIntervalMinutes;
   final String? lastError;
 }
+
+/// The background wallpaper schedule that runs on the device. Only one runs at
+/// a time.
+enum WallpaperScheduleMode { none, rotation, dailySchedule }
+
+/// One entry of a daily schedule.
+///
+/// The entry owns the local wall-clock time from [minuteOfDay] up to the next
+/// entry's minute, and the last entry wraps past midnight.
+class DailyScheduleEntry {
+  const DailyScheduleEntry({required this.minuteOfDay, required this.source});
+
+  /// Minutes after local midnight, 0 to 1439.
+  final int minuteOfDay;
+  final WallpaperRotationSource source;
+}
+
+/// Typed input for a daily schedule: two or more entries with different
+/// minutes.
+class DailyScheduleRequest {
+  const DailyScheduleRequest({required this.entries, required this.target});
+
+  final List<DailyScheduleEntry> entries;
+  final WallpaperTarget target;
+}
+
+/// What one apply of the current daily schedule entry did.
+enum DailyScheduleApplyOutcome {
+  /// The entry that owns the current time was applied now.
+  applied,
+
+  /// The entry that owns the current time was already the last one applied.
+  alreadyCurrent,
+
+  /// No daily schedule runs.
+  notRunning,
+
+  /// The entry could not be applied, for example because its cached file is
+  /// missing. Start the schedule again to cache every source again.
+  failed,
+
+  /// The platform has no daily schedule.
+  unsupported,
+}
+
+/// The result of an apply of the current daily schedule entry.
+class DailyScheduleApplyResult {
+  const DailyScheduleApplyResult({required this.outcome, this.entryIndex});
+
+  final DailyScheduleApplyOutcome outcome;
+
+  /// The index in [DailyScheduleRequest.entries] of the entry that owns the
+  /// current time. Null when no schedule runs.
+  final int? entryIndex;
+}
+
+/// Current status of the background wallpaper schedule.
+class DailyScheduleStatus {
+  const DailyScheduleStatus({
+    required this.mode,
+    required this.entryCount,
+    required this.nextSwitchEpochMs,
+    this.currentEntryIndex,
+    this.lastAppliedEntryIndex,
+    this.lastError,
+  });
+
+  /// Which schedule runs: none, rotation, or the daily schedule.
+  final WallpaperScheduleMode mode;
+  final int entryCount;
+
+  /// When the alarm for the next entry is due, in UTC milliseconds. The alarm
+  /// is inexact, so Android can deliver it some minutes later. 0 when no
+  /// daily schedule runs.
+  final int nextSwitchEpochMs;
+
+  /// The entry that owns the current local time.
+  final int? currentEntryIndex;
+
+  /// The entry that the schedule applied last.
+  final int? lastAppliedEntryIndex;
+  final String? lastError;
+}

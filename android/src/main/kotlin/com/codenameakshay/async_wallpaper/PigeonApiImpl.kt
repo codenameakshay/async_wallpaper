@@ -25,6 +25,20 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
+internal fun liveWallpaperScreensSnapshot(
+  perScreen: Boolean,
+  readScreens: () -> LiveWallpaperScreensData,
+): LiveWallpaperScreensData {
+  if (!perScreen) {
+    return LiveWallpaperScreensData(
+      perScreen = false,
+      home = LiveScreenStateData(showsThisWallpaper = false, contentTag = null),
+      lock = LiveScreenStateData(showsThisWallpaper = false, contentTag = null),
+    )
+  }
+  return readScreens().copy(perScreen = true)
+}
+
 /**
  * Android implementation of the Pigeon transport.
  *
@@ -635,7 +649,9 @@ class PigeonApiImpl(
     callback(runCatching { liveWallpaperScreens() })
   }
 
-  private fun liveWallpaperScreens(): LiveWallpaperScreensData {
+  private fun liveWallpaperScreens(): LiveWallpaperScreensData = liveWallpaperScreensSnapshot(
+    perScreen = AndroidCapabilities.supportsPerScreenLiveWallpaper(),
+  ) {
     val manager = WallpaperManager.getInstance(appContext)
     val ours = ComponentName(appContext, OpenGlLiveWallpaper::class.java)
     fun showsOurs(which: Int): Boolean =
@@ -656,8 +672,7 @@ class PigeonApiImpl(
       lockRecord = records[LiveScreen.LOCK],
     )
     fun data(state: LiveScreenState?) = LiveScreenStateData(state?.showsThisWallpaper ?: false, state?.contentTag)
-    return LiveWallpaperScreensData(
-      perScreen = AndroidCapabilities.supportsPerScreenLiveWallpaper(),
+    LiveWallpaperScreensData(
       home = data(screens[LiveScreen.HOME]),
       lock = data(screens[LiveScreen.LOCK]),
     )

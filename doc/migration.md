@@ -1,5 +1,14 @@
 # Migration guide
 
+## From 3.6 to 3.7
+
+The public Dart API only gains fields and methods. Update the version and check these points.
+
+- **Daily schedule and rotation exclude each other.** `startDailySchedule` stops a running rotation, and a successful `startWallpaperRotation` stops the daily schedule.
+- **The Android manifest also listens for `MY_PACKAGE_REPLACED`.** After an app update, the plugin applies the current schedule entry and arms its alarm again.
+- **Per-screen OpenGL content needs Android 16 (API 36).** Check `WallpaperCapabilities.supportsPerScreenLiveWallpaper`. On older Android, `WallpaperOperationResult.effectiveTarget` is `both`, and all screens share one live content as before.
+- **Test fakes that implement `WallpaperClient` need a new method.** `WallpaperClient` is in `lib/src` and is not exported, but a test that implements it must add `getLiveWallpaperScreens()`.
+
 ## From 3.4 to 3.5
 
 The Dart API is unchanged. Update the version and check these behavior changes.

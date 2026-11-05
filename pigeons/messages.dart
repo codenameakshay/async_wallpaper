@@ -41,7 +41,12 @@ enum RotationOrderData { sequential, shuffle }
 enum WallpaperScheduleModeData { none, rotation, dailySchedule }
 
 /// What one apply of the current daily schedule entry did.
-enum DailyScheduleApplyOutcomeData { applied, alreadyCurrent, notRunning, failed }
+enum DailyScheduleApplyOutcomeData {
+  applied,
+  alreadyCurrent,
+  notRunning,
+  failed,
+}
 
 /// A static, content-provider, or in-memory wallpaper source.
 class WallpaperSourceData {

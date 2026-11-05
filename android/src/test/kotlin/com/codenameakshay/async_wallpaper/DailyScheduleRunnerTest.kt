@@ -269,6 +269,15 @@ class DailyScheduleRunnerTest {
   }
 
   @Test
+  fun `a failed or blocked broadcast apply leaves the switch to the durable job`() {
+    assertTrue(broadcastApplyHandled(DailyScheduleApplyOutcomeData.APPLIED))
+    assertTrue(broadcastApplyHandled(DailyScheduleApplyOutcomeData.ALREADY_CURRENT))
+    assertTrue(broadcastApplyHandled(DailyScheduleApplyOutcomeData.NOT_RUNNING))
+    assertFalse(broadcastApplyHandled(DailyScheduleApplyOutcomeData.FAILED))
+    assertFalse(broadcastApplyHandled(null))
+  }
+
+  @Test
   fun `tryWithLock gives up when another thread holds the coordinator`() {
     val held = CountDownLatch(1)
     val release = CountDownLatch(1)

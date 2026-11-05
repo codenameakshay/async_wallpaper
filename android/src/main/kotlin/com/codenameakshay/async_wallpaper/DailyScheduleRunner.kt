@@ -150,7 +150,9 @@ internal object DailyScheduleRunner {
       dispatchDailyScheduleBroadcast(
         execute = { task -> background.execute(task) },
         applyNow = {
-          WallpaperRotationCoordinator.tryWithLock(APPLY_LOCK_WAIT_MS) { applyCurrent(appContext, force = true) } != null
+          broadcastApplyHandled(
+            WallpaperRotationCoordinator.tryWithLock(APPLY_LOCK_WAIT_MS) { applyCurrent(appContext, force = true).outcome },
+          )
         },
         deadline = { finish -> deadlines.schedule(finish, 8L, TimeUnit.SECONDS) },
         enqueueRecovery = {
@@ -354,6 +356,12 @@ internal fun dispatchDailyScheduleBroadcast(
     throw error
   }
 }
+
+/** A busy lock (null) or a failed apply leaves the switch to the durable job; nothing to run needs no job. */
+internal fun broadcastApplyHandled(outcome: DailyScheduleApplyOutcomeData?): Boolean =
+  outcome == DailyScheduleApplyOutcomeData.APPLIED ||
+    outcome == DailyScheduleApplyOutcomeData.ALREADY_CURRENT ||
+    outcome == DailyScheduleApplyOutcomeData.NOT_RUNNING
 
 private const val APPLY_LOCK_WAIT_MS = 3_000L
 private const val MISSING_CACHE_ERROR = "A cached daily schedule wallpaper is missing. Start the schedule again."

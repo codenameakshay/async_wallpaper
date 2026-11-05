@@ -1,3 +1,15 @@
+## 3.7.0
+
+Android daily schedule release. The Dart API gains a daily wallpaper schedule that applies one wallpaper for each time of day. No breaking change.
+
+- New `startDailySchedule`, `stopDailySchedule`, `applyCurrentScheduleEntry`, and `getDailyScheduleStatus`. A schedule has 2 to 100 entries, each at a different minute of the day. Each entry owns the local time up to the next entry, and the last entry wraps past midnight.
+- Every source is cached when the schedule starts. If one source fails, the request fails and the running schedule or rotation stays as it was.
+- One inexact alarm drives the switches. No exact-alarm permission is needed, so Doze can deliver a switch some minutes late.
+- Boot, clock changes, time zone changes, and app updates apply the current entry and arm the alarm again. The manifest now also listens for `MY_PACKAGE_REPLACED`.
+- Only one schedule runs. `startDailySchedule` stops rotation, and a successful `startWallpaperRotation` stops the daily schedule.
+- `applyCurrentScheduleEntry` re-arms an alarm that a force stop removed. `getDailyScheduleStatus` reports the mode, entry indexes, next switch time, and last error.
+- Android only. iOS and other platforms return `unsupported`.
+
 ## 3.6.0
 
 Android OpenGL tilt release. The Dart API gains `WallpaperCapabilities.supportsTilt`. Existing shaders are unaffected.

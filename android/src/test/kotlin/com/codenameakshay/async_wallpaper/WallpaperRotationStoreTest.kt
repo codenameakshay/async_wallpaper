@@ -146,7 +146,7 @@ class WallpaperRotationStoreTest {
   )
 }
 
-private class MemorySharedPreferences(
+internal class MemorySharedPreferences(
   private val diskValues: MutableMap<String, Any?> = mutableMapOf(),
 ) : SharedPreferences {
   private val values = diskValues.toMutableMap()

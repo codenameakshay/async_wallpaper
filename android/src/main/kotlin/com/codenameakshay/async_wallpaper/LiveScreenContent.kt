@@ -103,6 +103,16 @@ internal object PerScreenLiveSupport {
 /** What a screen's engine drew, keyed to the system's id for that screen's wallpaper. */
 internal data class LiveScreenRecord(val wallpaperId: Int, val content: LiveScreenContent)
 
+/**
+ * Records for the screens a picker is about to set from a description. Android never issues
+ * wallpaper id 0, so the record keeps its textures until that screen's engine records its real
+ * id, and never matches a restart by accident.
+ */
+internal fun describedScreenIds(which: Int): Map<LiveScreen, Int> =
+  LiveScreen.fromFlags(which).associateWith { PENDING_WALLPAPER_ID }
+
+internal const val PENDING_WALLPAPER_ID = 0
+
 /** A shared Lock wallpaper inherits Home's id when Android later splits the two screens. */
 internal fun normalizeScreenWallpaperIds(wallpaperIds: Map<LiveScreen, Int>): Map<LiveScreen, Int> {
   val homeId = wallpaperIds[LiveScreen.HOME] ?: return wallpaperIds

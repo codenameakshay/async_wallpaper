@@ -373,7 +373,11 @@ class OpenGlLiveWallpaper : WallpaperService() {
      * Home, Lock, or both. The system saves the returned description for those screens and hands
      * it back to [onCreateEngine].
      */
-    override fun onApplyWallpaper(which: Int): WallpaperDescription? = LiveScreenDescriptions.build(screenContent)
+    override fun onApplyWallpaper(which: Int): WallpaperDescription? {
+      val content = screenContent
+      OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, describedScreenIds(which), content)
+      return LiveScreenDescriptions.build(content)
+    }
 
     override fun onDestroy() {
       renderThread.shutdown()
@@ -1022,8 +1026,15 @@ internal object OpenGlWallpaperConfigurationStore {
 
   /** Remembers what each screen's engine draws, so its textures survive cleanup and callers can ask. */
   fun recordScreens(context: Context, wallpaperIds: Map<LiveScreen, Int>, content: LiveScreenContent) =
+    recordScreens(context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE), wallpaperIds, content)
+
+  internal fun recordScreens(
+    preferences: android.content.SharedPreferences,
+    wallpaperIds: Map<LiveScreen, Int>,
+    content: LiveScreenContent,
+  ) =
     configurationLock.withLock {
-      val editor = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).edit()
+      val editor = preferences.edit()
       wallpaperIds.forEach { (screen, wallpaperId) ->
         val prefix = screenPrefix(screen)
         LiveScreenContent.keys.forEach { key -> editor.remove("$prefix$key") }

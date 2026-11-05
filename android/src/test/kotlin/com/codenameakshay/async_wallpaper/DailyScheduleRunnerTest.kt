@@ -238,6 +238,57 @@ class DailyScheduleRunnerTest {
   }
 
   @Test
+  fun `broadcast applies at once and skips the deferred job when the apply succeeds`() {
+    var enqueued = 0
+    var finished = 0
+    var applied = 0
+    dispatchDailyScheduleBroadcast(
+      execute = { it() }, deadline = {},
+      enqueueRecovery = { enqueued++ }, finish = { finished++ },
+      applyNow = { applied++; true },
+    )
+
+    assertEquals(1, applied)
+    assertEquals(0, enqueued)
+    assertEquals(1, finished)
+  }
+
+  @Test
+  fun `broadcast falls back to the deferred job when the lock stays busy or the apply throws`() {
+    var enqueued = 0
+    dispatchDailyScheduleBroadcast(
+      execute = { it() }, deadline = {}, enqueueRecovery = { enqueued++ }, finish = {},
+      applyNow = { false },
+    )
+    dispatchDailyScheduleBroadcast(
+      execute = { it() }, deadline = {}, enqueueRecovery = { enqueued++ }, finish = {},
+      applyNow = { error("decode failed") },
+    )
+
+    assertEquals(2, enqueued)
+  }
+
+  @Test
+  fun `tryWithLock gives up when another thread holds the coordinator`() {
+    val held = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val holder = Thread {
+      WallpaperRotationCoordinator.withLock {
+        held.countDown()
+        release.await(5, TimeUnit.SECONDS)
+      }
+    }.apply { start() }
+    try {
+      assertTrue(held.await(5, TimeUnit.SECONDS))
+      assertEquals(null, WallpaperRotationCoordinator.tryWithLock(50L) { "ran" })
+    } finally {
+      release.countDown()
+      holder.join(5_000)
+    }
+    assertEquals("ran", WallpaperRotationCoordinator.tryWithLock(50L) { "ran" })
+  }
+
+  @Test
   fun `broadcast rejection still finishes the pending result exactly once`() {
     var timedOut: (() -> Unit)? = null
     var finished = 0

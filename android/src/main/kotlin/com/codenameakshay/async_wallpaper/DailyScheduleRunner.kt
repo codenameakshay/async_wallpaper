@@ -149,6 +149,9 @@ internal object DailyScheduleRunner {
     runCatching {
       dispatchDailyScheduleBroadcast(
         execute = { task -> background.execute(task) },
+        applyNow = {
+          WallpaperRotationCoordinator.tryWithLock(APPLY_LOCK_WAIT_MS) { applyCurrent(appContext, force = true) } != null
+        },
         deadline = { finish -> deadlines.schedule(finish, 8L, TimeUnit.SECONDS) },
         enqueueRecovery = {
           runCatching { DailyScheduleWorker.enqueue(appContext).result.get(6L, TimeUnit.SECONDS) }
@@ -323,11 +326,17 @@ internal fun dailyScheduleStatus(
   )
 }
 
+/**
+ * Applies the current entry while the alarm's idle allowance lasts, because a deferred job could wait
+ * for a Doze maintenance window. The durable job is the fallback when the lock stays busy or the apply
+ * throws. [deadline] finishes the broadcast even if the work runs long.
+ */
 internal fun dispatchDailyScheduleBroadcast(
   execute: (() -> Unit) -> Unit,
   deadline: (() -> Unit) -> Unit,
   enqueueRecovery: () -> Unit,
   finish: () -> Unit,
+  applyNow: () -> Boolean = { false },
 ) {
   val finished = AtomicBoolean()
   val finishOnce = { if (finished.compareAndSet(false, true)) finish() }
@@ -335,7 +344,7 @@ internal fun dispatchDailyScheduleBroadcast(
     deadline(finishOnce)
     execute {
       try {
-        enqueueRecovery()
+        if (!runCatching(applyNow).getOrDefault(false)) enqueueRecovery()
       } finally {
         finishOnce()
       }
@@ -346,5 +355,6 @@ internal fun dispatchDailyScheduleBroadcast(
   }
 }
 
+private const val APPLY_LOCK_WAIT_MS = 3_000L
 private const val MISSING_CACHE_ERROR = "A cached daily schedule wallpaper is missing. Start the schedule again."
 private const val INVALID_SCHEDULE_ERROR = "The saved daily schedule is invalid. Start the schedule again."

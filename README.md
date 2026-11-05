@@ -165,7 +165,7 @@ await AsyncWallpaper.startDailySchedule(
 - Sources are the same HTTPS URLs and file sources that rotation uses. Every source is cached when the schedule starts. If one source fails, the request fails and the running schedule or rotation stays as it was.
 - Starting a daily schedule stops rotation. A successful `startWallpaperRotation` stops the daily schedule.
 - One inexact alarm drives the next switch. No exact-alarm permission is needed, so Doze can deliver a switch some minutes late. Show a time such as "around 07:00" in your UI.
-- Each alarm applies the entry that owns the current local time. Boot, clock changes, time zone changes, and app updates enqueue durable background recovery, which reapplies the current entry and arms the alarm again.
+- Each alarm applies the entry that owns the current local time. Boot, clock changes, time zone changes, and app updates apply the current entry and arm the alarm again. If another wallpaper change is in progress, a durable background job does it later.
 - Call `applyCurrentScheduleEntry()` when the app opens. It re-arms an alarm that a force stop removed. If it returns `failed` and the cache is missing, call `startDailySchedule` again.
 - If a cached source is missing, `getDailyScheduleStatus()` reports the error immediately. Applying then returns `failed` and cancels the unusable alarm. `nextSwitchEpochMs` is 0 while the cache is incomplete.
 - `getDailyScheduleStatus()` returns the mode (`none`, `rotation`, or `dailySchedule`), the entry count, the current and last applied entry index, `nextSwitchEpochMs` (0 when none), and `lastError`.

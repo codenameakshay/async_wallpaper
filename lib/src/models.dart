@@ -451,7 +451,7 @@ class DailyScheduleStatus {
 
   /// When the alarm for the next entry is due, in UTC milliseconds. The alarm
   /// is inexact, so Android can deliver it some minutes later. 0 when no
-  /// daily schedule runs.
+  /// usable daily alarm is armed.
   final int nextSwitchEpochMs;
 
   /// The entry that owns the current local time.

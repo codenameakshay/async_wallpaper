@@ -146,6 +146,19 @@ internal fun completeScheduleReconciliation(awaitOperations: () -> Unit, clearPe
   check(clearPending()) { "Unable to save completed rotation schedule reconciliation." }
 }
 
+internal fun rollbackStartedRotation(
+  rollbackRotation: () -> Unit,
+  rotationIsRunning: () -> Boolean,
+  restoreDailySchedule: () -> Unit,
+  ensureDailyStopped: () -> Unit = {},
+) {
+  try {
+    rollbackRotation()
+  } finally {
+    if (!rotationIsRunning()) restoreDailySchedule() else ensureDailyStopped()
+  }
+}
+
 /** Reconciles from current persisted state, ignoring any generation carried by the triggering worker. */
 internal fun recoverPendingRotationSchedules(
   store: WallpaperRotationStore,

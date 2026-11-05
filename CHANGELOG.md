@@ -8,6 +8,8 @@ Android daily schedule release. The Dart API gains a daily wallpaper schedule th
 - Boot, clock changes, time zone changes, and app updates apply the current entry and arm the alarm again. The manifest now also listens for `MY_PACKAGE_REPLACED`.
 - Only one schedule runs. `startDailySchedule` stops rotation, and a successful `startWallpaperRotation` stops the daily schedule.
 - `applyCurrentScheduleEntry` re-arms an alarm that a force stop removed. `getDailyScheduleStatus` reports the mode, entry indexes, next switch time, and last error.
+- Broadcast receivers enqueue durable background recovery with a bounded lifetime instead of waiting on wallpaper work. Recovery reapplies the current owner even when its index has not changed.
+- Missing cached sources appear in status immediately. Applying fails and cancels the unusable alarm. `nextSwitchEpochMs` is 0 while the cache is incomplete.
 - Android only. iOS and other platforms return `unsupported`.
 
 ## 3.6.0

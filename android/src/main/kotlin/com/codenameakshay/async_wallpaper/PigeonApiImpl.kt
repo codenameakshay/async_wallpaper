@@ -117,24 +117,36 @@ class PigeonApiImpl(
       }
       WallpaperRotationCoordinator.withLock {
         runCatching {
+          val dailySnapshot = DailyScheduleRunner.snapshot(appContext)
+          fun rollbackStart() {
+            rollbackStartedRotation(
+              rollbackRotation = { rollbackFailedRotationStart() },
+              rotationIsRunning = { rotationStore.isRunning() },
+              restoreDailySchedule = {
+                DailyScheduleRunner.restoreAfterFailedRotation(appContext, dailySnapshot)
+              },
+              ensureDailyStopped = { DailyScheduleRunner.stop(appContext) },
+            )
+          }
           when (rotationEngine.startRotation(config)) {
             RotationStartResult.STARTED -> {
               try {
                 reconcileRotationTriggers()
-                check(DailyScheduleRunner.stop(appContext)) { "Unable to stop the daily schedule." }
+                check(DailyScheduleRunner.suspendForRotation(appContext)) { "Unable to stop the daily schedule." }
+                DailyScheduleRunner.clearStoppedCache(appContext)
                 true
               } catch (error: Exception) {
                 // The wallpaper is already applied but the schedules are unknown; report failure and
                 // tear the rotation down rather than leaving a half-armed trigger set.
                 Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
-                rollbackFailedRotationStart()
+                rollbackStart()
                 false
               }
             }
             // Only a start that already persisted a new configuration may roll back, so a rejected
             // request cannot stop a rotation that is still running.
             RotationStartResult.FAILED_AFTER_SAVE -> {
-              rollbackFailedRotationStart()
+              rollbackStart()
               false
             }
             RotationStartResult.REJECTED -> false

@@ -200,6 +200,22 @@ internal class LoadedOpenGlConfiguration internal constructor(
   }
 }
 
+internal class OpenGlEngineContent(configuration: LoadedOpenGlConfiguration) {
+  @Volatile
+  var content: LiveScreenContent = configuration.toScreenContent()
+    private set
+
+  fun adopt(
+    chosen: LiveScreenContent,
+    load: (LiveScreenContent) -> LoadedOpenGlConfiguration,
+  ): LoadedOpenGlConfiguration = replace(load(chosen))
+
+  fun replace(loaded: LoadedOpenGlConfiguration): LoadedOpenGlConfiguration {
+    content = loaded.toScreenContent()
+    return loaded
+  }
+}
+
 /**
  * A GLES2 WallpaperService whose EGL context, shader program, textures, and frame loop live on
  * one HandlerThread. It intentionally does not contact the network or invoke Flutter callbacks.
@@ -232,8 +248,9 @@ class OpenGlLiveWallpaper : WallpaperService() {
     configuration: LoadedOpenGlConfiguration,
     private val described: LiveScreenContent?,
   ) : Engine() {
-    @Volatile
-    private var screenContent = configuration.toScreenContent()
+    private val engineContent = OpenGlEngineContent(configuration)
+    private val screenContent: LiveScreenContent
+      get() = engineContent.content
     private val renderThread = WallpaperRenderThread(applicationContext, configuration)
 
     init {
@@ -262,10 +279,12 @@ class OpenGlLiveWallpaper : WallpaperService() {
       val records = OpenGlWallpaperConfigurationStore.screenRecords(applicationContext)
       val chosen = chooseScreenContent(described, records[primary], wallpaperIds.getValue(primary), screenContent)
       if (chosen != screenContent) {
-        screenContent = chosen
-        renderThread.configurationChanged(OpenGlWallpaperConfigurationStore.loadScreenContent(applicationContext, chosen))
+        val loaded = engineContent.adopt(chosen) { content ->
+          OpenGlWallpaperConfigurationStore.loadScreenContent(applicationContext, content)
+        }
+        renderThread.configurationChanged(loaded)
       }
-      OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, wallpaperIds, chosen)
+      OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, wallpaperIds, screenContent)
     }
 
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
@@ -335,8 +354,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
     ): Bundle? {
       if (action == WALLPAPER_COMMAND_REAPPLY && described == null) {
         val reloaded = OpenGlWallpaperConfigurationStore.load(applicationContext)
-        screenContent = reloaded.toScreenContent()
-        renderThread.configurationChanged(reloaded)
+        renderThread.configurationChanged(engineContent.replace(reloaded))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && perScreen && !isPreview) {
           recordScreens(screenContent)
         }
@@ -946,9 +964,12 @@ internal object OpenGlWallpaperConfigurationStore {
    * the content meant for the other.
    */
   fun loadScreenContent(context: Context, content: LiveScreenContent): LoadedOpenGlConfiguration =
+    loadScreenContent(File(context.filesDir, TEXTURE_DIRECTORY), content)
+
+  internal fun loadScreenContent(rootDirectory: File, content: LiveScreenContent): LoadedOpenGlConfiguration =
     configurationLock.withLock {
       val directory = content.textureDirectory?.let { name ->
-        File(File(context.filesDir, TEXTURE_DIRECTORY), name)
+        File(rootDirectory, name)
       }
       val textures = List(content.textureCount) { index ->
         GlTextureSource.FilePath(File(directory, "$index$TEXTURE_FILE_SUFFIX").path)
@@ -956,7 +977,7 @@ internal object OpenGlWallpaperConfigurationStore {
       val generationDirectory = if (content.textureCount == 0) {
         null
       } else {
-        generationDirectoryFor(context, textures, content.textureCount)
+        generationDirectoryFor(rootDirectory, textures, content.textureCount)
           ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
       }
       leaseIfValid(
@@ -1161,11 +1182,17 @@ internal object OpenGlWallpaperConfigurationStore {
     context: Context,
     textures: List<GlTextureSource>,
     count: Int,
+  ): File? = generationDirectoryFor(File(context.filesDir, TEXTURE_DIRECTORY), textures, count)
+
+  private fun generationDirectoryFor(
+    rootDirectory: File,
+    textures: List<GlTextureSource>,
+    count: Int,
   ): File? {
     if (count == 0) {
       return null
     }
-    val root = File(context.filesDir, TEXTURE_DIRECTORY).canonicalFile
+    val root = rootDirectory.canonicalFile
     val paths = textures.map { source -> (source as? GlTextureSource.FilePath)?.path ?: return null }
     val directory = File(paths.first()).parentFile?.canonicalFile ?: return null
     if (directory.parentFile != root || !directory.name.startsWith(OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX)) {

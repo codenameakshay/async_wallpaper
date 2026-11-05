@@ -279,9 +279,10 @@ class OpenGlLiveWallpaper : WallpaperService() {
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     private fun currentWallpaperIds(): Map<LiveScreen, Int> {
       val manager = WallpaperManager.getInstance(applicationContext)
-      return LiveScreen.fromFlags(wallpaperFlags).associateWith { screen ->
+      val wallpaperIds = LiveScreen.fromFlags(wallpaperFlags).associateWith { screen ->
         runCatching { manager.getWallpaperId(screen.flag) }.getOrDefault(-1)
       }
+      return normalizeScreenWallpaperIds(wallpaperIds)
     }
 
     override fun onSurfaceCreated(holder: SurfaceHolder) {

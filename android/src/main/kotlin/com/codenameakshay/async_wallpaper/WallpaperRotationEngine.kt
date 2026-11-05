@@ -242,27 +242,31 @@ internal class WallpaperRotationEngine(
   private fun cacheSources(sources: List<RotationSourceData?>, cacheDir: File): List<String> {
     val prepared = mutableListOf<String>()
     sources.forEachIndexed { index, sourceData ->
-      val source = sourceData?.source?.trim().orEmpty()
-      if (source.isEmpty()) {
-        return@forEachIndexed
-      }
       val targetFile = File(cacheDir, "wallpaper_$index.jpg")
-      val success = when (sourceData?.sourceType) {
-        RotationSourceTypeData.URL -> cacheSource(
-          WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = source),
-          targetFile,
-        )
-        RotationSourceTypeData.FILE -> cacheSource(
-          WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = source),
-          targetFile,
-        )
-        null -> false
-      }
-      if (success) {
+      if (cacheRotationSource(sourceData, targetFile)) {
         prepared.add(targetFile.name)
       }
     }
     return prepared
+  }
+
+  /** Caches one URL or file source as a display-sized JPEG at [targetFile]. */
+  fun cacheRotationSource(sourceData: RotationSourceData?, targetFile: File): Boolean {
+    val source = sourceData?.source?.trim().orEmpty()
+    if (source.isEmpty()) {
+      return false
+    }
+    return when (sourceData?.sourceType) {
+      RotationSourceTypeData.URL -> cacheSource(
+        WallpaperSourceData(kind = WallpaperSourceKindData.URL, url = source),
+        targetFile,
+      )
+      RotationSourceTypeData.FILE -> cacheSource(
+        WallpaperSourceData(kind = WallpaperSourceKindData.FILE_PATH, filePath = source),
+        targetFile,
+      )
+      null -> false
+    }
   }
 
   /**
@@ -308,7 +312,7 @@ internal class WallpaperRotationEngine(
     }
   }
 
-  private fun applyPathToWallpaper(path: String, target: Int): Boolean {
+  fun applyPathToWallpaper(path: String, target: Int): Boolean {
     return runCatching {
       val flag = targetToFlag(target)
       wallpaperMutationLock.withLock {
@@ -331,7 +335,7 @@ internal class WallpaperRotationEngine(
     }
   }
 
-  private fun targetToStored(target: WallpaperTargetData?): Int {
+  fun targetToStored(target: WallpaperTargetData?): Int {
     return when (target) {
       WallpaperTargetData.HOME -> TARGET_HOME
       WallpaperTargetData.LOCK -> TARGET_LOCK

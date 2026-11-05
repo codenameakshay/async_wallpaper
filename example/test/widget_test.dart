@@ -104,6 +104,21 @@ class _FakeWallpaperDemoApi implements WallpaperDemoApi {
   DownloadWallpaperRequest? downloadRequest;
   WallpaperRequest? legacyRequest;
   WallpaperRotationRequest? rotationRequest;
+  DailyScheduleRequest? dailyRequest;
+  int dailyStopCalls = 0;
+  int dailyApplyCalls = 0;
+  int dailyStatusCalls = 0;
+  DailyScheduleApplyResult dailyApplyResult = const DailyScheduleApplyResult(
+    outcome: DailyScheduleApplyOutcome.applied,
+    entryIndex: 0,
+  );
+  DailyScheduleStatus dailyStatus = DailyScheduleStatus(
+    mode: WallpaperScheduleMode.dailySchedule,
+    entryCount: 2,
+    nextSwitchEpochMs: DateTime(2026, 11, 5, 19).millisecondsSinceEpoch,
+    currentEntryIndex: 0,
+    lastAppliedEntryIndex: 0,
+  );
 
   @override
   Future<String> platformVersion() => Future<String>.value('Android 16');
@@ -158,6 +173,30 @@ class _FakeWallpaperDemoApi implements WallpaperDemoApi {
   @override
   Future<WallpaperResult> rotateWallpaperNow() =>
       Future<WallpaperResult>.value(legacyResult);
+
+  @override
+  Future<WallpaperResult> startDailySchedule(DailyScheduleRequest request) {
+    dailyRequest = request;
+    return Future<WallpaperResult>.value(legacyResult);
+  }
+
+  @override
+  Future<WallpaperResult> stopDailySchedule() {
+    dailyStopCalls += 1;
+    return Future<WallpaperResult>.value(legacyResult);
+  }
+
+  @override
+  Future<DailyScheduleApplyResult> applyCurrentScheduleEntry() {
+    dailyApplyCalls += 1;
+    return Future<DailyScheduleApplyResult>.value(dailyApplyResult);
+  }
+
+  @override
+  Future<DailyScheduleStatus> getDailyScheduleStatus() {
+    dailyStatusCalls += 1;
+    return Future<DailyScheduleStatus>.value(dailyStatus);
+  }
 }
 
 Widget _example(_FakeWallpaperDemoApi api) {
@@ -168,7 +207,7 @@ Future<void> _pumpExample(
   WidgetTester tester,
   _FakeWallpaperDemoApi api,
 ) async {
-  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  await tester.binding.setSurfaceSize(const Size(800, 3200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(_example(api));
 }
@@ -351,6 +390,28 @@ void main() {
     expect(
       api.rotationRequest?.sources.first.sourceType,
       WallpaperSourceType.url,
+    );
+  });
+
+  testWidgets('starts a daily schedule and reads its status', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeWallpaperDemoApi();
+    await _pumpExample(tester, api);
+
+    await _tapVisible(tester, find.byKey(const Key('daily-start-button')));
+    await tester.pump();
+    expect(
+      api.dailyRequest?.entries.map((entry) => entry.minuteOfDay).toList(),
+      equals(<int>[420, 1140]),
+    );
+
+    await _tapVisible(tester, find.byKey(const Key('daily-status-button')));
+    await tester.pump();
+    expect(api.dailyStatusCalls, 1);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('status-text'))).data,
+      contains('dailySchedule'),
     );
   });
 

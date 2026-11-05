@@ -88,6 +88,14 @@ abstract interface class WallpaperDemoApi {
   Future<WallpaperRotationStatus> getWallpaperRotationStatus();
 
   Future<WallpaperResult> rotateWallpaperNow();
+
+  Future<WallpaperResult> startDailySchedule(DailyScheduleRequest request);
+
+  Future<WallpaperResult> stopDailySchedule();
+
+  Future<DailyScheduleApplyResult> applyCurrentScheduleEntry();
+
+  Future<DailyScheduleStatus> getDailyScheduleStatus();
 }
 
 class AsyncWallpaperDemoApi implements WallpaperDemoApi {
@@ -161,6 +169,22 @@ class AsyncWallpaperDemoApi implements WallpaperDemoApi {
   @override
   Future<WallpaperResult> rotateWallpaperNow() =>
       AsyncWallpaper.rotateWallpaperNow();
+
+  @override
+  Future<WallpaperResult> startDailySchedule(DailyScheduleRequest request) =>
+      AsyncWallpaper.startDailySchedule(request);
+
+  @override
+  Future<WallpaperResult> stopDailySchedule() =>
+      AsyncWallpaper.stopDailySchedule();
+
+  @override
+  Future<DailyScheduleApplyResult> applyCurrentScheduleEntry() =>
+      AsyncWallpaper.applyCurrentScheduleEntry();
+
+  @override
+  Future<DailyScheduleStatus> getDailyScheduleStatus() =>
+      AsyncWallpaper.getDailyScheduleStatus();
 }
 
 void main() {
@@ -555,6 +579,57 @@ class _HomePageState extends State<HomePage> {
       ],
       target: _target,
       intervalMinutes: 15,
+    );
+  }
+
+  String _dailySummary(DailyScheduleStatus status) {
+    final details = <String>['mode ${status.mode.name}'];
+    if (status.mode == WallpaperScheduleMode.dailySchedule) {
+      details.add(
+        'entry ${status.currentEntryIndex ?? 'none'} of ${status.entryCount}',
+      );
+      if (status.nextSwitchEpochMs > 0) {
+        final nextSwitch = DateTime.fromMillisecondsSinceEpoch(
+          status.nextSwitchEpochMs,
+        );
+        final time = TimeOfDay.fromDateTime(nextSwitch).format(context);
+        details.add('next switch around $time');
+      }
+    }
+    if (status.lastError != null) {
+      details.add(status.lastError!);
+    }
+    return details.join(', ');
+  }
+
+  String _dailyApplySummary(DailyScheduleApplyResult result) {
+    final entry = result.entryIndex;
+    if (entry == null) {
+      return result.outcome.name;
+    }
+    return '${result.outcome.name}, entry $entry';
+  }
+
+  DailyScheduleRequest _dailyRequest() {
+    final url = _requiredInput(_urlController.text, 'URL');
+    return DailyScheduleRequest(
+      entries: <DailyScheduleEntry>[
+        DailyScheduleEntry(
+          minuteOfDay: 7 * 60,
+          source: WallpaperRotationSource(
+            sourceType: WallpaperSourceType.url,
+            source: url,
+          ),
+        ),
+        DailyScheduleEntry(
+          minuteOfDay: 19 * 60,
+          source: WallpaperRotationSource(
+            sourceType: WallpaperSourceType.url,
+            source: url,
+          ),
+        ),
+      ],
+      target: _target,
     );
   }
 
@@ -1095,6 +1170,62 @@ class _HomePageState extends State<HomePage> {
                     'Stop rotation',
                     widget.api.stopWallpaperRotation,
                     _legacySummary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Daily schedule',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Day wall at 07:00 and night wall at 19:00, both from the URL above.',
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _moreButton(
+                  'daily-start-button',
+                  'Start daily schedule',
+                  Icons.play_arrow_outlined,
+                  () => _runMore(
+                    'Start daily schedule',
+                    () => widget.api.startDailySchedule(_dailyRequest()),
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'daily-apply-button',
+                  'Apply current entry',
+                  Icons.refresh_outlined,
+                  () => _runMore(
+                    'Apply current entry',
+                    widget.api.applyCurrentScheduleEntry,
+                    _dailyApplySummary,
+                  ),
+                ),
+                _moreButton(
+                  'daily-stop-button',
+                  'Stop daily schedule',
+                  Icons.stop_outlined,
+                  () => _runMore(
+                    'Stop daily schedule',
+                    widget.api.stopDailySchedule,
+                    _legacySummary,
+                  ),
+                ),
+                _moreButton(
+                  'daily-status-button',
+                  'Daily status',
+                  Icons.info_outline,
+                  () => _runMore(
+                    'Daily status',
+                    widget.api.getDailyScheduleStatus,
+                    _dailySummary,
                   ),
                 ),
               ],

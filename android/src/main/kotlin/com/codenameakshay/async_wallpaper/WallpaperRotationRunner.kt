@@ -101,6 +101,22 @@ internal object WallpaperRotationRunner {
     success
   }
 
+  /** Stops rotation, cancels every rotation trigger, and deletes the rotation cache. */
+  fun stop(context: Context): Boolean = WallpaperRotationCoordinator.withLock {
+    val store = WallpaperRotationStore(context)
+    if (!store.stopRotation()) {
+      return@withLock false
+    }
+    completeScheduleReconciliation(
+      awaitOperations = {
+        WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(context, store))
+      },
+      clearPending = { store.clearSchedulesPending() },
+    )
+    WallpaperRotationEngine(context, store).clearRotationCache()
+    true
+  }
+
   /**
    * Completes schedule changes that were interrupted after their preference commit. This always
    * uses the latest stored config and returns without applying a wallpaper.
@@ -128,6 +144,19 @@ internal object WallpaperRotationRunner {
 internal fun completeScheduleReconciliation(awaitOperations: () -> Unit, clearPending: () -> Boolean) {
   awaitOperations()
   check(clearPending()) { "Unable to save completed rotation schedule reconciliation." }
+}
+
+internal fun rollbackStartedRotation(
+  rollbackRotation: () -> Unit,
+  rotationIsRunning: () -> Boolean,
+  restoreDailySchedule: () -> Unit,
+  ensureDailyStopped: () -> Unit = {},
+) {
+  try {
+    rollbackRotation()
+  } finally {
+    if (!rotationIsRunning()) restoreDailySchedule() else ensureDailyStopped()
+  }
 }
 
 /** Reconciles from current persisted state, ignoring any generation carried by the triggering worker. */

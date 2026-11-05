@@ -363,6 +363,8 @@ class AsyncWallpaper {
   }
 
   /// Starts wallpaper rotation with the provided playlist and trigger settings.
+  ///
+  /// A successful start stops a running daily schedule.
   static Future<WallpaperResult> startWallpaperRotation(
     WallpaperRotationRequest request,
   ) async {
@@ -525,6 +527,161 @@ class AsyncWallpaper {
       failureMessage: 'Failed to rotate wallpaper now.',
       exceptionMessage: 'Unexpected exception while rotating wallpaper now.',
     );
+  }
+
+  /// Starts a daily schedule: each entry's wallpaper applies from its minute
+  /// of the day up to the next entry's minute, on the local clock.
+  ///
+  /// Android caches every source first and refuses the request when one
+  /// fails, so a running schedule or rotation stays as it was. Then it applies
+  /// the entry that owns the current time, stops any rotation, and arms one
+  /// inexact alarm for the next entry. The alarm can arrive some minutes late
+  /// under Doze. A reboot, a clock change, a time zone change, and an app
+  /// update apply the current entry and arm the alarm again.
+  ///
+  /// Starting rotation with [startWallpaperRotation] stops a daily schedule.
+  static Future<WallpaperResult> startDailySchedule(
+    DailyScheduleRequest request,
+  ) async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
+    final invalid = _validateDailySchedule(request);
+    if (invalid != null) {
+      return WallpaperResult.failure(
+        WallpaperError(code: WallpaperErrorCode.invalidInput, message: invalid),
+      );
+    }
+    final data = DailyScheduleRequestData(
+      entries: request.entries
+          .map(
+            (entry) => DailyScheduleEntryData(
+              minuteOfDay: entry.minuteOfDay,
+              source: RotationSourceData(
+                source: entry.source.source,
+                sourceType: rotationSourceTypeToData(entry.source.sourceType),
+              ),
+            ),
+          )
+          .toList(),
+      target: wallpaperTargetToData(request.target),
+    );
+    return _runLegacyBooleanOperation(
+      call: () => _api.startDailySchedule(data),
+      failureMessage: 'Failed to start the daily schedule.',
+      exceptionMessage:
+          'Unexpected exception while starting the daily schedule.',
+    );
+  }
+
+  /// Stops the daily schedule, cancels its alarm, and deletes its cache.
+  static Future<WallpaperResult> stopDailySchedule() async {
+    if (!_isAndroid) {
+      return _unsupportedResult;
+    }
+    return _runLegacyBooleanOperation(
+      call: _api.stopDailySchedule,
+      failureMessage: 'Failed to stop the daily schedule.',
+      exceptionMessage:
+          'Unexpected exception while stopping the daily schedule.',
+    );
+  }
+
+  /// Applies the entry that owns the current local time, unless it is
+  /// already the last entry applied, and arms the alarm again.
+  ///
+  /// Call it when the app opens. It also re-arms an alarm that a force stop
+  /// removed.
+  static Future<DailyScheduleApplyResult> applyCurrentScheduleEntry() async {
+    if (!_isAndroid) {
+      return const DailyScheduleApplyResult(
+        outcome: DailyScheduleApplyOutcome.unsupported,
+      );
+    }
+    try {
+      final data = await _api.applyCurrentScheduleEntry();
+      return DailyScheduleApplyResult(
+        outcome: switch (data.outcome) {
+          DailyScheduleApplyOutcomeData.applied =>
+            DailyScheduleApplyOutcome.applied,
+          DailyScheduleApplyOutcomeData.alreadyCurrent =>
+            DailyScheduleApplyOutcome.alreadyCurrent,
+          DailyScheduleApplyOutcomeData.notRunning =>
+            DailyScheduleApplyOutcome.notRunning,
+          DailyScheduleApplyOutcomeData.failed ||
+          null => DailyScheduleApplyOutcome.failed,
+        },
+        entryIndex: data.entryIndex,
+      );
+    } catch (_) {
+      return const DailyScheduleApplyResult(
+        outcome: DailyScheduleApplyOutcome.failed,
+      );
+    }
+  }
+
+  /// Returns which schedule runs, the entry that owns the current time, and
+  /// when the next switch is due.
+  ///
+  /// Off Android this returns [WallpaperScheduleMode.none]. If the platform
+  /// call throws, it returns the same snapshot with
+  /// [DailyScheduleStatus.lastError] set.
+  static Future<DailyScheduleStatus> getDailyScheduleStatus() async {
+    const none = DailyScheduleStatus(
+      mode: WallpaperScheduleMode.none,
+      entryCount: 0,
+      nextSwitchEpochMs: 0,
+    );
+    if (!_isAndroid) {
+      return none;
+    }
+    try {
+      final data = await _api.getDailyScheduleStatus();
+      return DailyScheduleStatus(
+        mode: switch (data.mode) {
+          WallpaperScheduleModeData.rotation => WallpaperScheduleMode.rotation,
+          WallpaperScheduleModeData.dailySchedule =>
+            WallpaperScheduleMode.dailySchedule,
+          WallpaperScheduleModeData.none || null => WallpaperScheduleMode.none,
+        },
+        entryCount: data.entryCount ?? 0,
+        nextSwitchEpochMs: data.nextSwitchEpochMs ?? 0,
+        currentEntryIndex: data.currentEntryIndex,
+        lastAppliedEntryIndex: data.lastAppliedEntryIndex,
+        lastError: data.lastError,
+      );
+    } catch (_) {
+      return const DailyScheduleStatus(
+        mode: WallpaperScheduleMode.none,
+        entryCount: 0,
+        nextSwitchEpochMs: 0,
+        lastError: 'Failed to get the daily schedule status.',
+      );
+    }
+  }
+
+  static String? _validateDailySchedule(DailyScheduleRequest request) {
+    final entries = request.entries;
+    if (entries.length < 2 || entries.length > _maxRotationSources) {
+      return 'A daily schedule needs 2 to $_maxRotationSources entries.';
+    }
+    if (entries.any((e) => e.minuteOfDay < 0 || e.minuteOfDay > 1439)) {
+      return 'Daily schedule minutes must be between 0 and 1439.';
+    }
+    if (entries.map((e) => e.minuteOfDay).toSet().length != entries.length) {
+      return 'Each daily schedule entry needs a different minute.';
+    }
+    if (entries.any((e) => e.source.source.trim().isEmpty)) {
+      return 'Daily schedule sources cannot be empty.';
+    }
+    if (entries.any(
+      (e) =>
+          e.source.sourceType == WallpaperSourceType.url &&
+          !_isHttpsUrl(e.source.source),
+    )) {
+      return 'Daily schedule URL sources must be valid HTTPS URLs.';
+    }
+    return null;
   }
 
   static Future<WallpaperOperationResult> _runOperation({

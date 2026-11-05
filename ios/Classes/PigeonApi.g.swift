@@ -191,6 +191,21 @@ enum RotationOrderData: Int {
   case shuffle = 1
 }
 
+/// The background wallpaper schedule that currently runs.
+enum WallpaperScheduleModeData: Int {
+  case none = 0
+  case rotation = 1
+  case dailySchedule = 2
+}
+
+/// What one apply of the current daily schedule entry did.
+enum DailyScheduleApplyOutcomeData: Int {
+  case applied = 0
+  case alreadyCurrent = 1
+  case notRunning = 2
+  case failed = 3
+}
+
 /// A static, content-provider, or in-memory wallpaper source.
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -773,6 +788,138 @@ struct WallpaperRotationStatusData: Hashable {
   }
 }
 
+/// Generated class from Pigeon that represents data sent in messages.
+struct DailyScheduleEntryData: Hashable {
+  var minuteOfDay: Int64? = nil
+  var source: RotationSourceData? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> DailyScheduleEntryData? {
+    let minuteOfDay: Int64? = nilOrValue(pigeonVar_list[0])
+    let source: RotationSourceData? = nilOrValue(pigeonVar_list[1])
+
+    return DailyScheduleEntryData(
+      minuteOfDay: minuteOfDay,
+      source: source
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      minuteOfDay,
+      source,
+    ]
+  }
+  static func == (lhs: DailyScheduleEntryData, rhs: DailyScheduleEntryData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct DailyScheduleRequestData: Hashable {
+  var entries: [DailyScheduleEntryData?]? = nil
+  var target: WallpaperTargetData? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> DailyScheduleRequestData? {
+    let entries: [DailyScheduleEntryData?]? = nilOrValue(pigeonVar_list[0])
+    let target: WallpaperTargetData? = nilOrValue(pigeonVar_list[1])
+
+    return DailyScheduleRequestData(
+      entries: entries,
+      target: target
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      entries,
+      target,
+    ]
+  }
+  static func == (lhs: DailyScheduleRequestData, rhs: DailyScheduleRequestData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct DailyScheduleStatusData: Hashable {
+  var mode: WallpaperScheduleModeData? = nil
+  var entryCount: Int64? = nil
+  var currentEntryIndex: Int64? = nil
+  var lastAppliedEntryIndex: Int64? = nil
+  var nextSwitchEpochMs: Int64? = nil
+  var lastError: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> DailyScheduleStatusData? {
+    let mode: WallpaperScheduleModeData? = nilOrValue(pigeonVar_list[0])
+    let entryCount: Int64? = nilOrValue(pigeonVar_list[1])
+    let currentEntryIndex: Int64? = nilOrValue(pigeonVar_list[2])
+    let lastAppliedEntryIndex: Int64? = nilOrValue(pigeonVar_list[3])
+    let nextSwitchEpochMs: Int64? = nilOrValue(pigeonVar_list[4])
+    let lastError: String? = nilOrValue(pigeonVar_list[5])
+
+    return DailyScheduleStatusData(
+      mode: mode,
+      entryCount: entryCount,
+      currentEntryIndex: currentEntryIndex,
+      lastAppliedEntryIndex: lastAppliedEntryIndex,
+      nextSwitchEpochMs: nextSwitchEpochMs,
+      lastError: lastError
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      mode,
+      entryCount,
+      currentEntryIndex,
+      lastAppliedEntryIndex,
+      nextSwitchEpochMs,
+      lastError,
+    ]
+  }
+  static func == (lhs: DailyScheduleStatusData, rhs: DailyScheduleStatusData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
+/// Generated class from Pigeon that represents data sent in messages.
+struct DailyScheduleApplyResultData: Hashable {
+  var outcome: DailyScheduleApplyOutcomeData? = nil
+  var entryIndex: Int64? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> DailyScheduleApplyResultData? {
+    let outcome: DailyScheduleApplyOutcomeData? = nilOrValue(pigeonVar_list[0])
+    let entryIndex: Int64? = nilOrValue(pigeonVar_list[1])
+
+    return DailyScheduleApplyResultData(
+      outcome: outcome,
+      entryIndex: entryIndex
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      outcome,
+      entryIndex,
+    ]
+  }
+  static func == (lhs: DailyScheduleApplyResultData, rhs: DailyScheduleApplyResultData) -> Bool {
+    return deepEqualsPigeonApi(lhs.toList(), rhs.toList())  }
+  func hash(into hasher: inout Hasher) {
+    deepHashPigeonApi(value: toList(), hasher: &hasher)
+  }
+}
+
 private class PigeonApiPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
@@ -825,31 +972,51 @@ private class PigeonApiPigeonCodecReader: FlutterStandardReader {
       }
       return nil
     case 137:
-      return WallpaperSourceData.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return WallpaperScheduleModeData(rawValue: enumResultAsInt)
+      }
+      return nil
     case 138:
-      return TargetResultData.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return DailyScheduleApplyOutcomeData(rawValue: enumResultAsInt)
+      }
+      return nil
     case 139:
-      return OperationResultData.fromList(self.readValue() as! [Any?])
+      return WallpaperSourceData.fromList(self.readValue() as! [Any?])
     case 140:
-      return WallpaperCapabilitiesData.fromList(self.readValue() as! [Any?])
+      return TargetResultData.fromList(self.readValue() as! [Any?])
     case 141:
-      return StaticWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return OperationResultData.fromList(self.readValue() as! [Any?])
     case 142:
-      return VideoWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return WallpaperCapabilitiesData.fromList(self.readValue() as! [Any?])
     case 143:
-      return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
+      return StaticWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 144:
-      return LiveScreenStateData.fromList(self.readValue() as! [Any?])
+      return VideoWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 145:
-      return LiveWallpaperScreensData.fromList(self.readValue() as! [Any?])
+      return OpenGlWallpaperRequestData.fromList(self.readValue() as! [Any?])
     case 146:
-      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
+      return LiveScreenStateData.fromList(self.readValue() as! [Any?])
     case 147:
-      return RotationSourceData.fromList(self.readValue() as! [Any?])
+      return LiveWallpaperScreensData.fromList(self.readValue() as! [Any?])
     case 148:
-      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
+      return MaterialYouSupportData.fromList(self.readValue() as! [Any?])
     case 149:
+      return RotationSourceData.fromList(self.readValue() as! [Any?])
+    case 150:
+      return WallpaperRotationConfigData.fromList(self.readValue() as! [Any?])
+    case 151:
       return WallpaperRotationStatusData.fromList(self.readValue() as! [Any?])
+    case 152:
+      return DailyScheduleEntryData.fromList(self.readValue() as! [Any?])
+    case 153:
+      return DailyScheduleRequestData.fromList(self.readValue() as! [Any?])
+    case 154:
+      return DailyScheduleStatusData.fromList(self.readValue() as! [Any?])
+    case 155:
+      return DailyScheduleApplyResultData.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -882,44 +1049,62 @@ private class PigeonApiPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? RotationOrderData {
       super.writeByte(136)
       super.writeValue(value.rawValue)
-    } else if let value = value as? WallpaperSourceData {
+    } else if let value = value as? WallpaperScheduleModeData {
       super.writeByte(137)
-      super.writeValue(value.toList())
-    } else if let value = value as? TargetResultData {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? DailyScheduleApplyOutcomeData {
       super.writeByte(138)
-      super.writeValue(value.toList())
-    } else if let value = value as? OperationResultData {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? WallpaperSourceData {
       super.writeByte(139)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperCapabilitiesData {
+    } else if let value = value as? TargetResultData {
       super.writeByte(140)
       super.writeValue(value.toList())
-    } else if let value = value as? StaticWallpaperRequestData {
+    } else if let value = value as? OperationResultData {
       super.writeByte(141)
       super.writeValue(value.toList())
-    } else if let value = value as? VideoWallpaperRequestData {
+    } else if let value = value as? WallpaperCapabilitiesData {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? OpenGlWallpaperRequestData {
+    } else if let value = value as? StaticWallpaperRequestData {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? LiveScreenStateData {
+    } else if let value = value as? VideoWallpaperRequestData {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? LiveWallpaperScreensData {
+    } else if let value = value as? OpenGlWallpaperRequestData {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? MaterialYouSupportData {
+    } else if let value = value as? LiveScreenStateData {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? RotationSourceData {
+    } else if let value = value as? LiveWallpaperScreensData {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationConfigData {
+    } else if let value = value as? MaterialYouSupportData {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? WallpaperRotationStatusData {
+    } else if let value = value as? RotationSourceData {
       super.writeByte(149)
+      super.writeValue(value.toList())
+    } else if let value = value as? WallpaperRotationConfigData {
+      super.writeByte(150)
+      super.writeValue(value.toList())
+    } else if let value = value as? WallpaperRotationStatusData {
+      super.writeByte(151)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleEntryData {
+      super.writeByte(152)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleRequestData {
+      super.writeByte(153)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleStatusData {
+      super.writeByte(154)
+      super.writeValue(value.toList())
+    } else if let value = value as? DailyScheduleApplyResultData {
+      super.writeByte(155)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -965,6 +1150,14 @@ protocol WallpaperApi {
   func stopWallpaperRotation(completion: @escaping (Result<Bool, Error>) -> Void)
   func getWallpaperRotationStatus(completion: @escaping (Result<WallpaperRotationStatusData, Error>) -> Void)
   func rotateWallpaperNow(completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Caches every entry, applies the one that owns the current local time,
+  /// stops rotation, and arms one alarm for the next entry.
+  func startDailySchedule(request: DailyScheduleRequestData, completion: @escaping (Result<Bool, Error>) -> Void)
+  func stopDailySchedule(completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Applies the entry that owns the current local time when it is not the
+  /// last one applied, then arms the alarm again.
+  func applyCurrentScheduleEntry(completion: @escaping (Result<DailyScheduleApplyResultData, Error>) -> Void)
+  func getDailyScheduleStatus(completion: @escaping (Result<DailyScheduleStatusData, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -1217,6 +1410,72 @@ class WallpaperApiSetup {
       }
     } else {
       rotateWallpaperNowChannel.setMessageHandler(nil)
+    }
+    /// Caches every entry, applies the one that owns the current local time,
+    /// stops rotation, and arms one alarm for the next entry.
+    let startDailyScheduleChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.startDailySchedule\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      startDailyScheduleChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let requestArg = args[0] as! DailyScheduleRequestData
+        api.startDailySchedule(request: requestArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      startDailyScheduleChannel.setMessageHandler(nil)
+    }
+    let stopDailyScheduleChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.stopDailySchedule\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      stopDailyScheduleChannel.setMessageHandler { _, reply in
+        api.stopDailySchedule { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      stopDailyScheduleChannel.setMessageHandler(nil)
+    }
+    /// Applies the entry that owns the current local time when it is not the
+    /// last one applied, then arms the alarm again.
+    let applyCurrentScheduleEntryChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.applyCurrentScheduleEntry\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      applyCurrentScheduleEntryChannel.setMessageHandler { _, reply in
+        api.applyCurrentScheduleEntry { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      applyCurrentScheduleEntryChannel.setMessageHandler(nil)
+    }
+    let getDailyScheduleStatusChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.async_wallpaper.WallpaperApi.getDailyScheduleStatus\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getDailyScheduleStatusChannel.setMessageHandler { _, reply in
+        api.getDailyScheduleStatus { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      getDailyScheduleStatusChannel.setMessageHandler(nil)
     }
   }
 }

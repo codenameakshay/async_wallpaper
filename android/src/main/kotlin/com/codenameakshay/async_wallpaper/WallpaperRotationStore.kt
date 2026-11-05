@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.json.JSONArray
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -238,4 +239,14 @@ internal object WallpaperRotationCoordinator {
   private val transactionLock = ReentrantLock()
 
   fun <T> withLock(action: () -> T): T = transactionLock.withLock(action)
+
+  /** Runs [action] only when the lock frees up within [timeoutMs]; null when it does not. */
+  fun <T> tryWithLock(timeoutMs: Long, action: () -> T): T? {
+    if (!transactionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) return null
+    try {
+      return action()
+    } finally {
+      transactionLock.unlock()
+    }
+  }
 }

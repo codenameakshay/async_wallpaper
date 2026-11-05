@@ -132,23 +132,36 @@ class PigeonApiImpl(
       }
       WallpaperRotationCoordinator.withLock {
         runCatching {
+          val dailySnapshot = DailyScheduleRunner.snapshot(appContext)
+          fun rollbackStart() {
+            rollbackStartedRotation(
+              rollbackRotation = { rollbackFailedRotationStart() },
+              rotationIsRunning = { rotationStore.isRunning() },
+              restoreDailySchedule = {
+                DailyScheduleRunner.restoreAfterFailedRotation(appContext, dailySnapshot)
+              },
+              ensureDailyStopped = { DailyScheduleRunner.stop(appContext) },
+            )
+          }
           when (rotationEngine.startRotation(config)) {
             RotationStartResult.STARTED -> {
               try {
                 reconcileRotationTriggers()
+                check(DailyScheduleRunner.suspendForRotation(appContext)) { "Unable to stop the daily schedule." }
+                DailyScheduleRunner.clearStoppedCache(appContext)
                 true
               } catch (error: Exception) {
                 // The wallpaper is already applied but the schedules are unknown; report failure and
                 // tear the rotation down rather than leaving a half-armed trigger set.
                 Log.e(TAG, "Rotation started but trigger reconciliation failed", error)
-                rollbackFailedRotationStart()
+                rollbackStart()
                 false
               }
             }
             // Only a start that already persisted a new configuration may roll back, so a rejected
             // request cannot stop a rotation that is still running.
             RotationStartResult.FAILED_AFTER_SAVE -> {
-              rollbackFailedRotationStart()
+              rollbackStart()
               false
             }
             RotationStartResult.REJECTED -> false
@@ -165,17 +178,7 @@ class PigeonApiImpl(
     enqueueBoolean(callback) {
       WallpaperRotationCoordinator.withLock {
         runCatching {
-          if (!rotationStore.stopRotation()) {
-            return@runCatching false
-          }
-          completeScheduleReconciliation(
-            awaitOperations = {
-              WallpaperRotationScheduler.await(WallpaperRotationScheduler.reconcile(appContext, rotationStore))
-            },
-            clearPending = { rotationStore.clearSchedulesPending() },
-          )
-          rotationEngine.clearRotationCache()
-          true
+          WallpaperRotationRunner.stop(appContext)
         }.getOrElse {
           Log.e(TAG, "stopWallpaperRotation failed", it)
           false
@@ -251,6 +254,57 @@ class PigeonApiImpl(
         }
       }
     }
+  }
+
+  override fun startDailySchedule(
+    request: DailyScheduleRequestData,
+    callback: (Result<Boolean>) -> Unit,
+  ) {
+    enqueueBoolean(callback) {
+      runCatching { DailyScheduleRunner.start(appContext, request) }.getOrElse {
+        Log.e(TAG, "startDailySchedule failed", it)
+        false
+      }
+    }
+  }
+
+  override fun stopDailySchedule(callback: (Result<Boolean>) -> Unit) {
+    enqueueBoolean(callback) {
+      runCatching { DailyScheduleRunner.stop(appContext) }.getOrElse {
+        Log.e(TAG, "stopDailySchedule failed", it)
+        false
+      }
+    }
+  }
+
+  override fun applyCurrentScheduleEntry(callback: (Result<DailyScheduleApplyResultData>) -> Unit) {
+    operationQueue.submit(
+      operation = { DailyScheduleRunner.applyCurrent(appContext) },
+      callback = { result ->
+        postCallback(
+          callback,
+          Result.success(
+            result.getOrElse {
+              Log.e(TAG, "applyCurrentScheduleEntry failed", it)
+              DailyScheduleApplyResultData(outcome = DailyScheduleApplyOutcomeData.FAILED)
+            },
+          ),
+        )
+      },
+    )
+  }
+
+  override fun getDailyScheduleStatus(callback: (Result<DailyScheduleStatusData>) -> Unit) {
+    val status = runCatching { DailyScheduleRunner.status(appContext) }.getOrElse {
+      Log.e(TAG, "getDailyScheduleStatus failed", it)
+      DailyScheduleStatusData(
+        mode = WallpaperScheduleModeData.NONE,
+        entryCount = 0L,
+        nextSwitchEpochMs = 0L,
+        lastError = it.message,
+      )
+    }
+    callback(Result.success(status))
   }
 
   override fun applyWallpaper(

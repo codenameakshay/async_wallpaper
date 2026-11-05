@@ -1,6 +1,6 @@
 # Android compatibility
 
-This page describes the Android contract for `async_wallpaper` 3.6. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
+This page describes the Android contract for `async_wallpaper` 3.7. It is deliberately capability- and result-driven: Android wallpaper support is affected by API level, device policy, installed system UI, and OEM behavior, so no static compatibility list can replace `getCapabilities()` and the returned operation result.
 
 ## Baseline and capability check
 
@@ -150,6 +150,25 @@ Consequently:
 - `cancelled`, `unsupported`, and `failed` must remain visible to the user/app; do not replace them with a success toast.
 
 This limitation is documented rather than hidden because Android does not expose a portable API to force a live-wallpaper target across OEM preview implementations.
+
+### Per-screen OpenGL content on Android 16
+
+Android 16 (API 36) adds wallpaper descriptions. With them, the OpenGL live wallpaper can show different content on Home and Lock. The flow is:
+
+- The user still chooses Home, Lock, or both in the system preview. The app cannot set one screen directly. `WallpaperManager.setWallpaperComponentWithDescription` needs the system-only `SET_WALLPAPER_COMPONENT` permission.
+- Each running engine reads its own screen from `Engine.getWallpaperFlags()` and the system's id for that screen from `WallpaperManager.getWallpaperId()`. Android issues a new id each time the user sets a screen. An engine that sees a new id takes the content the app staged for the preview. An engine that sees the id it recorded before (after a process restart, for example) keeps that screen's content. Applying new content to one screen does not change the other screen.
+- The stock AOSP live picker (`com.android.wallpaper.livepicker`, which handles `ACTION_CHANGE_LIVE_WALLPAPER`) sets the wallpaper with `setWallpaperComponentWithFlags` and never calls [`onApplyWallpaper(which)`](https://developer.android.com/reference/android/service/wallpaper/WallpaperService.Engine#onApplyWallpaper(int)). The screen-id records above are what make per-screen content work there. Verified on the Android 16 (API 36) Pixel emulator image.
+- A picker that does call `onApplyWallpaper(which)` gets a `WallpaperDescription` with the shader, frame rate, the app-private texture directory, and the caller's `contentTag`. Android saves it for the chosen screens and passes it to that screen's engine, which then draws that content.
+- Each screen keeps its own textures. Two engines can hold textures at the same time, so memory use can double while both screens use this wallpaper. Each engine draws frames only while it is visible.
+- Call `AsyncWallpaper.getLiveWallpaperScreens()` after the preview closes. It reports `perScreen` and, for Home and Lock, whether this wallpaper is shown and which `contentTag` it has. Unsupported platforms return an empty snapshot.
+
+On Android 15 (API 35) and older, or in a build that turns the `android.app.Flags.liveWallpaperContentHandling` flag off, nothing changes. All OpenGL engines share the most recently applied content. `WallpaperOperationResult.effectiveTarget` is `both`, which tells the app that the requested target fell back to both screens. Video live wallpapers always share content on both screens. On iOS, `supportsPerScreenLiveWallpaper` is false.
+
+References:
+
+- [Android 16 features](https://developer.android.com/about/versions/16/features), including live wallpaper content handling.
+- [`WallpaperDescription`](https://developer.android.com/reference/android/app/wallpaper/WallpaperDescription).
+- [`WallpaperService.Engine.onApplyWallpaper(int)`](https://developer.android.com/reference/android/service/wallpaper/WallpaperService.Engine#onApplyWallpaper(int)).
 
 ## OpenGL live wallpapers
 

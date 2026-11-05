@@ -77,6 +77,13 @@ class _FakeWallpaperDemoApi implements WallpaperDemoApi {
     return Future<WallpaperOperationResult>.value(openGlResult);
   }
 
+  LiveWallpaperScreens screens = const LiveWallpaperScreens();
+
+  @override
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens() {
+    return Future<LiveWallpaperScreens>.value(screens);
+  }
+
   @override
   Future<WallpaperOperationResult> setVideoWallpaper(
     VideoWallpaperRequest request,

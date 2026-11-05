@@ -2,9 +2,11 @@ package com.codenameakshay.async_wallpaper
 
 import android.app.ActivityManager
 import android.app.WallpaperManager
+import android.app.wallpaper.WallpaperDescription
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -14,6 +16,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
+import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -137,6 +140,7 @@ class OpenGlWallpaperConfiguration(
   val fragmentShader: String,
   textures: List<GlTextureSource> = emptyList(),
   val frameRate: Int = DEFAULT_FRAME_RATE,
+  val contentTag: String? = null,
 ) {
   val textures: List<GlTextureSource> = textures.toList()
 
@@ -180,6 +184,15 @@ internal class LoadedOpenGlConfiguration internal constructor(
 ) : AutoCloseable {
   private val closed = AtomicBoolean(false)
 
+  /** The description payload that lets another engine render exactly this configuration. */
+  fun toScreenContent(): LiveScreenContent = LiveScreenContent(
+    fragmentShader = configuration.fragmentShader,
+    frameRate = configuration.frameRate,
+    textureDirectory = generationDirectory?.name,
+    textureCount = configuration.textures.size,
+    contentTag = configuration.contentTag,
+  )
+
   override fun close() {
     if (closed.compareAndSet(false, true)) {
       generationDirectory?.let(OpenGlWallpaperConfigurationStore::releaseGeneration)
@@ -192,19 +205,83 @@ internal class LoadedOpenGlConfiguration internal constructor(
  * one HandlerThread. It intentionally does not contact the network or invoke Flutter callbacks.
  */
 class OpenGlLiveWallpaper : WallpaperService() {
+  private val perScreen: Boolean by lazy { AndroidCapabilities.supportsPerScreenLiveWallpaper() }
+
   override fun onCreateEngine(): Engine {
     return OpenGlEngine(
       OpenGlWallpaperConfigurationStore.load(applicationContext),
+      described = null,
+    )
+  }
+
+  /**
+   * Android 16 passes the description it saved for this screen. A description this plugin wrote
+   * pins the engine to that content. Any other description, such as the component-only one the
+   * stock live picker saves, starts from the staged configuration until the engine knows its
+   * screen.
+   */
+  override fun onCreateEngine(description: WallpaperDescription): Engine {
+    val content = LiveScreenDescriptions.read(description) ?: return onCreateEngine()
+    return OpenGlEngine(
+      OpenGlWallpaperConfigurationStore.loadScreenContent(applicationContext, content),
+      described = content,
     )
   }
 
   private inner class OpenGlEngine(
     configuration: LoadedOpenGlConfiguration,
+    private val described: LiveScreenContent?,
   ) : Engine() {
+    @Volatile
+    private var screenContent = configuration.toScreenContent()
     private val renderThread = WallpaperRenderThread(applicationContext, configuration)
 
     init {
       setTouchEventsEnabled(true)
+    }
+
+    override fun onCreate(surfaceHolder: SurfaceHolder) {
+      super.onCreate(surfaceHolder)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && perScreen && !isPreview) {
+        adoptScreenContent()
+      }
+    }
+
+    override fun onWallpaperFlagsChanged(which: Int) {
+      super.onWallpaperFlagsChanged(which)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && perScreen && !isPreview) {
+        recordScreens(screenContent)
+      }
+    }
+
+    /** Keeps this screen's own content across restarts and takes the staged content after a new set. */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    private fun adoptScreenContent() {
+      val wallpaperIds = currentWallpaperIds()
+      val primary = wallpaperIds.keys.firstOrNull() ?: return
+      val records = OpenGlWallpaperConfigurationStore.screenRecords(applicationContext)
+      val chosen = chooseScreenContent(described, records[primary], wallpaperIds.getValue(primary), screenContent)
+      if (chosen != screenContent) {
+        screenContent = chosen
+        renderThread.configurationChanged(OpenGlWallpaperConfigurationStore.loadScreenContent(applicationContext, chosen))
+      }
+      OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, wallpaperIds, chosen)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    private fun recordScreens(content: LiveScreenContent) {
+      val wallpaperIds = currentWallpaperIds()
+      if (wallpaperIds.isNotEmpty()) {
+        OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, wallpaperIds, content)
+      }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    private fun currentWallpaperIds(): Map<LiveScreen, Int> {
+      val manager = WallpaperManager.getInstance(applicationContext)
+      return LiveScreen.fromFlags(wallpaperFlags).associateWith { screen ->
+        runCatching { manager.getWallpaperId(screen.flag) }.getOrDefault(-1)
+      }
     }
 
     override fun onSurfaceCreated(holder: SurfaceHolder) {
@@ -242,7 +319,11 @@ class OpenGlLiveWallpaper : WallpaperService() {
       super.onTouchEvent(event)
     }
 
-    /** Loads the newly saved configuration when the user confirms this same component again. */
+    /**
+     * Android sends this when the user sets this same component on this engine's screen again, so
+     * it loads the staged configuration. Only this engine's screen changes. An engine pinned by
+     * its description keeps that content.
+     */
     override fun onCommand(
       action: String?,
       x: Int,
@@ -251,11 +332,23 @@ class OpenGlLiveWallpaper : WallpaperService() {
       extras: Bundle?,
       resultRequested: Boolean,
     ): Bundle? {
-      if (action == WALLPAPER_COMMAND_REAPPLY) {
-        renderThread.configurationChanged(OpenGlWallpaperConfigurationStore.load(applicationContext))
+      if (action == WALLPAPER_COMMAND_REAPPLY && described == null) {
+        val reloaded = OpenGlWallpaperConfigurationStore.load(applicationContext)
+        screenContent = reloaded.toScreenContent()
+        renderThread.configurationChanged(reloaded)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && perScreen && !isPreview) {
+          recordScreens(screenContent)
+        }
       }
       return super.onCommand(action, x, y, z, extras, resultRequested)
     }
+
+    /**
+     * A picker that supports descriptions calls this on the preview engine after the user picks
+     * Home, Lock, or both. The system saves the returned description for those screens and hands
+     * it back to [onCreateEngine].
+     */
+    override fun onApplyWallpaper(which: Int): WallpaperDescription? = LiveScreenDescriptions.build(screenContent)
 
     override fun onDestroy() {
       renderThread.shutdown()
@@ -818,6 +911,8 @@ internal object OpenGlWallpaperConfigurationStore {
   private const val KEY_FRAME_RATE = "frame_rate"
   private const val KEY_TEXTURE_COUNT = "texture_count"
   private const val KEY_TEXTURE_PATH_PREFIX = "texture_path_"
+  private const val KEY_CONTENT_TAG = "content_tag"
+  private const val KEY_SCREEN_WALLPAPER_ID = "wallpaper_id"
   private const val TEXTURE_DIRECTORY = "async_wallpaper_opengl"
   private const val TEXTURE_FILE_SUFFIX = ".texture"
   // Staging reads are deliberately outside this lock; only preference snapshots and commits use it.
@@ -840,19 +935,98 @@ internal object OpenGlWallpaperConfigurationStore {
     }
     val generationDirectory = generationDirectoryFor(context, textures, count)
       ?: if (count == 0) null else return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
-    val configuration = OpenGlWallpaperConfiguration(shader, textures, frameRate)
+    val tag = preferences.getString(KEY_CONTENT_TAG, null)
+    leaseIfValid(OpenGlWallpaperConfiguration(shader, textures, frameRate, tag), generationDirectory)
+  }
+
+  /**
+   * Loads the content one screen's description names. A missing or tampered texture directory
+   * falls back to the default shader, never to the staged slot, so one screen cannot pick up
+   * the content meant for the other.
+   */
+  fun loadScreenContent(context: Context, content: LiveScreenContent): LoadedOpenGlConfiguration =
+    configurationLock.withLock {
+      val directory = content.textureDirectory?.let { name ->
+        File(File(context.filesDir, TEXTURE_DIRECTORY), name)
+      }
+      val textures = List(content.textureCount) { index ->
+        GlTextureSource.FilePath(File(directory, "$index$TEXTURE_FILE_SUFFIX").path)
+      }
+      val generationDirectory = if (content.textureCount == 0) {
+        null
+      } else {
+        generationDirectoryFor(context, textures, content.textureCount)
+          ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
+      }
+      leaseIfValid(
+        OpenGlWallpaperConfiguration(content.fragmentShader, textures, content.frameRate, content.contentTag),
+        generationDirectory,
+      )
+    }
+
+  private fun leaseIfValid(
+    configuration: OpenGlWallpaperConfiguration,
+    generationDirectory: File?,
+  ): LoadedOpenGlConfiguration {
     val validation = ShaderProgramValidator.validate(
       fragmentShader = configuration.fragmentShader,
       textures = configuration.textures.map { source -> source.validationInput() },
       frameRate = configuration.frameRate.toLong(),
       openGlEs2Available = true,
     )
-    if (validation.isValid) {
+    return if (validation.isValid) {
       generationDirectory?.let(OpenGlGenerationLeases::acquire)
       LoadedOpenGlConfiguration(configuration, generationDirectory)
     } else {
       LoadedOpenGlConfiguration(defaultConfiguration(), null)
     }
+  }
+
+  /** Remembers what each screen's engine draws, so its textures survive cleanup and callers can ask. */
+  fun recordScreens(context: Context, wallpaperIds: Map<LiveScreen, Int>, content: LiveScreenContent) =
+    configurationLock.withLock {
+      val editor = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).edit()
+      wallpaperIds.forEach { (screen, wallpaperId) ->
+        val prefix = screenPrefix(screen)
+        LiveScreenContent.keys.forEach { key -> editor.remove("$prefix$key") }
+        editor.putInt("$prefix$KEY_SCREEN_WALLPAPER_ID", wallpaperId)
+        content.toEntries().forEach { (key, value) ->
+          when (value) {
+            is String -> editor.putString("$prefix$key", value)
+            is Int -> editor.putInt("$prefix$key", value)
+          }
+        }
+      }
+      editor.commit()
+    }
+
+  fun screenRecords(context: Context): Map<LiveScreen, LiveScreenRecord> = configurationLock.withLock {
+    screenRecords(context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE))
+  }
+
+  private fun screenRecords(preferences: android.content.SharedPreferences): Map<LiveScreen, LiveScreenRecord> {
+    val values = preferences.all
+    return LiveScreen.entries.mapNotNull { screen ->
+      val prefix = screenPrefix(screen)
+      val wallpaperId = values["$prefix$KEY_SCREEN_WALLPAPER_ID"] as? Int ?: return@mapNotNull null
+      val content = LiveScreenContent.fromEntries(
+        LiveScreenContent.keys.associateWith { key -> values["$prefix$key"] },
+      ) ?: return@mapNotNull null
+      screen to LiveScreenRecord(wallpaperId, content)
+    }.toMap()
+  }
+
+  private fun screenPrefix(screen: LiveScreen) = "screen.${screen.name.lowercase()}."
+
+  private fun recordedScreenDirectories(
+    preferences: android.content.SharedPreferences,
+    rootDirectory: File,
+  ): Set<File> = screenRecords(preferences).values.mapNotNullTo(HashSet()) { record ->
+    record.content.textureDirectory?.let { name -> File(rootDirectory, name) }
+  }
+
+  private fun putOrRemove(editor: android.content.SharedPreferences.Editor, key: String, value: String?) {
+    if (value == null) editor.remove(key) else editor.putString(key, value)
   }
 
   @Throws(IOException::class, TextureStorageException::class)
@@ -898,6 +1072,7 @@ internal object OpenGlWallpaperConfigurationStore {
           configuration.fragmentShader,
           persistedTextures.map(GlTextureSource::FilePath),
           configuration.frameRate,
+          configuration.contentTag,
         ),
         rootDirectory = rootDirectory,
         generationDirectory = generationDirectory,
@@ -926,6 +1101,7 @@ internal object OpenGlWallpaperConfigurationStore {
           .putString(KEY_SHADER, prepared.configuration.fragmentShader)
           .putInt(KEY_FRAME_RATE, prepared.configuration.frameRate)
           .putInt(KEY_TEXTURE_COUNT, prepared.texturePaths.size)
+        putOrRemove(editor, KEY_CONTENT_TAG, prepared.configuration.contentTag)
         repeat(ShaderProgramValidator.MAX_TEXTURE_COUNT) { index ->
           val path = prepared.texturePaths.getOrNull(index)
           if (path == null) {
@@ -973,7 +1149,8 @@ internal object OpenGlWallpaperConfigurationStore {
       } else {
         null
       }
-      val protected = OpenGlGenerationLeases.protectedDirectories()
+      val protected = OpenGlGenerationLeases.protectedDirectories() +
+        recordedScreenDirectories(preferences, rootDirectory)
       obsoleteOpenGlGenerationDirectories(rootDirectory, activeDirectory, protected)
     }
     candidates.forEach { directory -> deleteOpenGlGenerationDirectory(rootDirectory, directory) }
@@ -1024,6 +1201,7 @@ internal object OpenGlWallpaperConfigurationStore {
       add(KEY_SHADER)
       add(KEY_FRAME_RATE)
       add(KEY_TEXTURE_COUNT)
+      add(KEY_CONTENT_TAG)
       repeat(ShaderProgramValidator.MAX_TEXTURE_COUNT) { index ->
         add("$KEY_TEXTURE_PATH_PREFIX$index")
       }
@@ -1064,7 +1242,7 @@ internal object OpenGlWallpaperConfigurationStore {
 
 private class TextureStorageException(message: String) : IOException(message)
 
-private const val OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX = "configuration-"
+internal const val OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX = "configuration-"
 
 internal fun obsoleteOpenGlGenerationDirectories(
   rootDirectory: File,

@@ -41,6 +41,7 @@ object AndroidCapabilities {
       supportsLiveWallpaper = supportsLive,
       supportsOpenGlLiveWallpaper = supportsOpenGl,
       supportsTilt = supportsOpenGl && TiltSensor.isAvailable(appContext),
+      supportsPerScreenLiveWallpaper = supportsOpenGl && supportsPerScreenLiveWallpaper(),
       supportsHomeWallpaper = staticSupport.canApplyDirectly,
       supportsLockWallpaper = staticSupport.canApplyDirectly,
       supportsBothWallpapers = staticSupport.canApplyDirectly,
@@ -77,6 +78,21 @@ object AndroidCapabilities {
       resolves(appContext.packageManager, Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)) &&
       hasWallpaperService(appContext, OpenGlLiveWallpaper::class.java) &&
       OpenGlLiveWallpaper.isOpenGlEs2Supported(appContext)
+  }
+
+  /**
+   * Android 16 ships wallpaper descriptions behind `android.app.Flags.liveWallpaperContentHandling`.
+   * A build that turns the flag off never hands descriptions to engines. The flag class is not
+   * public, so an unreadable flag counts as on: the public API 36 SDK only ships enabled flags.
+   */
+  fun supportsPerScreenLiveWallpaper(): Boolean {
+    if (Build.VERSION.SDK_INT < PerScreenLiveSupport.MIN_SDK) {
+      return false
+    }
+    val contentHandling = runCatching {
+      Class.forName("android.app.Flags").getMethod("liveWallpaperContentHandling").invoke(null) as Boolean
+    }.getOrDefault(true)
+    return PerScreenLiveSupport.isSupported(Build.VERSION.SDK_INT, contentHandling)
   }
 
   fun resolves(packageManager: PackageManager, intent: Intent): Boolean {

@@ -223,6 +223,7 @@ class WallpaperOperationResult {
     this.errorDetails,
     this.fallbackUsed = false,
     this.fallbackStrategy,
+    this.effectiveTarget,
   });
 
   final WallpaperOperationStatus status;
@@ -234,6 +235,13 @@ class WallpaperOperationResult {
   final String? errorDetails;
   final bool fallbackUsed;
   final WallpaperApplyStrategy? fallbackStrategy;
+
+  /// The screens a live wallpaper's content can reach, when the platform reports it.
+  ///
+  /// An OpenGL live wallpaper reports [requestedTarget] on Android 16 and later,
+  /// where Home and Lock keep separate content. Older Android shares one live
+  /// content between both screens, so it reports [WallpaperTarget.both].
+  final WallpaperTarget? effectiveTarget;
 }
 
 /// Capability snapshot reported by the platform implementation.
@@ -253,6 +261,7 @@ class WallpaperCapabilities {
     this.openGlVersion,
     this.openGlRenderer,
     this.supportsTilt = false,
+    this.supportsPerScreenLiveWallpaper = false,
   });
 
   final bool supportsStaticWallpaper;
@@ -274,6 +283,13 @@ class WallpaperCapabilities {
   /// `u_tilt` runs from -1 to 1 on each axis and is (0, 0) while the phone rests. Plugin version
   /// 3.5.0 accepts it as a generic uniform initialized to (0, 0).
   final bool supportsTilt;
+
+  /// True when the OpenGL live wallpaper can show different content on Home and Lock.
+  ///
+  /// It needs Android 16 (API 36) with wallpaper descriptions turned on. The
+  /// system preview still asks the user which screen to set; read
+  /// [AsyncWallpaper.getLiveWallpaperScreens] afterwards to learn the result.
+  final bool supportsPerScreenLiveWallpaper;
 }
 
 /// Typed request for a video live wallpaper.
@@ -301,12 +317,18 @@ class OpenGlLiveWallpaperRequest {
     this.target = WallpaperTarget.home,
     this.frameRate = 60,
     this.goToHome = false,
+    this.contentTag,
   }) : _textures = List<WallpaperSource>.unmodifiable(textures);
 
   final String fragmentShader;
   final List<WallpaperSource> _textures;
   final WallpaperTarget target;
   final int frameRate;
+
+  /// An opaque label, at most 256 characters, that
+  /// [AsyncWallpaper.getLiveWallpaperScreens] reports for each screen showing
+  /// this content.
+  final String? contentTag;
 
   /// Retained only for source compatibility since 3.2.0; ignored by the engine.
   final bool goToHome;
@@ -316,6 +338,31 @@ class OpenGlLiveWallpaperRequest {
   /// `texture2D(u_texture0, v_uv)` shows the first texture upright: `v_uv`
   /// (0, 0) is the bottom-left corner of both the screen and the image.
   List<WallpaperSource> get textures => _textures;
+}
+
+/// What one screen shows, as far as this app's OpenGL live wallpaper is concerned.
+class LiveScreenState {
+  const LiveScreenState({this.showsThisWallpaper = false, this.contentTag});
+
+  /// True when this app's OpenGL live wallpaper is on the screen.
+  final bool showsThisWallpaper;
+
+  /// The [OpenGlLiveWallpaperRequest.contentTag] the screen received, if known.
+  final String? contentTag;
+}
+
+/// The OpenGL live wallpaper content on the Home and Lock Screens.
+class LiveWallpaperScreens {
+  const LiveWallpaperScreens({
+    this.perScreen = false,
+    this.home = const LiveScreenState(),
+    this.lock = const LiveScreenState(),
+  });
+
+  /// True when Home and Lock can show different content.
+  final bool perScreen;
+  final LiveScreenState home;
+  final LiveScreenState lock;
 }
 
 /// Rotation ordering strategy.

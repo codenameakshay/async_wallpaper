@@ -1051,6 +1051,15 @@ internal object OpenGlWallpaperConfigurationStore {
     if (value == null) editor.remove(key) else editor.putString(key, value)
   }
 
+  internal fun createStagedGeneration(generationDirectory: File) {
+    configurationLock.withLock {
+      OpenGlGenerationLeases.registerStaged(generationDirectory)
+      if (!generationDirectory.mkdir()) {
+        throw IOException("Unable to allocate OpenGL texture storage.")
+      }
+    }
+  }
+
   @Throws(IOException::class, TextureStorageException::class)
   fun stage(context: Context, configuration: OpenGlWallpaperConfiguration): OpenGlPreparedConfiguration {
     if (configuration.textures.isEmpty()) {
@@ -1073,11 +1082,8 @@ internal object OpenGlWallpaperConfigurationStore {
       rootDirectory,
       "$OPEN_GL_CONFIGURATION_DIRECTORY_PREFIX${UUID.randomUUID()}",
     )
-    OpenGlGenerationLeases.registerStaged(generationDirectory)
     try {
-      if (!generationDirectory.mkdir()) {
-        throw IOException("Unable to allocate OpenGL texture storage.")
-      }
+      createStagedGeneration(generationDirectory)
       val persistedTextures = configuration.textures.mapIndexed { index, source ->
         val bytes = readSource(context, source)
         val destination = File(generationDirectory, "$index$TEXTURE_FILE_SUFFIX")
@@ -1163,8 +1169,11 @@ internal object OpenGlWallpaperConfigurationStore {
   }
 
   private fun cleanupObsoleteGenerations(context: Context, rootDirectory: File) {
-    val candidates = configurationLock.withLock {
-      val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    cleanupObsoleteGenerations(context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE), rootDirectory)
+  }
+
+  internal fun cleanupObsoleteGenerations(preferences: android.content.SharedPreferences, rootDirectory: File) {
+    configurationLock.withLock {
       val count = preferences.getInt(KEY_TEXTURE_COUNT, 0)
       val activeDirectory = if (count in 1..ShaderProgramValidator.MAX_TEXTURE_COUNT) {
         preferences.getString("${KEY_TEXTURE_PATH_PREFIX}0", null)?.let { File(it).parentFile?.canonicalFile }
@@ -1173,9 +1182,9 @@ internal object OpenGlWallpaperConfigurationStore {
       }
       val protected = OpenGlGenerationLeases.protectedDirectories() +
         recordedScreenDirectories(preferences, rootDirectory)
-      obsoleteOpenGlGenerationDirectories(rootDirectory, activeDirectory, protected)
+      val candidates = obsoleteOpenGlGenerationDirectories(rootDirectory, activeDirectory, protected)
+      candidates.forEach { directory -> deleteOpenGlGenerationDirectory(rootDirectory, directory) }
     }
-    candidates.forEach { directory -> deleteOpenGlGenerationDirectory(rootDirectory, directory) }
   }
 
   private fun generationDirectoryFor(

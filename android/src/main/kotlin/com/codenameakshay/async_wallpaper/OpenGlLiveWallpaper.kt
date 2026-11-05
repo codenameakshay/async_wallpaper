@@ -242,6 +242,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
    * stock live picker saves, starts from the staged configuration until the engine knows its
    * screen.
    */
+  @RequiresApi(Build.VERSION_CODES.BAKLAVA)
   override fun onCreateEngine(description: WallpaperDescription): Engine {
     val content = LiveScreenDescriptions.read(description) ?: return onCreateEngine()
     return OpenGlEngine(
@@ -270,6 +271,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
       }
     }
 
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     override fun onWallpaperFlagsChanged(which: Int) {
       super.onWallpaperFlagsChanged(which)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && perScreen && !isPreview) {
@@ -373,6 +375,7 @@ class OpenGlLiveWallpaper : WallpaperService() {
      * Home, Lock, or both. The system saves the returned description for those screens and hands
      * it back to [onCreateEngine].
      */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     override fun onApplyWallpaper(which: Int): WallpaperDescription? {
       val content = screenContent
       OpenGlWallpaperConfigurationStore.recordScreens(applicationContext, describedScreenIds(which), content)

@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import java.io.File
 import java.io.IOException
@@ -649,9 +650,15 @@ class PigeonApiImpl(
     callback(runCatching { liveWallpaperScreens() })
   }
 
-  private fun liveWallpaperScreens(): LiveWallpaperScreensData = liveWallpaperScreensSnapshot(
-    perScreen = AndroidCapabilities.supportsPerScreenLiveWallpaper(),
-  ) {
+  private fun liveWallpaperScreens(): LiveWallpaperScreensData =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+      liveWallpaperScreensSnapshot(AndroidCapabilities.supportsPerScreenLiveWallpaper(), ::readLiveWallpaperScreens)
+    } else {
+      liveWallpaperScreensSnapshot(perScreen = false) { LiveWallpaperScreensData() }
+    }
+
+  @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+  private fun readLiveWallpaperScreens(): LiveWallpaperScreensData {
     val manager = WallpaperManager.getInstance(appContext)
     val ours = ComponentName(appContext, OpenGlLiveWallpaper::class.java)
     fun showsOurs(which: Int): Boolean =
@@ -672,7 +679,7 @@ class PigeonApiImpl(
       lockRecord = records[LiveScreen.LOCK],
     )
     fun data(state: LiveScreenState?) = LiveScreenStateData(state?.showsThisWallpaper ?: false, state?.contentTag)
-    LiveWallpaperScreensData(
+    return LiveWallpaperScreensData(
       home = data(screens[LiveScreen.HOME]),
       lock = data(screens[LiveScreen.LOCK]),
     )

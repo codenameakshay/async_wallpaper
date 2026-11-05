@@ -344,4 +344,71 @@ void main() {
       RotationOrderData.shuffle,
     );
   });
+
+  test('maps supportsPerScreenLiveWallpaper with a false default', () {
+    final capabilities = capabilitiesFromData(
+      WallpaperCapabilitiesData(supportsPerScreenLiveWallpaper: true),
+    );
+    final defaults = capabilitiesFromData(WallpaperCapabilitiesData());
+
+    expect(capabilities.supportsPerScreenLiveWallpaper, isTrue);
+    expect(defaults.supportsPerScreenLiveWallpaper, isFalse);
+  });
+
+  test('maps effectiveTarget and keeps requestedTarget separate', () {
+    final result = operationResultFromData(
+      OperationResultData(
+        status: OperationStatusData.previewOpened,
+        requestedTarget: WallpaperTargetData.lock,
+        effectiveTarget: WallpaperTargetData.both,
+      ),
+    );
+    final unresolved = operationResultFromData(
+      OperationResultData(
+        status: OperationStatusData.previewOpened,
+        requestedTarget: WallpaperTargetData.lock,
+      ),
+    );
+
+    expect(result.effectiveTarget, WallpaperTarget.both);
+    expect(result.requestedTarget, WallpaperTarget.lock);
+    expect(unresolved.effectiveTarget, isNull);
+  });
+
+  test('maps OpenGL contentTag and target to transport data', () {
+    final data = openGlWallpaperRequestToData(
+      OpenGlLiveWallpaperRequest(
+        fragmentShader: 'void main() {}',
+        target: WallpaperTarget.lock,
+        contentTag: 'motion:ripple',
+      ),
+    );
+
+    expect(data.contentTag, 'motion:ripple');
+    expect(data.target, WallpaperTargetData.lock);
+  });
+
+  test('maps live wallpaper screen snapshots from transport data', () {
+    final screens = liveWallpaperScreensFromData(
+      LiveWallpaperScreensData(
+        perScreen: true,
+        home: LiveScreenStateData(showsThisWallpaper: true, contentTag: 'a'),
+        lock: LiveScreenStateData(showsThisWallpaper: false),
+      ),
+    );
+
+    expect(screens.perScreen, isTrue);
+    expect(screens.home.showsThisWallpaper, isTrue);
+    expect(screens.home.contentTag, 'a');
+    expect(screens.lock.showsThisWallpaper, isFalse);
+    expect(screens.lock.contentTag, isNull);
+  });
+
+  test('defaults empty live wallpaper screen transport data to off', () {
+    final screens = liveWallpaperScreensFromData(LiveWallpaperScreensData());
+
+    expect(screens.perScreen, isFalse);
+    expect(screens.home.showsThisWallpaper, isFalse);
+    expect(screens.lock.showsThisWallpaper, isFalse);
+  });
 }

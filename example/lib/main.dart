@@ -27,6 +27,21 @@ void main() {
 }
 ''';
 
+/// A second bundled shader, warm where the first is cool, so the Home and
+/// Lock Screens are easy to tell apart on Android 16.
+const String _warmOpenGlFragmentShader = '''
+precision mediump float;
+varying vec2 v_uv;
+uniform float u_time;
+
+void main() {
+  float pulse = 0.5 + 0.5 * sin(u_time + v_uv.y * 3.0);
+  gl_FragColor = vec4(0.9, 0.35 + 0.3 * pulse, 0.1 * v_uv.x, 1.0);
+}
+''';
+
+enum _DemoShader { cool, warm }
+
 /// Small seam that keeps the example's widgets testable without a platform
 /// channel or a package-owned notification mechanism.
 abstract interface class WallpaperDemoApi {
@@ -47,6 +62,8 @@ abstract interface class WallpaperDemoApi {
   Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
     OpenGlLiveWallpaperRequest request,
   );
+
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens();
 
   Future<String> platformVersion();
 
@@ -99,6 +116,10 @@ class AsyncWallpaperDemoApi implements WallpaperDemoApi {
   Future<WallpaperOperationResult> setOpenGlLiveWallpaper(
     OpenGlLiveWallpaperRequest request,
   ) => AsyncWallpaper.setOpenGlLiveWallpaper(request);
+
+  @override
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens() =>
+      AsyncWallpaper.getLiveWallpaperScreens();
 
   @override
   Future<String> platformVersion() => AsyncWallpaper.platformVersion;
@@ -198,6 +219,8 @@ class _HomePageState extends State<HomePage> {
   WallpaperOperationResult? _videoPreparationResult;
   WallpaperOperationResult? _videoPreviewResult;
   WallpaperOperationResult? _openGlResult;
+  _DemoShader _shader = _DemoShader.cool;
+  LiveWallpaperScreens? _screens;
   String? _moreOutcome;
 
   bool get _isBusy => _activeAction != null;
@@ -386,15 +409,33 @@ class _HomePageState extends State<HomePage> {
       startingStatus: 'Opening the OpenGL live wallpaper flow…',
       operation: () => widget.api.setOpenGlLiveWallpaper(
         OpenGlLiveWallpaperRequest(
-          fragmentShader: _safeOpenGlFragmentShader,
+          fragmentShader: switch (_shader) {
+            _DemoShader.cool => _safeOpenGlFragmentShader,
+            _DemoShader.warm => _warmOpenGlFragmentShader,
+          },
           target: _target,
           frameRate: 30,
+          contentTag: _shader.name,
         ),
       ),
       storeResult: (WallpaperOperationResult result) {
         _openGlResult = result;
       },
     );
+  }
+
+  Future<void> _checkLiveScreens() async {
+    final screens = await widget.api.getLiveWallpaperScreens();
+    if (mounted) {
+      setState(() => _screens = screens);
+    }
+  }
+
+  static String _screenLabel(LiveScreenState state) {
+    if (!state.showsThisWallpaper) {
+      return 'not this app';
+    }
+    return state.contentTag ?? 'this app, untagged';
   }
 
   VideoWallpaperRequest _videoRequest() {
@@ -779,6 +820,10 @@ class _HomePageState extends State<HomePage> {
                 'OpenGL: ${_supportLabel(capabilities.supportsOpenGlLiveWallpaper)}',
               ),
               Text(
+                'Per-screen OpenGL: '
+                '${_supportLabel(capabilities.supportsPerScreenLiveWallpaper)}',
+              ),
+              Text(
                 'Home: ${_supportLabel(capabilities.supportsHomeWallpaper)} · '
                 'Lock: ${_supportLabel(capabilities.supportsLockWallpaper)} · '
                 'Both: ${_supportLabel(capabilities.supportsBothWallpapers)}',
@@ -868,17 +913,45 @@ class _HomePageState extends State<HomePage> {
               'The example does not execute user-supplied shader text or download textures.',
             ),
             const SizedBox(height: 12),
+            SegmentedButton<_DemoShader>(
+              key: const Key('opengl-shader-choice'),
+              segments: const <ButtonSegment<_DemoShader>>[
+                ButtonSegment(value: _DemoShader.cool, label: Text('Cool')),
+                ButtonSegment(value: _DemoShader.warm, label: Text('Warm')),
+              ],
+              selected: <_DemoShader>{_shader},
+              onSelectionChanged: (Set<_DemoShader> value) {
+                setState(() => _shader = value.single);
+              },
+            ),
+            const SizedBox(height: 12),
             FilledButton.tonalIcon(
               key: const Key('apply-opengl-button'),
               onPressed: _isBusy ? null : _applyOpenGlWallpaper,
               icon: const Icon(Icons.animation_outlined),
               label: const Text('Open OpenGL wallpaper flow'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('check-live-screens-button'),
+              onPressed: _checkLiveScreens,
+              icon: const Icon(Icons.phone_android_outlined),
+              label: const Text('Check Home and Lock'),
+            ),
             const SizedBox(height: 12),
             _resultPanel(
               context,
               title: 'OpenGL outcome',
               result: _openGlResult,
+              children: <Widget>[
+                if (_openGlResult?.effectiveTarget case final target?)
+                  Text('Content reaches: ${target.name}'),
+                if (_screens case final screens?) ...<Widget>[
+                  Text('Per-screen: ${screens.perScreen ? 'yes' : 'no'}'),
+                  Text('Home: ${_screenLabel(screens.home)}'),
+                  Text('Lock: ${_screenLabel(screens.lock)}'),
+                ],
+              ],
             ),
           ],
         ),

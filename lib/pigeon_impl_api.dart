@@ -190,6 +190,7 @@ class OperationResultData {
     this.errorDetails,
     this.fallbackUsed,
     this.fallbackStrategy,
+    this.effectiveTarget,
   });
 
   OperationStatusData? status;
@@ -210,6 +211,9 @@ class OperationResultData {
 
   WallpaperApplyStrategyData? fallbackStrategy;
 
+  /// The screens this content can reach. Without per-screen live support it is [both].
+  WallpaperTargetData? effectiveTarget;
+
   List<Object?> _toList() {
     return <Object?>[
       status,
@@ -221,6 +225,7 @@ class OperationResultData {
       errorDetails,
       fallbackUsed,
       fallbackStrategy,
+      effectiveTarget,
     ];
   }
 
@@ -240,6 +245,7 @@ class OperationResultData {
       errorDetails: result[6] as String?,
       fallbackUsed: result[7] as bool?,
       fallbackStrategy: result[8] as WallpaperApplyStrategyData?,
+      effectiveTarget: result[9] as WallpaperTargetData?,
     );
   }
 
@@ -277,6 +283,7 @@ class WallpaperCapabilitiesData {
     this.openGlVersion,
     this.openGlRenderer,
     this.supportsTilt,
+    this.supportsPerScreenLiveWallpaper,
   });
 
   bool? supportsStaticWallpaper;
@@ -307,6 +314,9 @@ class WallpaperCapabilitiesData {
 
   bool? supportsTilt;
 
+  /// True when the OpenGL live wallpaper can show different content on Home and Lock.
+  bool? supportsPerScreenLiveWallpaper;
+
   List<Object?> _toList() {
     return <Object?>[
       supportsStaticWallpaper,
@@ -323,6 +333,7 @@ class WallpaperCapabilitiesData {
       openGlVersion,
       openGlRenderer,
       supportsTilt,
+      supportsPerScreenLiveWallpaper,
     ];
   }
 
@@ -347,6 +358,7 @@ class WallpaperCapabilitiesData {
       openGlVersion: result[11] as String?,
       openGlRenderer: result[12] as String?,
       supportsTilt: result[13] as bool?,
+      supportsPerScreenLiveWallpaper: result[14] as bool?,
     );
   }
 
@@ -473,6 +485,7 @@ class OpenGlWallpaperRequestData {
     this.textures,
     this.target,
     this.frameRate,
+    this.contentTag,
   });
 
   String? fragmentShader;
@@ -483,8 +496,11 @@ class OpenGlWallpaperRequestData {
 
   int? frameRate;
 
+  /// An opaque caller label that [WallpaperApi.getLiveWallpaperScreens] reports per screen.
+  String? contentTag;
+
   List<Object?> _toList() {
-    return <Object?>[fragmentShader, textures, target, frameRate];
+    return <Object?>[fragmentShader, textures, target, frameRate, contentTag];
   }
 
   Object encode() {
@@ -498,6 +514,7 @@ class OpenGlWallpaperRequestData {
       textures: (result[1] as List<Object?>?)?.cast<WallpaperSourceData?>(),
       target: result[2] as WallpaperTargetData?,
       frameRate: result[3] as int?,
+      contentTag: result[4] as String?,
     );
   }
 
@@ -505,6 +522,92 @@ class OpenGlWallpaperRequestData {
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
     if (other is! OpenGlWallpaperRequestData ||
+        other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// What one screen shows, as far as this app's OpenGL live wallpaper is concerned.
+class LiveScreenStateData {
+  LiveScreenStateData({this.showsThisWallpaper, this.contentTag});
+
+  bool? showsThisWallpaper;
+
+  String? contentTag;
+
+  List<Object?> _toList() {
+    return <Object?>[showsThisWallpaper, contentTag];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static LiveScreenStateData decode(Object result) {
+    result as List<Object?>;
+    return LiveScreenStateData(
+      showsThisWallpaper: result[0] as bool?,
+      contentTag: result[1] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! LiveScreenStateData || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList());
+}
+
+/// The OpenGL live wallpaper content on each screen.
+class LiveWallpaperScreensData {
+  LiveWallpaperScreensData({this.perScreen, this.home, this.lock});
+
+  bool? perScreen;
+
+  LiveScreenStateData? home;
+
+  LiveScreenStateData? lock;
+
+  List<Object?> _toList() {
+    return <Object?>[perScreen, home, lock];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static LiveWallpaperScreensData decode(Object result) {
+    result as List<Object?>;
+    return LiveWallpaperScreensData(
+      perScreen: result[0] as bool?,
+      home: result[1] as LiveScreenStateData?,
+      lock: result[2] as LiveScreenStateData?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! LiveWallpaperScreensData ||
         other.runtimeType != runtimeType) {
       return false;
     }
@@ -808,17 +911,23 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is OpenGlWallpaperRequestData) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is MaterialYouSupportData) {
+    } else if (value is LiveScreenStateData) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is RotationSourceData) {
+    } else if (value is LiveWallpaperScreensData) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationConfigData) {
+    } else if (value is MaterialYouSupportData) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is WallpaperRotationStatusData) {
+    } else if (value is RotationSourceData) {
       buffer.putUint8(147);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationConfigData) {
+      buffer.putUint8(148);
+      writeValue(buffer, value.encode());
+    } else if (value is WallpaperRotationStatusData) {
+      buffer.putUint8(149);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -867,12 +976,16 @@ class _PigeonCodec extends StandardMessageCodec {
       case 143:
         return OpenGlWallpaperRequestData.decode(readValue(buffer)!);
       case 144:
-        return MaterialYouSupportData.decode(readValue(buffer)!);
+        return LiveScreenStateData.decode(readValue(buffer)!);
       case 145:
-        return RotationSourceData.decode(readValue(buffer)!);
+        return LiveWallpaperScreensData.decode(readValue(buffer)!);
       case 146:
-        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+        return MaterialYouSupportData.decode(readValue(buffer)!);
       case 147:
+        return RotationSourceData.decode(readValue(buffer)!);
+      case 148:
+        return WallpaperRotationConfigData.decode(readValue(buffer)!);
+      case 149:
         return WallpaperRotationStatusData.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1125,6 +1238,37 @@ class WallpaperApi {
       );
     } else {
       return (pigeonVar_replyList[0] as OperationResultData?)!;
+    }
+  }
+
+  /// Reports which screens show this app's OpenGL live wallpaper, and with which content tag.
+  Future<LiveWallpaperScreensData> getLiveWallpaperScreens() async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.async_wallpaper.WallpaperApi.getLiveWallpaperScreens$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
+          pigeonVar_channelName,
+          pigeonChannelCodec,
+          binaryMessenger: pigeonVar_binaryMessenger,
+        );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as LiveWallpaperScreensData?)!;
     }
   }
 

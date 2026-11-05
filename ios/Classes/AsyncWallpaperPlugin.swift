@@ -77,6 +77,13 @@ public class AsyncWallpaperPlugin: NSObject, FlutterPlugin, WallpaperApi {
     completion(.success(unsupportedResult(target: request.target, operation: "OpenGL wallpaper")))
   }
 
+  func getLiveWallpaperScreens(
+    completion: @escaping (Result<LiveWallpaperScreensData, Error>) -> Void
+  ) {
+    let none = LiveScreenStateData(showsThisWallpaper: false, contentTag: nil)
+    completion(.success(LiveWallpaperScreensData(perScreen: false, home: none, lock: none)))
+  }
+
   func setMaterialYouWallpaper(
     url: String,
     completion: @escaping (Result<Bool, Error>) -> Void

@@ -184,6 +184,9 @@ WallpaperOperationResult operationResultFromData(
       errorDetails: data.errorDetails,
       fallbackUsed: data.fallbackUsed ?? false,
       fallbackStrategy: fallbackStrategy,
+      effectiveTarget: data.effectiveTarget == null
+          ? null
+          : wallpaperTargetFromData(data.effectiveTarget),
     );
   } on FormatException catch (error) {
     return _malformedOperationResult(
@@ -213,6 +216,23 @@ WallpaperCapabilities capabilitiesFromData(WallpaperCapabilitiesData data) {
     openGlVersion: data.openGlVersion,
     openGlRenderer: data.openGlRenderer,
     supportsTilt: data.supportsTilt ?? false,
+    supportsPerScreenLiveWallpaper:
+        data.supportsPerScreenLiveWallpaper ?? false,
+  );
+}
+
+/// Converts a nullable Pigeon screens snapshot using conservative defaults.
+LiveWallpaperScreens liveWallpaperScreensFromData(
+  LiveWallpaperScreensData data,
+) {
+  LiveScreenState screen(LiveScreenStateData? state) => LiveScreenState(
+    showsThisWallpaper: state?.showsThisWallpaper ?? false,
+    contentTag: state?.contentTag,
+  );
+  return LiveWallpaperScreens(
+    perScreen: data.perScreen ?? false,
+    home: screen(data.home),
+    lock: screen(data.lock),
   );
 }
 
@@ -250,6 +270,7 @@ OpenGlWallpaperRequestData openGlWallpaperRequestToData(
         .toList(growable: false),
     target: wallpaperTargetToData(request.target),
     frameRate: request.frameRate,
+    contentTag: request.contentTag,
   );
 }
 
@@ -277,6 +298,9 @@ abstract interface class WallpaperClient {
   Future<WallpaperOperationResult> applyOpenGlWallpaper(
     OpenGlLiveWallpaperRequest request,
   );
+
+  /// Reports the OpenGL live wallpaper content on each screen.
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens();
 }
 
 /// Default Pigeon-backed client for structured wallpaper operations.
@@ -328,6 +352,11 @@ class PigeonWallpaperClient implements WallpaperClient {
       await _api.applyOpenGlWallpaper(openGlWallpaperRequestToData(request)),
       expectedTarget: request.target,
     );
+  }
+
+  @override
+  Future<LiveWallpaperScreens> getLiveWallpaperScreens() async {
+    return liveWallpaperScreensFromData(await _api.getLiveWallpaperScreens());
   }
 }
 

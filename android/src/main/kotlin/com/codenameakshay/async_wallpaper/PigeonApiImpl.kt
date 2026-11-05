@@ -18,12 +18,27 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+
+internal fun liveWallpaperScreensSnapshot(
+  perScreen: Boolean,
+  readScreens: () -> LiveWallpaperScreensData,
+): LiveWallpaperScreensData {
+  if (!perScreen) {
+    return LiveWallpaperScreensData(
+      perScreen = false,
+      home = LiveScreenStateData(showsThisWallpaper = false, contentTag = null),
+      lock = LiveScreenStateData(showsThisWallpaper = false, contentTag = null),
+    )
+  }
+  return readScreens().copy(perScreen = true)
+}
 
 /**
  * Android implementation of the Pigeon transport.
@@ -580,10 +595,19 @@ class PigeonApiImpl(
       )
     }
 
+    val contentTag = request.contentTag
+    if (contentTag != null && contentTag.length > LiveScreenContent.MAX_CONTENT_TAG_LENGTH) {
+      return OperationResultPolicy.failed(
+        target,
+        ERROR_INVALID_REQUEST,
+        "A content tag must be at most ${LiveScreenContent.MAX_CONTENT_TAG_LENGTH} characters.",
+      )
+    }
     val configuration = OpenGlWallpaperConfiguration(
       fragmentShader = fragmentShader,
       textures = textureSources,
       frameRate = frameRate.toInt(),
+      contentTag = contentTag,
     )
     val prepared = when (val staged = OpenGlLiveWallpaper.stageConfiguration(appContext, configuration)) {
       is OpenGlConfigurationStageResult.Prepared -> staged.configuration
@@ -597,6 +621,10 @@ class PigeonApiImpl(
       }
     }
 
+    val effectiveTarget = PerScreenLiveSupport.effectiveTarget(
+      target,
+      AndroidCapabilities.supportsPerScreenLiveWallpaper(),
+    )
     return prepared.use { stagedConfiguration ->
       runOnMainBlocking {
         openLiveWallpaperUi(target, OpenGlLiveWallpaper::class.java) {
@@ -613,7 +641,48 @@ class PigeonApiImpl(
           }
         }
       }
+    }.let { result ->
+      if (result.status == OperationStatusData.PREVIEW_OPENED) result.copy(effectiveTarget = effectiveTarget) else result
     }
+  }
+
+  override fun getLiveWallpaperScreens(callback: (Result<LiveWallpaperScreensData>) -> Unit) {
+    callback(runCatching { liveWallpaperScreens() })
+  }
+
+  private fun liveWallpaperScreens(): LiveWallpaperScreensData =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+      liveWallpaperScreensSnapshot(AndroidCapabilities.supportsPerScreenLiveWallpaper(), ::readLiveWallpaperScreens)
+    } else {
+      liveWallpaperScreensSnapshot(perScreen = false) { LiveWallpaperScreensData() }
+    }
+
+  @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+  private fun readLiveWallpaperScreens(): LiveWallpaperScreensData {
+    val manager = WallpaperManager.getInstance(appContext)
+    val ours = ComponentName(appContext, OpenGlLiveWallpaper::class.java)
+    fun showsOurs(which: Int): Boolean =
+      runCatching { manager.getWallpaperInfo(which)?.component == ours }.getOrDefault(false)
+    fun wallpaperId(which: Int): Int = runCatching { manager.getWallpaperId(which) }.getOrDefault(-1)
+    val homeWallpaperId = wallpaperId(WallpaperManager.FLAG_SYSTEM)
+    val lockWallpaperId = wallpaperId(WallpaperManager.FLAG_LOCK)
+    // A negative lock id means the lock screen shows the home wallpaper.
+    val lockMirrorsHome = lockWallpaperId < 0
+    val records = OpenGlWallpaperConfigurationStore.screenRecords(appContext)
+    val screens = resolveLiveScreens(
+      homeIsThisWallpaper = showsOurs(WallpaperManager.FLAG_SYSTEM),
+      lockMirrorsHome = lockMirrorsHome,
+      lockIsThisWallpaper = !lockMirrorsHome && showsOurs(WallpaperManager.FLAG_LOCK),
+      homeWallpaperId = homeWallpaperId,
+      lockWallpaperId = lockWallpaperId,
+      homeRecord = records[LiveScreen.HOME],
+      lockRecord = records[LiveScreen.LOCK],
+    )
+    fun data(state: LiveScreenState?) = LiveScreenStateData(state?.showsThisWallpaper ?: false, state?.contentTag)
+    return LiveWallpaperScreensData(
+      home = data(screens[LiveScreen.HOME]),
+      lock = data(screens[LiveScreen.LOCK]),
+    )
   }
 
   private fun textureSourceFor(source: WallpaperSourceData): GlTextureSource {

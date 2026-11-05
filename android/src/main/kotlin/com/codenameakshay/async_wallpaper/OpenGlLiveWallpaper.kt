@@ -144,6 +144,12 @@ class OpenGlWallpaperConfiguration(
 ) {
   val textures: List<GlTextureSource> = textures.toList()
 
+  init {
+    require(contentTag == null || contentTag.length <= LiveScreenContent.MAX_CONTENT_TAG_LENGTH) {
+      "contentTag exceeds its maximum length."
+    }
+  }
+
   companion object {
     const val DEFAULT_FRAME_RATE = 30
   }
@@ -934,11 +940,18 @@ internal object OpenGlWallpaperConfigurationStore {
   private const val KEY_SCREEN_WALLPAPER_ID = "wallpaper_id"
   private const val TEXTURE_DIRECTORY = "async_wallpaper_opengl"
   private const val TEXTURE_FILE_SUFFIX = ".texture"
-  // Staging reads are deliberately outside this lock; only preference snapshots and commits use it.
+  // Texture byte I/O stays outside this lock; preferences and generation membership share it.
   private val configurationLock = ReentrantLock()
 
-  fun load(context: Context): LoadedOpenGlConfiguration = configurationLock.withLock {
-    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+  fun load(context: Context): LoadedOpenGlConfiguration = load(
+    context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+    File(context.filesDir, TEXTURE_DIRECTORY),
+  )
+
+  internal fun load(
+    preferences: android.content.SharedPreferences,
+    rootDirectory: File,
+  ): LoadedOpenGlConfiguration = configurationLock.withLock {
     val shader = preferences.getString(KEY_SHADER, null)
       ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
     val frameRate = preferences.getInt(KEY_FRAME_RATE, OpenGlWallpaperConfiguration.DEFAULT_FRAME_RATE)
@@ -952,9 +965,12 @@ internal object OpenGlWallpaperConfigurationStore {
         ?: return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
       textures += GlTextureSource.FilePath(path)
     }
-    val generationDirectory = generationDirectoryFor(context, textures, count)
+    val generationDirectory = generationDirectoryFor(rootDirectory, textures, count)
       ?: if (count == 0) null else return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
     val tag = preferences.getString(KEY_CONTENT_TAG, null)
+    if (tag != null && tag.length > LiveScreenContent.MAX_CONTENT_TAG_LENGTH) {
+      return@withLock LoadedOpenGlConfiguration(defaultConfiguration(), null)
+    }
     leaseIfValid(OpenGlWallpaperConfiguration(shader, textures, frameRate, tag), generationDirectory)
   }
 
@@ -1186,12 +1202,6 @@ internal object OpenGlWallpaperConfigurationStore {
       candidates.forEach { directory -> deleteOpenGlGenerationDirectory(rootDirectory, directory) }
     }
   }
-
-  private fun generationDirectoryFor(
-    context: Context,
-    textures: List<GlTextureSource>,
-    count: Int,
-  ): File? = generationDirectoryFor(File(context.filesDir, TEXTURE_DIRECTORY), textures, count)
 
   private fun generationDirectoryFor(
     rootDirectory: File,
